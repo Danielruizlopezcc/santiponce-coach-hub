@@ -53,6 +53,23 @@ export const registroSchema = z
     password: passwordSchema,
     confirmPassword: z.string().min(1, REQ),
     consentimiento: z.string().trim().min(2, REQ),
+    aceptaPrivacidad: z.boolean().refine((v) => v === true, {
+      message: 'Debes aceptar la política de privacidad',
+    }),
+    aceptaCondiciones: z.boolean().refine((v) => v === true, {
+      message: 'Debes aceptar las condiciones de matrícula',
+    }),
+    consienteDatosMenor: z.boolean().refine((v) => v === true, {
+      message: 'Debes autorizar el tratamiento de datos del menor',
+    }),
+    consienteDatosSalud: z.boolean().refine((v) => v === true, {
+      message: 'Debes autorizar el tratamiento de datos de salud y alergias',
+    }),
+    autorizaImagenes: z.boolean(),
+    consienteMetodoPago: z.boolean().refine((v) => v === true, {
+      message:
+        'Debes autorizar guardar el método de pago para futuras cuotas',
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],
