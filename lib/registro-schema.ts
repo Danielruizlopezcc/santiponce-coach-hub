@@ -65,7 +65,7 @@ export const registroSchema = z
     consienteDatosSalud: z.boolean().refine((v) => v === true, {
       message: 'Debes autorizar el tratamiento de datos de salud y alergias',
     }),
-    autorizaImagenes: z.boolean().optional().default(false),
+    autorizaImagenes: z.boolean(),
     consienteMetodoPago: z.boolean().refine((v) => v === true, {
       message:
         'Debes autorizar guardar el método de pago para futuras cuotas',
