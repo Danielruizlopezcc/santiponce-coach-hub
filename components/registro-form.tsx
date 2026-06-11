@@ -400,6 +400,20 @@ export function RegistroForm() {
           />
         </div>
 
+        {/* Deportistas relacionados */}
+        <DeportistasSection
+          deportistas={deportistaFields}
+          error={
+            typeof errors.deportistas?.message === 'string'
+              ? errors.deportistas?.message
+              : undefined
+          }
+          disabled={disabled}
+          onAdd={(d) => appendDeportista(d)}
+          onUpdate={(index, d) => updateDeportista(index, d)}
+          onRemove={(index) => removeDeportista(index)}
+        />
+
         {/* Consentimientos */}
         <fieldset className="grid gap-3 rounded-lg border border-border bg-card/60 p-4">
           <legend className="px-1 text-sm font-medium">Consentimientos</legend>
