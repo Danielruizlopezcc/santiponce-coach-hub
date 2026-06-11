@@ -12,6 +12,72 @@ const CP_ES = /^(0[1-9]|[1-4]\d|5[0-2])\d{3}$/
 
 const REQ = 'Este campo es obligatorio'
 
+export const CATEGORIAS = [
+  'Bebés',
+  'Prebenjamín',
+  'Benjamín',
+  'Alevín',
+  'Infantil',
+  'Cadete',
+  'Juvenil',
+] as const
+
+export const TIPOS_IDENTIFICACION = ['DNI', 'NIE', 'Pasaporte', 'Otro'] as const
+
+const emailOpcional = z
+  .string()
+  .trim()
+  .email('Correo electrónico no válido')
+  .max(120)
+  .optional()
+  .or(z.literal(''))
+
+const telefonoOpcional = z
+  .string()
+  .trim()
+  .regex(TELEFONO_ES, 'Teléfono español no válido')
+  .optional()
+  .or(z.literal(''))
+
+export const deportistaSchema = z
+  .object({
+    id: z.string(),
+    nombre: z.string().trim().min(2, 'Introduce un nombre válido').max(60),
+    apellidos: z.string().trim().min(2, 'Introduce los apellidos').max(80),
+    fechaNacimiento: z
+      .string()
+      .min(1, REQ)
+      .refine((v) => {
+        const d = new Date(v)
+        return !Number.isNaN(d.getTime()) && d < new Date()
+      }, 'Fecha de nacimiento no válida'),
+    tipoIdentificacion: z.enum(TIPOS_IDENTIFICACION, {
+      message: 'Selecciona el tipo de identificación',
+    }),
+    documento: z.string().trim().min(3, REQ).max(40),
+    email: emailOpcional,
+    telefono: telefonoOpcional,
+    alergias: z.string().max(500).optional().or(z.literal('')),
+    tieneHermanos: z.enum(['si', 'no'], {
+      message: 'Indica si tiene hermanos inscritos',
+    }),
+    nombreHermano: z.string().trim().max(120).optional().or(z.literal('')),
+    categoria: z.enum(CATEGORIAS, {
+      message: 'Selecciona la categoría solicitada',
+    }),
+  })
+  .refine(
+    (d) =>
+      d.tieneHermanos !== 'si' ||
+      (typeof d.nombreHermano === 'string' && d.nombreHermano.trim().length >= 2),
+    {
+      path: ['nombreHermano'],
+      message: 'Indica el nombre del hermano inscrito',
+    },
+  )
+
+export type DeportistaFormValues = z.infer<typeof deportistaSchema>
+
 const passwordSchema = z
   .string()
   .min(8, 'Mínimo 8 caracteres')
@@ -70,6 +136,9 @@ export const registroSchema = z
       message:
         'Debes autorizar guardar el método de pago para futuras cuotas',
     }),
+    deportistas: z
+      .array(deportistaSchema)
+      .min(1, 'Debes añadir al menos un deportista'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],

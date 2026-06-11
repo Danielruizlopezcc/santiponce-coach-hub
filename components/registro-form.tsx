@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
-import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
+import { useForm, useFieldArray, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
   registroSchema,
   type RegistroFormValues,
 } from '@/lib/registro-schema'
+import { DeportistasSection } from '@/components/deportistas-section'
 
 type FieldErrorProps = { id: string; message?: string }
 function FieldError({ id, message }: FieldErrorProps) {
@@ -38,6 +39,7 @@ export function RegistroForm() {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting, isSubmitSuccessful },
   } = useForm<RegistroFormValues>({
@@ -64,8 +66,16 @@ export function RegistroForm() {
       consienteDatosSalud: false,
       autorizaImagenes: false,
       consienteMetodoPago: false,
+      deportistas: [],
     },
   })
+
+  const {
+    fields: deportistaFields,
+    append: appendDeportista,
+    update: updateDeportista,
+    remove: removeDeportista,
+  } = useFieldArray({ control, name: 'deportistas', keyName: '_rhfId' })
 
   // Bloquea reenvío mientras esté procesando o ya enviado correctamente.
   const disabled = isSubmitting || submitted
@@ -389,6 +399,20 @@ export function RegistroForm() {
             message={errors.consentimiento?.message}
           />
         </div>
+
+        {/* Deportistas relacionados */}
+        <DeportistasSection
+          deportistas={deportistaFields}
+          error={
+            typeof errors.deportistas?.message === 'string'
+              ? errors.deportistas?.message
+              : undefined
+          }
+          disabled={disabled}
+          onAdd={(d) => appendDeportista(d)}
+          onUpdate={(index, d) => updateDeportista(index, d)}
+          onRemove={(index) => removeDeportista(index)}
+        />
 
         {/* Consentimientos */}
         <fieldset className="grid gap-3 rounded-lg border border-border bg-card/60 p-4">
