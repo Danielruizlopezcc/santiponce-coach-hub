@@ -1,17 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Eye, Loader2, Pencil, ShieldAlert } from 'lucide-react'
-import { AdminTable, type Column, type FilterConfig } from '@/components/admin/admin-table'
+import { Download, Loader2, ShieldAlert } from 'lucide-react'
+import {
+  AdminTable,
+  type AdminTableRow,
+  type Column,
+  type FilterConfig,
+} from '@/components/admin/admin-table'
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 
-type AdminPageShellProps<T> = {
+type AdminPageShellProps = {
   title: string
   description: string
-  data: T[]
-  columns: Column<T>[]
-  getKey: (row: T) => string | number
+  data: AdminTableRow[]
+  columns: Column[]
+  keyField?: string
+  rowBasePath?: string
   searchPlaceholder: string
   filters?: FilterConfig[]
   emptyTitle: string
@@ -19,18 +25,19 @@ type AdminPageShellProps<T> = {
   counterLabel: string
 }
 
-export function AdminPageShell<T>({
+export function AdminPageShell({
   title,
   description,
   data,
   columns,
-  getKey,
+  keyField,
+  rowBasePath,
   searchPlaceholder,
   filters,
   emptyTitle,
   emptyDescription,
   counterLabel,
-}: AdminPageShellProps<T>) {
+}: AdminPageShellProps) {
   const [loading, setLoading] = useState(false)
 
   function simulateLoading() {
@@ -69,22 +76,13 @@ export function AdminPageShell<T>({
       <AdminTable
         data={data}
         columns={columns}
-        getKey={getKey}
+        keyField={keyField}
+        rowBasePath={rowBasePath}
         searchPlaceholder={searchPlaceholder}
         filters={filters}
         isLoading={loading}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
-        actions={(row) => (
-          <div className="flex items-center justify-end gap-1">
-            <Button variant="ghost" size="icon-sm" aria-label={`Ver ${String(getKey(row))}`}>
-              <Eye className="size-4" aria-hidden="true" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" aria-label={`Editar ${String(getKey(row))}`}>
-              <Pencil className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-        )}
       />
     </PageContainer>
   )

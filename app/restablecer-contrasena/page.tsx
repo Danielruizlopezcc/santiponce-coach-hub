@@ -1,24 +1,23 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AuthCard } from '@/components/auth-card'
-import { RecoverPasswordForm } from '@/components/recover-password-form'
 import { PublicShell } from '@/components/public-shell'
+import { ResetPasswordForm } from '@/components/reset-password-form'
 
 export const metadata: Metadata = {
-  title: 'Recuperar contraseña | CD Santiponce',
-  description:
-    'Restablece la contraseña de tu cuenta de la plataforma oficial del Club Deportivo Santiponce.',
+  title: 'Restablecer contraseña | CD Santiponce',
+  description: 'Crea una nueva contraseña para tu cuenta de CD Santiponce.',
 }
 
-export default function RecuperarContrasenaPage() {
+export default function RestablecerContrasenaPage() {
   return (
     <PublicShell>
       <AuthCard
-        title="Recuperar contraseña"
-        description="Introduce tu correo y te enviaremos instrucciones para restablecer tu contraseña."
+        title="Restablecer contraseña"
+        description="Introduce tu nueva contraseña para recuperar el acceso a tu cuenta."
         footer={
           <>
-            ¿Recordaste tu contraseña?{' '}
+            ¿Ya la has cambiado?{' '}
             <Link
               href="/iniciar-sesion"
               className="rounded font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
@@ -28,7 +27,7 @@ export default function RecuperarContrasenaPage() {
           </>
         }
       >
-        <RecoverPasswordForm />
+        <ResetPasswordForm />
       </AuthCard>
     </PublicShell>
   )

@@ -1,10 +1,10 @@
 import {
-  AlertCircle,
   AlertTriangle,
   BadgeCheck,
   Clock3,
   CreditCard,
   Info,
+  LoaderCircle,
   ShieldCheck,
   Trophy,
   UserCheck,
@@ -13,13 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
 import { formatEuro } from '@/lib/format'
-import {
-  ALERTAS_ADMIN,
-  DASHBOARD_RESUMEN,
-  DEPORTISTAS_POR_CATEGORIA,
-  DEPORTISTAS_POR_EQUIPO,
-  PAGOS_RECIENTES,
-} from '@/lib/admin'
+import { getAdminDashboardData } from '@/lib/admin-app'
 
 const alertStyles = {
   aviso: {
@@ -31,11 +25,6 @@ const alertStyles = {
     icon: Info,
     className: 'border-blue-200 bg-blue-50 text-blue-800',
     badge: 'bg-blue-100 text-blue-700',
-  },
-  critico: {
-    icon: AlertCircle,
-    className: 'border-red-200 bg-red-50 text-red-800',
-    badge: 'bg-red-100 text-red-700',
   },
   ok: {
     icon: BadgeCheck,
@@ -51,8 +40,12 @@ const paymentStyles = {
   reembolsado: 'bg-blue-100 text-blue-700',
 } as const
 
-export default function AdminDashboardPage() {
-  const maxCategoria = Math.max(...DEPORTISTAS_POR_CATEGORIA.map((item) => item.total))
+export default async function AdminDashboardPage() {
+  const data = await getAdminDashboardData()
+  const maxCategoria = Math.max(
+    1,
+    ...data.athletesByCategory.map((item) => item.total),
+  )
 
   return (
     <PageContainer
@@ -60,7 +53,6 @@ export default function AdminDashboardPage() {
       description="Panel de administración visual del Club Deportivo Santiponce."
       className="max-w-7xl"
     >
-      {/* TODO: Proteger este layout en servidor con un rol admin real. */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
@@ -68,7 +60,7 @@ export default function AdminDashboardPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Número de usuarios
               </CardTitle>
-              <p className="mt-2 text-3xl font-bold text-foreground">{DASHBOARD_RESUMEN.usuarios}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{data.summary.usuarios}</p>
             </div>
             <Users className="size-5 text-primary" aria-hidden="true" />
           </CardHeader>
@@ -79,7 +71,7 @@ export default function AdminDashboardPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Número de tutores
               </CardTitle>
-              <p className="mt-2 text-3xl font-bold text-foreground">{DASHBOARD_RESUMEN.tutores}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{data.summary.tutores}</p>
             </div>
             <UserCheck className="size-5 text-primary" aria-hidden="true" />
           </CardHeader>
@@ -88,9 +80,11 @@ export default function AdminDashboardPage() {
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Número de deportistas
+                Deportistas matriculados
               </CardTitle>
-              <p className="mt-2 text-3xl font-bold text-foreground">{DASHBOARD_RESUMEN.deportistas}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">
+                {data.summary.deportistasMatriculados}
+              </p>
             </div>
             <Trophy className="size-5 text-primary" aria-hidden="true" />
           </CardHeader>
@@ -99,10 +93,10 @@ export default function AdminDashboardPage() {
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Deportistas pendientes
+                En revisión
               </CardTitle>
               <p className="mt-2 text-3xl font-bold text-amber-700">
-                {DASHBOARD_RESUMEN.deportistasPendientes}
+                {data.summary.deportistasEnRevision}
               </p>
             </div>
             <Clock3 className="size-5 text-amber-600" aria-hidden="true" />
@@ -112,26 +106,26 @@ export default function AdminDashboardPage() {
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Matrículas pagadas
+                Pendientes
               </CardTitle>
-              <p className="mt-2 text-3xl font-bold text-emerald-700">
-                {DASHBOARD_RESUMEN.matriculasPagadas}
+              <p className="mt-2 text-3xl font-bold text-amber-700">
+                {data.summary.deportistasPendientes}
               </p>
             </div>
-            <ShieldCheck className="size-5 text-emerald-600" aria-hidden="true" />
+            <LoaderCircle className="size-5 text-amber-600" aria-hidden="true" />
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Matrículas pendientes
+                Sin equipo asignado
               </CardTitle>
               <p className="mt-2 text-3xl font-bold text-amber-700">
-                {DASHBOARD_RESUMEN.matriculasPendientes}
+                {data.summary.deportistasSinEquipo}
               </p>
             </div>
-            <AlertTriangle className="size-5 text-amber-600" aria-hidden="true" />
+            <ShieldCheck className="size-5 text-amber-600" aria-hidden="true" />
           </CardHeader>
         </Card>
         <Card className="md:col-span-2">
@@ -141,7 +135,7 @@ export default function AdminDashboardPage() {
                 Ingresos por matrículas
               </CardTitle>
               <p className="mt-2 text-3xl font-bold text-foreground">
-                {formatEuro(DASHBOARD_RESUMEN.ingresosEuros)}
+                {formatEuro(data.summary.ingresosEuros)}
               </p>
             </div>
             <CreditCard className="size-5 text-primary" aria-hidden="true" />
@@ -155,7 +149,7 @@ export default function AdminDashboardPage() {
             <CardTitle>Deportistas por categoría</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {DEPORTISTAS_POR_CATEGORIA.map((item) => (
+            {data.athletesByCategory.map((item) => (
               <div key={item.label} className="grid gap-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-foreground">{item.label}</span>
@@ -177,10 +171,10 @@ export default function AdminDashboardPage() {
             <CardTitle>Deportistas por equipo</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {DEPORTISTAS_POR_EQUIPO.length === 0 ? (
+            {data.athletesByTeam.length === 0 ? (
               <p className="text-sm text-muted-foreground">No hay equipos disponibles.</p>
             ) : (
-              DEPORTISTAS_POR_EQUIPO.map((item) => (
+              data.athletesByTeam.map((item) => (
                 <div
                   key={item.equipo}
                   className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm"
@@ -203,7 +197,7 @@ export default function AdminDashboardPage() {
             <CardTitle>Pagos recientes</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
-            {PAGOS_RECIENTES.length === 0 ? (
+            {data.recentPayments.length === 0 ? (
               <div className="p-6 text-sm text-muted-foreground">No hay pagos recientes.</div>
             ) : (
               <table className="w-full text-sm">
@@ -217,7 +211,7 @@ export default function AdminDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {PAGOS_RECIENTES.map((item) => (
+                  {data.recentPayments.map((item) => (
                     <tr key={item.id} className="border-b border-border last:border-0">
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{item.concepto}</p>
@@ -251,10 +245,10 @@ export default function AdminDashboardPage() {
             <CardTitle>Alertas administrativas</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {ALERTAS_ADMIN.length === 0 ? (
+            {data.alerts.length === 0 ? (
               <p className="text-sm text-muted-foreground">No hay alertas activas.</p>
             ) : (
-              ALERTAS_ADMIN.map((alerta) => {
+              data.alerts.map((alerta) => {
                 const Icon = alertStyles[alerta.tipo].icon
                 return (
                   <div

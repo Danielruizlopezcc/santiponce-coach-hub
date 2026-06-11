@@ -5,7 +5,7 @@ export default function NuevoDeportistaPage() {
   return (
     <PrivatePageContainer
       title="Nuevo deportista"
-      description="Crea una ficha deportiva visual para la temporada activa."
+      description="Crea una ficha deportiva nueva vinculada a tu cuenta."
     >
       <DeportistaEditorPage
         title="Alta de deportista"

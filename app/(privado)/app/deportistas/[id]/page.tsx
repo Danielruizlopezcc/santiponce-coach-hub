@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import { DeportistaEditorPage } from '@/components/deportista-editor-page'
 import { PrivatePageContainer } from '@/components/private-page-container'
-import { getDeportistaById } from '@/lib/mock-deportistas'
+import { requireUser } from '@/lib/auth'
+import { getPrivateAthleteById } from '@/lib/private-app'
 
 export default async function DeportistaDetallePage({
   params,
@@ -9,7 +10,8 @@ export default async function DeportistaDetallePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const deportista = getDeportistaById(id)
+  const user = await requireUser()
+  const deportista = await getPrivateAthleteById(user.id, id)
 
   if (!deportista) {
     notFound()
@@ -18,7 +20,7 @@ export default async function DeportistaDetallePage({
   return (
     <PrivatePageContainer
       title={`${deportista.nombre} ${deportista.apellidos}`}
-      description="Edita la ficha visual del deportista asociado a tu cuenta."
+      description="Edita la ficha del deportista asociado a tu cuenta."
     >
       <DeportistaEditorPage
         title="Editar deportista"

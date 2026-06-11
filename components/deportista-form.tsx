@@ -77,9 +77,17 @@ export function DeportistaForm({
 
   const tieneHermanos = watch('tieneHermanos')
   const disabled = isSubmitting || formSubmitting
+  const submitForm = handleSubmit(onSubmit)
 
   return (
-    <form noValidate onSubmit={handleSubmit(onSubmit)} className="grid gap-5">
+    <form
+      noValidate
+      onSubmit={(event) => {
+        event.stopPropagation()
+        void submitForm(event)
+      }}
+      className="grid gap-5"
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor={`${errId}-nombre`}>

@@ -2,12 +2,15 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
+import { registerGuardianAccount } from '@/app/registro/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   registroSchema,
@@ -33,6 +36,7 @@ const selectClasses = cn(
 )
 
 export function RegistroForm() {
+  const router = useRouter()
   const errId = useId()
   const [serverError, setServerError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
@@ -59,7 +63,6 @@ export function RegistroForm() {
       preferenciaPago: 'cuotas',
       password: '',
       confirmPassword: '',
-      consentimiento: '',
       aceptaPrivacidad: false,
       aceptaCondiciones: false,
       consienteDatosMenor: false,
@@ -83,19 +86,33 @@ export function RegistroForm() {
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null)
     try {
-      // TODO: Conectar con la Server Action cuando esté disponible.
-      // await registroAction(values)
-      await new Promise((r) => setTimeout(r, 600))
-      // Marca como enviado para evitar doble envío.
-      setSubmitted(true)
-      if (typeof console !== 'undefined') {
-        console.info('[registro] datos validados', { email: values.email })
+      const result = await registerGuardianAccount(values)
+
+      if (!result.success) {
+        setServerError(result.message)
+        return
       }
+
+      const supabase = createClient()
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      })
+
+      if (signInError) {
+        setServerError(
+          'La cuenta se ha creado, pero no se ha podido iniciar sesión automáticamente.',
+        )
+        return
+      }
+
+      setSubmitted(true)
+      router.push('/app')
     } catch (err) {
       setServerError(
         err instanceof Error
           ? err.message
-          : 'No se ha podido completar el registro. Inténtalo de nuevo.',
+          : 'No se ha podido completar el registro real. Inténtalo de nuevo.',
       )
     }
   })
@@ -354,50 +371,17 @@ export function RegistroForm() {
               }
               {...register('confirmPassword')}
             />
-            <FieldError
-              id={`${errId}-confirm`}
-              message={errors.confirmPassword?.message}
-            />
+            {errors.confirmPassword ? (
+              <FieldError
+                id={`${errId}-confirm`}
+                message={errors.confirmPassword?.message}
+              />
+            ) : (
+              <p className="text-xs text-transparent" aria-hidden="true">
+                Mínimo 8 caracteres con mayúscula, minúscula y número.
+              </p>
+            )}
           </div>
-        </div>
-
-        {/* Consentimiento digital */}
-        <div className="grid gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-4">
-          <Label htmlFor="consentimiento">
-            Consentimiento digital <span aria-hidden="true" className="text-destructive">*</span>
-          </Label>
-          <p className="text-xs text-muted-foreground text-pretty">
-            Escribe tu <strong>nombre completo</strong> tal y como aparece arriba
-            para confirmar que aceptas la{' '}
-            <Link
-              href="/legal/privacidad"
-              className="rounded text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              política de privacidad
-            </Link>{' '}
-            y las{' '}
-            <Link
-              href="/legal/condiciones-matricula"
-              className="rounded text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              condiciones de matrícula
-            </Link>
-            .
-          </p>
-          <Input
-            id="consentimiento"
-            autoComplete="off"
-            placeholder="Nombre y apellidos"
-            aria-invalid={!!errors.consentimiento || undefined}
-            aria-describedby={
-              errors.consentimiento ? `${errId}-consent` : undefined
-            }
-            {...register('consentimiento')}
-          />
-          <FieldError
-            id={`${errId}-consent`}
-            message={errors.consentimiento?.message}
-          />
         </div>
 
         {/* Deportistas relacionados */}
@@ -507,7 +491,7 @@ export function RegistroForm() {
           role="status"
           className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary"
         >
-          Hemos recibido tus datos correctamente. Nos pondremos en contacto pronto.
+          Tu cuenta se ha creado correctamente. Redirigiendo a tu zona privada...
         </div>
       )}
 

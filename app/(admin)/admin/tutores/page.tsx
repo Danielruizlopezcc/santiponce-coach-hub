@@ -1,30 +1,27 @@
-'use client'
-
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { type Column } from '@/components/admin/admin-table'
 import { maskDocument } from '@/lib/format'
-import { ADMIN_TUTORES, type AdminTutor } from '@/lib/admin'
+import { getAdminTutors } from '@/lib/admin-app'
 
-const columns: Column<AdminTutor>[] = [
+const columns: Column[] = [
   { key: 'nombre', label: 'Nombre' },
-  {
-    key: 'documento',
-    label: 'DNI/NIE',
-    render: (row) => maskDocument(row.documento),
-  },
+  { key: 'documento', label: 'DNI/NIE' },
   { key: 'telefono', label: 'Teléfono', responsive: 'md' },
   { key: 'ciudad', label: 'Ciudad', responsive: 'lg' },
   { key: 'deportistasAsociados', label: 'Deportistas asociados' },
 ]
 
-export default function AdminTutoresPage() {
+export default async function AdminTutoresPage() {
+  const data = (await getAdminTutors()).map((row) => ({
+    ...row,
+    documento: maskDocument(row.documento),
+  }))
   return (
     <AdminPageShell
       title="Tutores"
       description="Resumen visual de tutores y familias registradas."
-      data={ADMIN_TUTORES}
+      data={data}
       columns={columns}
-      getKey={(row) => row.id}
       searchPlaceholder="Buscar por tutor o ciudad"
       emptyTitle="Sin tutores"
       emptyDescription="No hay tutores registrados para mostrar."

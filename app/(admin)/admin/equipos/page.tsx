@@ -1,10 +1,8 @@
-'use client'
-
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { type Column, type FilterConfig } from '@/components/admin/admin-table'
-import { ADMIN_EQUIPOS, type AdminTeam } from '@/lib/admin'
+import { getAdminTeams } from '@/lib/admin-app'
 
-const columns: Column<AdminTeam>[] = [
+const columns: Column[] = [
   { key: 'nombre', label: 'Nombre' },
   { key: 'categoria', label: 'Categoría' },
   { key: 'temporada', label: 'Temporada', responsive: 'md' },
@@ -24,14 +22,14 @@ const filters: FilterConfig[] = [
   },
 ]
 
-export default function AdminEquiposPage() {
+export default async function AdminEquiposPage() {
+  const data = await getAdminTeams()
   return (
     <AdminPageShell
       title="Equipos"
-      description="Equipos disponibles y ocupación actual en modo visual."
-      data={ADMIN_EQUIPOS}
+      description="Equipos disponibles y ocupación actual leída desde Supabase."
+      data={data}
       columns={columns}
-      getKey={(row) => row.id}
       searchPlaceholder="Buscar por equipo o categoría"
       filters={filters}
       emptyTitle="Sin equipos"

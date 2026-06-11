@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut } from 'lucide-react'
+import { SignOutButton } from '@/components/sign-out-button'
 import { ADMIN_NAV } from '@/lib/admin'
 import { cn } from '@/lib/utils'
 
@@ -46,18 +46,14 @@ export function AdminNav({ onNavigate }: AdminNavProps) {
       })}
 
       <div className="mt-auto border-t border-white/10 pt-3">
-        <Link
-          href="/iniciar-sesion"
-          onClick={onNavigate}
+        <SignOutButton
+          variant="ghost"
           className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+            'w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
             'text-blue-200/60 hover:bg-red-500/20 hover:text-red-300',
             'outline-none focus-visible:ring-2 focus-visible:ring-white/60',
           )}
-        >
-          <LogOut className="size-4 shrink-0" aria-hidden="true" />
-          Cerrar sesión
-        </Link>
+        />
       </div>
     </nav>
   )

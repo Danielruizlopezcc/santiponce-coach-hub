@@ -39,32 +39,3 @@ export const PRIVATE_NAV: PrivateNavItem[] = [
   { label: 'Mis deportistas', href: '/app/deportistas', icon: Users },
   { label: 'Matriculación', href: '/app/matriculacion', icon: ClipboardList },
 ]
-
-// Usuario mock — sustituir por datos reales de Supabase cuando esté disponible.
-export const MOCK_USER = {
-  name: 'María García López',
-  firstName: 'María',
-  email: 'maria.garcia@ejemplo.com',
-  initials: 'MG',
-  role: 'Tutor',
-} as const
-
-export const MOCK_TUTOR_PROFILE = {
-  nombre: 'María',
-  apellidos: 'García López',
-  email: 'maria.garcia@ejemplo.com',
-  telefono: '600 123 456',
-  documento: '12345678A',
-  direccion: 'Avenida de Extremadura, 8',
-  codigoPostal: '41970',
-  provincia: 'Sevilla',
-  ciudad: 'Santiponce',
-  pais: 'España',
-  preferenciaPago: 'cuotas' as const,
-  metodoPago: {
-    marca: 'Visa',
-    ultimosDigitos: '4242',
-    caducidad: '12/2028',
-    estado: 'Método de pago guardado',
-  },
-} as const

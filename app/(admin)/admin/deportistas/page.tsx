@@ -1,10 +1,8 @@
-'use client'
-
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { type Column, type FilterConfig } from '@/components/admin/admin-table'
-import { ADMIN_DEPORTISTAS, type AdminAthlete } from '@/lib/admin'
+import { getAdminAthletes } from '@/lib/admin-app'
 
-const columns: Column<AdminAthlete>[] = [
+const columns: Column[] = [
   { key: 'nombre', label: 'Nombre' },
   { key: 'tutor', label: 'Tutor', responsive: 'md' },
   { key: 'categoriaSolicitada', label: 'Categoría solicitada' },
@@ -25,14 +23,14 @@ const filters: FilterConfig[] = [
   },
 ]
 
-export default function AdminDeportistasPage() {
+export default async function AdminDeportistasPage() {
+  const data = await getAdminAthletes()
   return (
     <AdminPageShell
       title="Deportistas"
       description="Listado visual de deportistas y estado de matrícula."
-      data={ADMIN_DEPORTISTAS}
+      data={data}
       columns={columns}
-      getKey={(row) => row.id}
       searchPlaceholder="Buscar por deportista, tutor o categoría"
       filters={filters}
       emptyTitle="Sin deportistas"

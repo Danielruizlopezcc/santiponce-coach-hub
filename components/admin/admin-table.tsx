@@ -1,18 +1,17 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Inbox, Search, X } from 'lucide-react'
-import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type Column<T> = {
+export type Column = {
   key: string
   label: string
-  render?: (row: T) => ReactNode
   searchable?: boolean                            // default: true
   className?: string                              // applied to <td>
   headerClassName?: string                        // applied to <th>
@@ -30,22 +29,24 @@ export type FilterConfig = {
   options: FilterOption[]
 }
 
-type AdminTableProps<T> = {
-  data: T[]
-  columns: Column<T>[]
-  getKey: (row: T) => string | number
+export type AdminTableRow = Record<string, string | number>
+
+type AdminTableProps = {
+  data: AdminTableRow[]
+  columns: Column[]
+  keyField?: string
+  rowBasePath?: string
   searchPlaceholder?: string
   filters?: FilterConfig[]
   pageSize?: number
   isLoading?: boolean
-  actions?: (row: T) => ReactNode
   emptyTitle?: string
   emptyDescription?: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const RESPONSIVE_CLS: Record<NonNullable<Column<unknown>['responsive']>, string> = {
+const RESPONSIVE_CLS: Record<NonNullable<Column['responsive']>, string> = {
   always: '',
   sm:     'hidden sm:table-cell',
   md:     'hidden md:table-cell',
@@ -68,18 +69,19 @@ function getPageNumbers(total: number, current: number): (number | 'ellipsis')[]
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function AdminTable<T,>({
+export function AdminTable({
   data,
   columns,
-  getKey,
+  keyField = 'id',
+  rowBasePath,
   searchPlaceholder = 'Buscar…',
   filters,
   pageSize = 10,
   isLoading = false,
-  actions,
   emptyTitle = 'Sin resultados',
   emptyDescription = 'No se encontraron registros con los filtros aplicados.',
-}: AdminTableProps<T>) {
+}: AdminTableProps) {
+  const showActions = !!rowBasePath
   const [search, setSearch]               = useState('')
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
   const [page, setPage]                   = useState(1)
@@ -134,7 +136,7 @@ export function AdminTable<T,>({
   const paged      = filtered.slice((current - 1) * pageSize, current * pageSize)
   const pageNums   = getPageNumbers(totalPages, current)
 
-  const colCount = columns.length + (actions ? 1 : 0)
+  const colCount = columns.length + (showActions ? 1 : 0)
 
   return (
     <div className="space-y-4">
@@ -232,7 +234,7 @@ export function AdminTable<T,>({
                   {col.label}
                 </th>
               ))}
-              {actions && (
+              {showActions && (
                 <th
                   scope="col"
                   className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground"
@@ -259,7 +261,7 @@ export function AdminTable<T,>({
                       />
                     </td>
                   ))}
-                  {actions && (
+                  {showActions && (
                     <td className="px-4 py-3.5">
                       <div className="ml-auto h-6 w-20 animate-pulse rounded-md bg-muted" />
                     </td>
@@ -295,7 +297,7 @@ export function AdminTable<T,>({
             {!isLoading &&
               paged.map((row) => (
                 <tr
-                  key={getKey(row)}
+                  key={String(row[keyField] ?? `${current}-${Math.random()}`)}
                   className="transition-colors hover:bg-muted/30"
                 >
                   {columns.map((col) => (
@@ -307,13 +309,30 @@ export function AdminTable<T,>({
                         col.className,
                       )}
                     >
-                      {col.render
-                        ? col.render(row)
-                        : String((row as Record<string, unknown>)[col.key] ?? '—')}
+                      {String(row[col.key] ?? '—')}
                     </td>
                   ))}
-                  {actions && (
-                    <td className="px-4 py-3 text-right">{actions(row)}</td>
+                  {showActions && rowBasePath && (
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link
+                            href={`${rowBasePath}/${row[keyField]}`}
+                            aria-label={`Ver ${String(row[keyField] ?? '')}`}
+                          >
+                            Ver
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link
+                            href={`${rowBasePath}/${row[keyField]}/editar`}
+                            aria-label={`Editar ${String(row[keyField] ?? '')}`}
+                          >
+                            Editar
+                          </Link>
+                        </Button>
+                      </div>
+                    </td>
                   )}
                 </tr>
               ))}

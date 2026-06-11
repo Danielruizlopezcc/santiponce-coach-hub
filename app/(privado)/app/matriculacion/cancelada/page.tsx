@@ -22,8 +22,10 @@ export default function MatriculacionCanceladaPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button render={<Link href="/app/matriculacion" />}>Intentar de nuevo</Button>
-          <Button variant="outline" render={<Link href="/app" />}>
+          <Button nativeButton={false} render={<Link href="/app/matriculacion" />}>
+            Intentar de nuevo
+          </Button>
+          <Button nativeButton={false} variant="outline" render={<Link href="/app" />}>
             Volver al panel
           </Button>
         </div>

@@ -1,15 +1,13 @@
-'use client'
-
 import { AdminPageShell } from '@/components/admin/admin-page-shell'
 import { type Column, type FilterConfig } from '@/components/admin/admin-table'
 import { formatEuro } from '@/lib/format'
-import { ADMIN_PAGOS, type AdminPayment } from '@/lib/admin'
+import { getAdminPayments } from '@/lib/admin-app'
 
-const columns: Column<AdminPayment>[] = [
+const columns: Column[] = [
   { key: 'operacion', label: 'Operación' },
   { key: 'deportista', label: 'Deportista' },
   { key: 'tutor', label: 'Tutor', responsive: 'md' },
-  { key: 'importe', label: 'Importe', render: (row) => formatEuro(row.importe) },
+  { key: 'importe', label: 'Importe' },
   { key: 'estado', label: 'Estado' },
   { key: 'proveedor', label: 'Proveedor', responsive: 'lg' },
   { key: 'fecha', label: 'Fecha', responsive: 'lg' },
@@ -28,14 +26,17 @@ const filters: FilterConfig[] = [
   },
 ]
 
-export default function AdminPagosPage() {
+export default async function AdminPagosPage() {
+  const data = (await getAdminPayments()).map((row) => ({
+    ...row,
+    importe: formatEuro(row.importe),
+  }))
   return (
     <AdminPageShell
       title="Pagos"
-      description="Pagos y operaciones del proveedor en modo visual."
-      data={ADMIN_PAGOS}
+      description="Operaciones pendientes leídas desde Supabase mientras Stripe termina de integrarse."
+      data={data}
       columns={columns}
-      getKey={(row) => row.id}
       searchPlaceholder="Buscar por operación, tutor o deportista"
       filters={filters}
       emptyTitle="Sin pagos"

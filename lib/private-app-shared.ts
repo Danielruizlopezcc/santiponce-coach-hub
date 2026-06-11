@@ -1,0 +1,88 @@
+import type {
+  DeportistaFormValues,
+  TutorProfileFormValues,
+} from '@/lib/registro-schema'
+
+export type PrivateViewer = {
+  id: string
+  firstName: string
+  fullName: string
+  email: string
+  initials: string
+}
+
+export type PrivateAthleteSummary = {
+  id: string
+  nombre: string
+  apellidos: string
+  categoriaSolicitada: string
+  equipoAsignado: string | null
+  estado: 'pendiente' | 'matriculado' | 'en_revision'
+}
+
+export type PrivateAthleteDetail = PrivateAthleteSummary & {
+  fechaNacimiento: string
+  tipoIdentificacion: 'DNI' | 'NIE' | 'Pasaporte' | 'Otro'
+  documento: string
+  email: string
+  telefono: string
+  alergias: string
+  tieneHermanos: 'si' | 'no'
+  nombreHermano: string
+  temporada: string
+  pagoEstado: 'pagado' | 'pendiente'
+}
+
+export type PrivateTutorProfile = TutorProfileFormValues & {
+  metodoPago: {
+    estado: string
+  }
+}
+
+export type PrivateDashboardData = {
+  viewer: PrivateViewer
+  seasonLabel: string
+  matriculaImporte: number
+  deportistas: PrivateAthleteSummary[]
+}
+
+export function normalizeEmail(value: string) {
+  return value.trim().toLowerCase()
+}
+
+export function normalizePhone(value: string) {
+  return value.replace(/\D/g, '')
+}
+
+export function normalizeDocument(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, '')
+}
+
+export function normalizeOptionalEmail(value?: string) {
+  return value?.trim() ? normalizeEmail(value) : null
+}
+
+export function normalizeOptionalPhone(value?: string) {
+  return value?.trim() ? normalizePhone(value) : null
+}
+
+export function toAthleteFormValues(
+  athlete?: PrivateAthleteDetail | null,
+): DeportistaFormValues | undefined {
+  if (!athlete) return undefined
+
+  return {
+    id: athlete.id,
+    nombre: athlete.nombre,
+    apellidos: athlete.apellidos,
+    fechaNacimiento: athlete.fechaNacimiento,
+    tipoIdentificacion: athlete.tipoIdentificacion,
+    documento: athlete.documento,
+    email: athlete.email,
+    telefono: athlete.telefono,
+    alergias: athlete.alergias,
+    tieneHermanos: athlete.tieneHermanos,
+    nombreHermano: athlete.nombreHermano,
+    categoria: athlete.categoriaSolicitada as DeportistaFormValues['categoria'],
+  }
+}

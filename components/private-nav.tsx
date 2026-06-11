@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut } from 'lucide-react'
+import { SignOutButton } from '@/components/sign-out-button'
 import { PRIVATE_NAV } from '@/lib/club'
 import { cn } from '@/lib/utils'
 
@@ -46,18 +46,14 @@ export function PrivateNav({ onNavigate }: PrivateNavProps) {
       })}
 
       <div className="mt-auto pt-3">
-        <Link
-          href="/iniciar-sesion"
-          onClick={onNavigate}
+        <SignOutButton
+          variant="ghost"
           className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+            'w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
             'text-muted-foreground hover:bg-destructive/10 hover:text-destructive',
             'outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
-        >
-          <LogOut className="size-5 shrink-0" aria-hidden="true" />
-          Cerrar sesión
-        </Link>
+        />
       </div>
     </nav>
   )

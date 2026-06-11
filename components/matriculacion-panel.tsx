@@ -1,16 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2, CreditCard, Loader2, X } from 'lucide-react'
+import { startEnrollmentAction } from '@/app/(privado)/app/actions'
 import { Button } from '@/components/ui/button'
 import { formatEuro } from '@/lib/format'
-import {
-  MATRICULA_INFO,
-  MOCK_DEPORTISTAS_TUTOR,
-  canMatricularDeportista,
-} from '@/lib/mock-deportistas'
+import { type PrivateAthleteDetail } from '@/lib/private-app-shared'
 import { cn } from '@/lib/utils'
 
 const ESTADO_STYLES = {
@@ -19,21 +16,39 @@ const ESTADO_STYLES = {
   en_revision: 'bg-blue-100 text-blue-700',
 } as const
 
-export function MatriculacionPanel() {
+type MatriculacionPanelProps = {
+  temporada: string
+  importe: number
+  deportistas: PrivateAthleteDetail[]
+}
+
+function canMatricularDeportista(deportista: PrivateAthleteDetail) {
+  return deportista.estado !== 'matriculado'
+}
+
+export function MatriculacionPanel({
+  temporada,
+  importe,
+  deportistas,
+}: MatriculacionPanelProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
 
-  const disponibles = useMemo(
-    () => MOCK_DEPORTISTAS_TUTOR.filter(canMatricularDeportista),
-    [],
-  )
+  const disponibles = deportistas.filter(canMatricularDeportista)
 
   async function handleContinue() {
     if (!selectedId) return
     setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 900))
+    setServerError(null)
+    const result = await startEnrollmentAction(selectedId)
+    setLoading(false)
+    if (!result.success) {
+      setServerError(result.message ?? 'No se ha podido iniciar la matriculación.')
+      return
+    }
     router.push(`/app/matriculacion/exito?deportista=${selectedId}`)
   }
 
@@ -44,23 +59,23 @@ export function MatriculacionPanel() {
           <div className="max-w-2xl">
             <h2 className="text-xl font-semibold text-foreground">Matriculación</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              La matrícula cuesta {formatEuro(MATRICULA_INFO.importe)} por deportista para la
-              temporada {MATRICULA_INFO.temporada}.
+              La matrícula cuesta {formatEuro(importe)} por deportista para la
+              temporada {temporada}.
             </p>
             <ul className="mt-4 grid gap-2 text-sm text-muted-foreground">
               <li>La matrícula es individual por deportista.</li>
-              <li>{MATRICULA_INFO.mensajeWebhook}</li>
-              <li>Esta pantalla todavía no realiza pagos reales.</li>
+              <li>Al continuar, el deportista pasará a estado "En revisión".</li>
+              <li>Cuando Stripe esté integrado, este flujo enlazará con el cobro real.</li>
             </ul>
           </div>
 
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
             <p className="font-semibold text-foreground">Precio visible</p>
             <p className="mt-1 text-2xl font-bold text-primary">
-              {formatEuro(MATRICULA_INFO.importe)}
+              {formatEuro(importe)}
             </p>
             <p className="mt-2 text-muted-foreground">
-              El pago real se confirmará únicamente mediante webhook de Stripe.
+              La persistencia ya usa Supabase; el cobro real sigue pendiente de Stripe.
             </p>
           </div>
         </div>
@@ -81,12 +96,21 @@ export function MatriculacionPanel() {
           <div>
             <h3 className="font-semibold text-foreground">Aviso importante</h3>
             <p className="text-sm text-muted-foreground">
-              La confirmación definitiva del pago se realizará de forma segura cuando
-              Stripe notifique el pago al sistema.
+              Este panel ya trabaja con deportistas reales de Supabase. De momento
+              la matrícula cambia su estado a revisión hasta completar Stripe.
             </p>
           </div>
         </div>
       </section>
+
+      {serverError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {serverError}
+        </div>
+      )}
 
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
@@ -109,7 +133,7 @@ export function MatriculacionPanel() {
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto p-5">
-              {MOCK_DEPORTISTAS_TUTOR.length === 0 ? (
+              {deportistas.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center">
                   <p className="font-medium text-foreground">No hay deportistas disponibles.</p>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -118,7 +142,7 @@ export function MatriculacionPanel() {
                 </div>
               ) : (
                 <div className="grid gap-3">
-                  {MOCK_DEPORTISTAS_TUTOR.map((deportista) => {
+                  {deportistas.map((deportista) => {
                     const disabled = !canMatricularDeportista(deportista)
                     return (
                       <label
@@ -170,7 +194,7 @@ export function MatriculacionPanel() {
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-sm">
                           <span className="inline-flex items-center gap-2 text-foreground">
                             <CreditCard className="size-4 text-primary" aria-hidden="true" />
-                            Precio: {formatEuro(MATRICULA_INFO.importe)}
+                            Precio: {formatEuro(importe)}
                           </span>
                           {disabled ? (
                             <span className="inline-flex items-center gap-2 text-emerald-700">
@@ -190,7 +214,7 @@ export function MatriculacionPanel() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-5">
               <p className="text-sm text-muted-foreground">
-                El pago real se confirmará únicamente mediante webhook de Stripe.
+                El estado se guardará en Supabase al continuar.
               </p>
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => setOpen(false)}>

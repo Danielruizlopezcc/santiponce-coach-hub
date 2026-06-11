@@ -3,9 +3,11 @@ import { ArrowRight, ClipboardList, UserCheck, UserPlus, Users } from 'lucide-re
 import { ClubLogo } from '@/components/club-logo'
 import { PrivatePageContainer } from '@/components/private-page-container'
 import { Button } from '@/components/ui/button'
-import { CLUB, MATRICULA_IMPORTE, MOCK_USER } from '@/lib/club'
+import { CLUB } from '@/lib/club'
+import { requireUser } from '@/lib/auth'
 import { formatEuro } from '@/lib/format'
-import { MOCK_DEPORTISTAS_TUTOR } from '@/lib/mock-deportistas'
+import { getPrivateDashboardData } from '@/lib/private-app'
+import { type PrivateAthleteSummary } from '@/lib/private-app-shared'
 import { cn } from '@/lib/utils'
 
 // ── Badges de estado ──────────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ function ResumenCard({ label, value, icon: Icon, accent = 'bg-primary/10 text-pr
 
 // ── Tarjeta de deportista ─────────────────────────────────────────────────────
 
-function DeportistaCard({ deportista }: { deportista: (typeof MOCK_DEPORTISTAS_TUTOR)[number] }) {
+function DeportistaCard({ deportista }: { deportista: PrivateAthleteSummary }) {
   const { cls, label } = ESTADO_BADGE[deportista.estado]
   return (
     <li className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur">
@@ -67,16 +69,18 @@ function DeportistaCard({ deportista }: { deportista: (typeof MOCK_DEPORTISTAS_T
 
 // ── Página ────────────────────────────────────────────────────────────────────
 
-export default function AppDashboardPage() {
-  const deportistas  = MOCK_DEPORTISTAS_TUTOR
+export default async function AppDashboardPage() {
+  const user = await requireUser()
+  const { viewer, seasonLabel, matriculaImporte, deportistas } =
+    await getPrivateDashboardData(user.id)
   const total        = deportistas.length
   const matriculados = deportistas.filter((d) => d.estado === 'matriculado').length
   const pendientes   = deportistas.filter((d) => d.estado !== 'matriculado').length
 
   return (
     <PrivatePageContainer
-      title={`Hola, ${MOCK_USER.firstName}`}
-      description={`Bienvenida al panel del ${CLUB.legalName}. Temporada activa ${CLUB.season}.`}
+      title={`Hola, ${viewer.firstName}`}
+      description={`Bienvenida al panel del ${CLUB.legalName}. Temporada activa ${seasonLabel}.`}
     >
 
       {/* ── Identidad del club ─────────────────────────────────────────── */}
@@ -87,7 +91,7 @@ export default function AppDashboardPage() {
         <ClubLogo size={52} href="/app" />
         <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
           <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-          Temporada activa {CLUB.season}
+          Temporada activa {seasonLabel}
         </span>
       </section>
 
@@ -110,17 +114,15 @@ export default function AppDashboardPage() {
           icon={UserCheck}
           accent="bg-emerald-100 text-emerald-600"
         />
-        {/* TODO: precio real desde tabla temporadas de Supabase */}
         <ResumenCard
           label="Precio de matrícula"
-          value={formatEuro(MATRICULA_IMPORTE)}
+          value={formatEuro(matriculaImporte)}
           icon={ClipboardList}
           accent="bg-violet-100 text-violet-600"
         />
       </section>
 
       {/* ── Acceso a matriculación ─────────────────────────────────────── */}
-      {/* TODO: mostrar según estado real de matrícula del tutor en Supabase */}
       <section
         aria-label="Matriculación"
         className="mt-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/80 to-card p-6 shadow-sm backdrop-blur sm:p-7"
@@ -131,16 +133,19 @@ export default function AppDashboardPage() {
               Acceso destacado
             </p>
             <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">
-              Matriculación temporada {CLUB.season}
+              Matriculación temporada {seasonLabel}
             </h2>
             <p className="mt-1 text-sm text-pretty text-muted-foreground">
               {pendientes > 0
-                ? `Tienes ${pendientes} ${pendientes === 1 ? 'deportista pendiente' : 'deportistas pendientes'} de matricular. Importe por deportista: ${formatEuro(MATRICULA_IMPORTE)}.`
-                : `Todos tus deportistas están matriculados. Importe por deportista: ${formatEuro(MATRICULA_IMPORTE)}.`}
+                ? `Tienes ${pendientes} ${pendientes === 1 ? 'deportista pendiente' : 'deportistas pendientes'} de matricular. Importe por deportista: ${formatEuro(matriculaImporte)}.`
+                : `Todos tus deportistas están matriculados. Importe por deportista: ${formatEuro(matriculaImporte)}.`}
             </p>
           </div>
-          {/* TODO: conectar con flujo real de Stripe cuando Supabase esté listo */}
-          <Button render={<Link href="/app/matriculacion" />} size="lg">
+          <Button
+            nativeButton={false}
+            render={<Link href="/app/matriculacion" />}
+            size="lg"
+          >
             Ir a matriculación
             <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
@@ -148,7 +153,6 @@ export default function AppDashboardPage() {
       </section>
 
       {/* ── Listado de deportistas ─────────────────────────────────────── */}
-      {/* TODO: reemplazar DEPORTISTAS_MOCK por getDeportistasByTutor(userId) */}
       <section aria-label="Tus deportistas" className="mt-6">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>

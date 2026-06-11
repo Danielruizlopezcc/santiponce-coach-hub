@@ -1,17 +1,18 @@
 import { Settings2 } from 'lucide-react'
 import { PageContainer } from '@/components/page-container'
-import { ADMIN_CONFIGURACION } from '@/lib/admin'
+import { getAdminConfig } from '@/lib/admin-app'
 
-export default function AdminConfiguracionPage() {
+export default async function AdminConfiguracionPage() {
+  const data = await getAdminConfig()
+
   return (
     <PageContainer
       title="Configuración"
-      description="Tarjetas visuales de configuración general sin persistencia real."
+      description="Resumen de configuración basado en el estado real disponible en Supabase."
       className="max-w-7xl"
     >
-      {/* TODO: Conectar esta pantalla con Supabase, Stripe y permisos admin en servidor. */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {ADMIN_CONFIGURACION.map((item) => (
+        {data.map((item) => (
           <section
             key={item.id}
             className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm"

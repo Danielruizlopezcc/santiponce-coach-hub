@@ -3,11 +3,12 @@
 import { useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CheckCircle2, CreditCard, Loader2 } from 'lucide-react'
+import { CreditCard, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MOCK_TUTOR_PROFILE } from '@/lib/club'
+import { updateTutorProfileAction } from '@/app/(privado)/app/actions'
+import { type PrivateTutorProfile } from '@/lib/private-app-shared'
 import {
   tutorProfileSchema,
   type TutorProfileFormValues,
@@ -22,9 +23,14 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   )
 }
 
-export function TutorProfileForm() {
+type TutorProfileFormProps = {
+  profile: PrivateTutorProfile
+}
+
+export function TutorProfileForm({ profile }: TutorProfileFormProps) {
   const errId = useId()
   const [saved, setSaved] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -33,25 +39,30 @@ export function TutorProfileForm() {
     resolver: zodResolver(tutorProfileSchema),
     mode: 'onBlur',
     defaultValues: {
-      nombre: MOCK_TUTOR_PROFILE.nombre,
-      apellidos: MOCK_TUTOR_PROFILE.apellidos,
-      email: MOCK_TUTOR_PROFILE.email,
-      telefono: MOCK_TUTOR_PROFILE.telefono,
-      documento: MOCK_TUTOR_PROFILE.documento,
-      direccion: MOCK_TUTOR_PROFILE.direccion,
-      codigoPostal: MOCK_TUTOR_PROFILE.codigoPostal,
-      provincia: MOCK_TUTOR_PROFILE.provincia,
-      ciudad: MOCK_TUTOR_PROFILE.ciudad,
-      pais: MOCK_TUTOR_PROFILE.pais,
-      preferenciaPago: MOCK_TUTOR_PROFILE.preferenciaPago,
+      nombre: profile.nombre,
+      apellidos: profile.apellidos,
+      email: profile.email,
+      telefono: profile.telefono,
+      documento: profile.documento,
+      direccion: profile.direccion,
+      codigoPostal: profile.codigoPostal,
+      provincia: profile.provincia,
+      ciudad: profile.ciudad,
+      pais: profile.pais,
+      preferenciaPago: profile.preferenciaPago,
     },
   })
 
   const onSubmit = handleSubmit(async (values) => {
     setSaved(false)
-    // TODO: Conectar este formulario con una Server Action y Supabase.
-    await new Promise((resolve) => setTimeout(resolve, 900))
-    console.info('[perfil] cambios validados', values)
+    setServerError(null)
+    const result = await updateTutorProfileAction(values)
+
+    if (!result.success) {
+      setServerError(result.message ?? 'No se han podido guardar los cambios.')
+      return
+    }
+
     setSaved(true)
   })
 
@@ -155,12 +166,21 @@ export function TutorProfileForm() {
             />
           </div>
 
+          {serverError && (
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              {serverError}
+            </div>
+          )}
+
           {saved && (
             <div
               role="status"
               className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
             >
-              Los cambios se han guardado correctamente en este entorno visual.
+              Los cambios se han guardado correctamente.
             </div>
           )}
 
@@ -187,29 +207,15 @@ export function TutorProfileForm() {
 
           <dl className="mt-4 grid gap-3 text-sm">
             <div className="rounded-xl border border-border bg-muted/20 p-3">
-              <dt className="text-muted-foreground">Tarjeta</dt>
-              <dd className="mt-1 font-medium text-foreground">
-                {MOCK_TUTOR_PROFILE.metodoPago.marca} terminada en{' '}
-                {MOCK_TUTOR_PROFILE.metodoPago.ultimosDigitos}
-              </dd>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3">
-              <dt className="text-muted-foreground">Caducidad</dt>
-              <dd className="mt-1 font-medium text-foreground">
-                {MOCK_TUTOR_PROFILE.metodoPago.caducidad}
-              </dd>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3">
               <dt className="text-muted-foreground">Estado</dt>
               <dd className="mt-1 inline-flex items-center gap-2 font-medium text-foreground">
-                <CheckCircle2 className="size-4 text-emerald-600" aria-hidden="true" />
-                {MOCK_TUTOR_PROFILE.metodoPago.estado}
+                {profile.metodoPago.estado}
               </dd>
             </div>
           </dl>
 
-          <Button variant="outline" className="mt-4 w-full" type="button">
-            Cambiar método de pago
+          <Button variant="outline" className="mt-4 w-full" type="button" disabled>
+            Próximamente con Stripe
           </Button>
         </section>
       </aside>

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Edit3, Plus, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatSpanishDate } from '@/lib/format'
-import { MOCK_DEPORTISTAS_TUTOR } from '@/lib/mock-deportistas'
+import { type PrivateAthleteDetail } from '@/lib/private-app-shared'
 import { cn } from '@/lib/utils'
 
 const estadoStyles = {
@@ -16,15 +16,23 @@ const pagoStyles = {
   pendiente: 'bg-slate-100 text-slate-700',
 } as const
 
-export function DeportistasOverview() {
-  if (MOCK_DEPORTISTAS_TUTOR.length === 0) {
+type DeportistasOverviewProps = {
+  deportistas: PrivateAthleteDetail[]
+}
+
+export function DeportistasOverview({ deportistas }: DeportistasOverviewProps) {
+  if (deportistas.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center">
         <p className="text-base font-medium text-foreground">Aún no tienes deportistas registrados.</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Añade un deportista para empezar con la matriculación de la temporada.
         </p>
-        <Button render={<Link href="/app/deportistas/nuevo" />} className="mt-4">
+        <Button
+          nativeButton={false}
+          render={<Link href="/app/deportistas/nuevo" />}
+          className="mt-4"
+        >
           <Plus className="size-4" aria-hidden="true" />
           Añadir deportista
         </Button>
@@ -36,16 +44,16 @@ export function DeportistasOverview() {
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {MOCK_DEPORTISTAS_TUTOR.length} deportistas vinculados
+          {deportistas.length} deportistas vinculados
         </span>
-        <Button render={<Link href="/app/deportistas/nuevo" />}>
+        <Button nativeButton={false} render={<Link href="/app/deportistas/nuevo" />}>
           <Plus className="size-4" aria-hidden="true" />
           Nuevo deportista
         </Button>
       </div>
 
       <div className="grid gap-4">
-        {MOCK_DEPORTISTAS_TUTOR.map((deportista) => (
+        {deportistas.map((deportista) => (
           <article
             key={deportista.id}
             className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm"
@@ -107,12 +115,16 @@ export function DeportistasOverview() {
                       ? 'Matriculado'
                       : 'Pendiente'}
                 </span>
-                <Button variant="outline" render={<Link href={`/app/deportistas/${deportista.id}`} />}>
+                <Button
+                  nativeButton={false}
+                  variant="outline"
+                  render={<Link href={`/app/deportistas/${deportista.id}`} />}
+                >
                   <Edit3 className="size-4" aria-hidden="true" />
                   Editar
                 </Button>
                 {deportista.estado !== 'matriculado' && (
-                  <Button render={<Link href="/app/matriculacion" />}>
+                  <Button nativeButton={false} render={<Link href="/app/matriculacion" />}>
                     <ShieldCheck className="size-4" aria-hidden="true" />
                     Matricular
                   </Button>

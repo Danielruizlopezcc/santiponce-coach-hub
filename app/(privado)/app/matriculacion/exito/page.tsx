@@ -25,8 +25,14 @@ export default function MatriculacionExitoPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button render={<Link href="/app/matriculacion" />}>Volver a matriculación</Button>
-          <Button variant="outline" render={<Link href="/app/deportistas" />}>
+          <Button nativeButton={false} render={<Link href="/app/matriculacion" />}>
+            Volver a matriculación
+          </Button>
+          <Button
+            nativeButton={false}
+            variant="outline"
+            render={<Link href="/app/deportistas" />}
+          >
             Ir a mis deportistas
           </Button>
         </div>

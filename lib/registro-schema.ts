@@ -6,6 +6,7 @@ const TELEFONO_ES = /^(?:(?:\+34|0034|34)[\s-]?)?[6789]\d{2}[\s-]?\d{3}[\s-]?\d{
 
 // DNI (8 dígitos + letra) o NIE (X/Y/Z + 7 dígitos + letra).
 const DNI_NIE = /^([0-9]{8}[A-Za-z]|[XYZxyz][0-9]{7}[A-Za-z])$/
+const DNI_LETRAS = 'TRWAGMYFPDXBNJZSQVHLCKE'
 
 // Código postal español: 01000 – 52999.
 const CP_ES = /^(0[1-9]|[1-4]\d|5[0-2])\d{3}$/
@@ -38,6 +39,50 @@ const telefonoOpcional = z
   .regex(TELEFONO_ES, 'Teléfono español no válido')
   .optional()
   .or(z.literal(''))
+
+function normalizarDocumento(value: string) {
+  return value.trim().toUpperCase()
+}
+
+function isValidDniNie(value: string) {
+  const documento = normalizarDocumento(value)
+
+  if (!DNI_NIE.test(documento)) {
+    return false
+  }
+
+  const letra = documento.at(-1)
+  if (!letra) {
+    return false
+  }
+
+  let numeroBase = documento.slice(0, -1)
+
+  if (/^[XYZ]/.test(documento)) {
+    const prefijo = documento[0]
+    const mapaNie: Record<string, string> = {
+      X: '0',
+      Y: '1',
+      Z: '2',
+    }
+
+    numeroBase = `${mapaNie[prefijo]}${documento.slice(1, -1)}`
+  }
+
+  const numero = Number(numeroBase)
+  if (Number.isNaN(numero)) {
+    return false
+  }
+
+  return DNI_LETRAS[numero % 23] === letra
+}
+
+const dniNieSchema = z
+  .string()
+  .trim()
+  .min(1, REQ)
+  .regex(DNI_NIE, 'DNI/NIE no válido (ej. 12345678A o X1234567A)')
+  .refine(isValidDniNie, 'La letra del DNI/NIE no coincide con el número')
 
 export const deportistaSchema = z
   .object({
@@ -75,6 +120,18 @@ export const deportistaSchema = z
       message: 'Indica el nombre del hermano inscrito',
     },
   )
+  .superRefine((d, ctx) => {
+    if (
+      (d.tipoIdentificacion === 'DNI' || d.tipoIdentificacion === 'NIE') &&
+      !isValidDniNie(d.documento)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['documento'],
+        message: 'El DNI/NIE del deportista no es válido',
+      })
+    }
+  })
 
 export type DeportistaFormValues = z.infer<typeof deportistaSchema>
 
@@ -99,11 +156,7 @@ export const tutorProfileSchema = z.object({
     .trim()
     .min(1, REQ)
     .regex(TELEFONO_ES, 'Teléfono español no válido'),
-  documento: z
-    .string()
-    .trim()
-    .min(1, REQ)
-    .regex(DNI_NIE, 'DNI/NIE no válido (ej. 12345678A o X1234567A)'),
+  documento: dniNieSchema,
   direccion: z.string().trim().min(3, 'Introduce una dirección válida').max(120),
   codigoPostal: z.string().trim().regex(CP_ES, 'Código postal español no válido'),
   provincia: z.string().trim().min(2, REQ).max(60),
@@ -131,11 +184,7 @@ export const registroSchema = z
       .trim()
       .min(1, REQ)
       .regex(TELEFONO_ES, 'Teléfono español no válido'),
-    documento: z
-      .string()
-      .trim()
-      .min(1, REQ)
-      .regex(DNI_NIE, 'DNI/NIE no válido (ej. 12345678A o X1234567A)'),
+    documento: dniNieSchema,
     direccion: z.string().trim().min(3, 'Introduce una dirección válida').max(120),
     codigoPostal: z
       .string()
@@ -149,7 +198,6 @@ export const registroSchema = z
     }),
     password: passwordSchema,
     confirmPassword: z.string().min(1, REQ),
-    consentimiento: z.string().trim().min(2, REQ),
     aceptaPrivacidad: z.boolean().refine((v) => v === true, {
       message: 'Debes aceptar la política de privacidad',
     }),
@@ -175,16 +223,5 @@ export const registroSchema = z
     path: ['confirmPassword'],
     message: 'Las contraseñas no coinciden',
   })
-  .refine(
-    (data) => {
-      const completo = `${data.nombre} ${data.apellidos}`.trim().toLowerCase()
-      return data.consentimiento.trim().toLowerCase() === completo
-    },
-    {
-      path: ['consentimiento'],
-      message:
-        'Debe coincidir exactamente con tu nombre y apellidos como consentimiento digital',
-    },
-  )
 
 export type RegistroFormValues = z.infer<typeof registroSchema>

@@ -3,34 +3,20 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { saveAthleteAction } from '@/app/(privado)/app/actions'
 import { Button } from '@/components/ui/button'
 import { DeportistaForm } from '@/components/deportista-form'
-import { type DeportistaTutor } from '@/lib/mock-deportistas'
-import { type DeportistaFormValues } from '@/lib/registro-schema'
+import {
+  toAthleteFormValues,
+  type PrivateAthleteDetail,
+} from '@/lib/private-app-shared'
 
 type DeportistaEditorPageProps = {
   title: string
   description: string
   submitLabel: string
-  deportista?: DeportistaTutor
-}
-
-function toFormValues(deportista?: DeportistaTutor): DeportistaFormValues | undefined {
-  if (!deportista) return undefined
-  return {
-    id: deportista.id,
-    nombre: deportista.nombre,
-    apellidos: deportista.apellidos,
-    fechaNacimiento: deportista.fechaNacimiento,
-    tipoIdentificacion: deportista.tipoIdentificacion,
-    documento: deportista.documento,
-    email: deportista.email,
-    telefono: deportista.telefono,
-    alergias: deportista.alergias,
-    tieneHermanos: deportista.tieneHermanos,
-    nombreHermano: deportista.nombreHermano,
-    categoria: deportista.categoriaSolicitada as DeportistaFormValues['categoria'],
-  }
+  deportista?: PrivateAthleteDetail | null
 }
 
 export function DeportistaEditorPage({
@@ -39,11 +25,18 @@ export function DeportistaEditorPage({
   submitLabel,
   deportista,
 }: DeportistaEditorPageProps) {
+  const router = useRouter()
   const [saved, setSaved] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
 
   return (
     <div className="grid gap-5">
-      <Button variant="ghost" className="w-fit" render={<Link href="/app/deportistas" />}>
+      <Button
+        nativeButton={false}
+        variant="ghost"
+        className="w-fit"
+        render={<Link href="/app/deportistas" />}
+      >
         <ArrowLeft className="size-4" aria-hidden="true" />
         Volver a mis deportistas
       </Button>
@@ -61,20 +54,34 @@ export function DeportistaEditorPage({
           >
             <span className="inline-flex items-center gap-2">
               <CheckCircle2 className="size-4" aria-hidden="true" />
-              Cambios guardados en este entorno visual. La integración real se conectará más adelante.
+              Cambios guardados correctamente.
             </span>
           </div>
         )}
 
+        {serverError && (
+          <div
+            role="alert"
+            className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            {serverError}
+          </div>
+        )}
+
         <DeportistaForm
-          defaultValues={toFormValues(deportista)}
+          defaultValues={toAthleteFormValues(deportista)}
           readOnlyTeam={deportista?.equipoAsignado ?? null}
           submitLabel={submitLabel}
           onSubmit={async (values) => {
-            // TODO: Conectar este formulario con Server Actions y Supabase.
-            await new Promise((resolve) => setTimeout(resolve, 700))
-            console.info('[deportista] datos validados', values)
+            setSaved(false)
+            setServerError(null)
+            const result = await saveAthleteAction(values, deportista?.id)
+            if (!result.success) {
+              setServerError(result.message ?? 'No se ha podido guardar el deportista.')
+              return
+            }
             setSaved(true)
+            router.refresh()
           }}
         />
       </section>
