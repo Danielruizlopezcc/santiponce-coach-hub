@@ -88,9 +88,31 @@ export type AdminTeamRow = {
   id: string
   nombre: string
   categoria: string
+  categoryId: string
   temporada: string
+  seasonId: string
   deportistas: number
+  isActive: boolean
+  notes: string | null
   estado: 'Completo' | 'Abierto' | 'Pendiente'
+}
+
+export type AdminTeamMember = {
+  id: string
+  nombre: string
+  tutor: string
+  estadoMatricula: AdminAthleteRow['estadoMatricula']
+}
+
+export type AdminAvailableAthlete = {
+  id: string
+  nombre: string
+  tutor: string
+}
+
+export type AdminTeamDetail = AdminTeamRow & {
+  members: AdminTeamMember[]
+  available: AdminAvailableAthlete[]
 }
 
 export type AdminSeasonRow = {
@@ -446,12 +468,65 @@ export async function getAdminTeams(): Promise<AdminTeamRow[]> {
         id: team.id,
         nombre: team.name,
         categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+        categoryId: team.category_id,
         temporada: seasonById.get(team.season_id) ?? CLUB.season,
+        seasonId: team.season_id,
         deportistas: total,
+        isActive: team.is_active,
+        notes: team.notes ?? null,
         estado: !team.is_active ? 'Pendiente' : total >= 15 ? 'Completo' : 'Abierto',
       } as AdminTeamRow
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetail | null> {
+  const { guardians, athletes, categories, teams, seasons } = await getAdminCollections()
+
+  const team = teams.find((t) => t.id === teamId)
+  if (!team) return null
+
+  const guardianById = createGuardianNameLookup(guardians)
+  const categoryById = new Map(categories.map((c) => [c.id, c.name]))
+  const seasonById   = new Map(seasons.map((s) => [s.id, s.name]))
+
+  const teamAthletes = athletes.filter((a) => a.assigned_team_id === teamId)
+  const totalMembers = teamAthletes.length
+
+  const members: AdminTeamMember[] = teamAthletes.map((a) => ({
+    id: a.id,
+    nombre: `${a.first_name} ${a.last_name}`.trim(),
+    tutor: guardianById.get(a.guardian_id)?.name ?? 'Tutor no disponible',
+    estadoMatricula: mapStatusLabel(a.status),
+  }))
+
+  const available: AdminAvailableAthlete[] = athletes
+    .filter(
+      (a) =>
+        a.season_id === team.season_id &&
+        !a.assigned_team_id &&
+        a.requested_category_id === team.category_id,
+    )
+    .map((a) => ({
+      id: a.id,
+      nombre: `${a.first_name} ${a.last_name}`.trim(),
+      tutor: guardianById.get(a.guardian_id)?.name ?? 'Tutor no disponible',
+    }))
+
+  return {
+    id: team.id,
+    nombre: team.name,
+    categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+    categoryId: team.category_id,
+    temporada: seasonById.get(team.season_id) ?? CLUB.season,
+    seasonId: team.season_id,
+    deportistas: totalMembers,
+    isActive: team.is_active,
+    notes: team.notes ?? null,
+    estado: !team.is_active ? 'Pendiente' : totalMembers >= 15 ? 'Completo' : 'Abierto',
+    members,
+    available,
+  }
 }
 
 export async function getAdminSeasons(): Promise<AdminSeasonRow[]> {
