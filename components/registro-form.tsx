@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
-import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
+import { useForm, useFieldArray, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import {
   registroSchema,
   type RegistroFormValues,
 } from '@/lib/registro-schema'
+import { DeportistasSection } from '@/components/deportistas-section'
 
 type FieldErrorProps = { id: string; message?: string }
 function FieldError({ id, message }: FieldErrorProps) {
@@ -38,6 +39,7 @@ export function RegistroForm() {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting, isSubmitSuccessful },
   } = useForm<RegistroFormValues>({
@@ -64,8 +66,16 @@ export function RegistroForm() {
       consienteDatosSalud: false,
       autorizaImagenes: false,
       consienteMetodoPago: false,
+      deportistas: [],
     },
   })
+
+  const {
+    fields: deportistaFields,
+    append: appendDeportista,
+    update: updateDeportista,
+    remove: removeDeportista,
+  } = useFieldArray({ control, name: 'deportistas' })
 
   // Bloquea reenvío mientras esté procesando o ya enviado correctamente.
   const disabled = isSubmitting || submitted
