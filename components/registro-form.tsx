@@ -75,7 +75,7 @@ export function RegistroForm() {
     append: appendDeportista,
     update: updateDeportista,
     remove: removeDeportista,
-  } = useFieldArray({ control, name: 'deportistas' })
+  } = useFieldArray({ control, name: 'deportistas', keyName: '_rhfId' })
 
   // Bloquea reenvío mientras esté procesando o ya enviado correctamente.
   const disabled = isSubmitting || submitted
