@@ -136,6 +136,9 @@ export const registroSchema = z
       message:
         'Debes autorizar guardar el método de pago para futuras cuotas',
     }),
+    deportistas: z
+      .array(deportistaSchema)
+      .min(1, 'Debes añadir al menos un deportista'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],
