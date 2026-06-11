@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
-import { useForm } from 'react-hook-form'
+import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -507,7 +507,7 @@ type ConsentItemProps = {
   id: string
   required?: boolean
   error?: string
-  register: ReturnType<ReturnType<typeof useForm<RegistroFormValues>>['register']>
+  register: UseFormRegisterReturn
   children: React.ReactNode
 }
 
