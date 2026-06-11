@@ -74,23 +74,6 @@ export function PublicNav() {
           className="hidden items-center gap-2 md:flex"
         >
           <NavLinks pathname={pathname} />
-          <div className="ml-3 flex items-center gap-2">
-            <Button
-              render={<Link href="/iniciar-sesion" />}
-              nativeButton={false}
-              variant="ghost"
-              size="sm"
-            >
-              Iniciar sesión
-            </Button>
-            <Button
-              render={<Link href="/registro" />}
-              nativeButton={false}
-              size="sm"
-            >
-              Registrarse
-            </Button>
-          </div>
         </nav>
 
         {/* Mobile drawer */}

@@ -73,14 +73,14 @@ export function LandingHero() {
         </div>
 
         <div className="relative flex justify-center">
-          <div className="relative flex aspect-square w-full max-w-sm items-center justify-center rounded-3xl border border-border/60 bg-card/70 p-10 shadow-sm backdrop-blur">
+          <div className="relative aspect-square w-full max-w-sm overflow-hidden rounded-3xl border border-border/60 bg-card/70 shadow-sm backdrop-blur">
             <Image
               src={CLUB.crest || '/placeholder.svg'}
               alt={`Escudo del ${CLUB.legalName}`}
-              width={320}
-              height={320}
+              fill
               priority
-              className="h-auto w-auto max-h-full max-w-full object-contain drop-shadow-md"
+              className="object-cover"
+              sizes="(max-width: 768px) 80vw, 320px"
             />
           </div>
         </div>

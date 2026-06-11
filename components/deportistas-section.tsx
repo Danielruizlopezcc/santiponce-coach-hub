@@ -1,43 +1,19 @@
 'use client'
 
 import * as React from 'react'
-import { useId, useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { DeportistaForm } from '@/components/deportista-form'
 import { cn } from '@/lib/utils'
-import {
-  CATEGORIAS,
-  TIPOS_IDENTIFICACION,
-  deportistaSchema,
-  type DeportistaFormValues,
-} from '@/lib/registro-schema'
-
-const selectClasses = cn(
-  'h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none transition-colors',
-  'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
-  'aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20',
-  'disabled:pointer-events-none disabled:opacity-50 md:text-sm',
-)
+import { type DeportistaFormValues } from '@/lib/registro-schema'
 
 function newDeportistaId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()
   }
   return `d_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-}
-
-function FieldError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null
-  return (
-    <p id={id} role="alert" className="text-xs font-medium text-destructive">
-      {message}
-    </p>
-  )
 }
 
 export type DeportistasSectionProps = {
@@ -127,6 +103,13 @@ export function DeportistasSection({
                 <p className="text-xs text-muted-foreground">
                   {d.tipoIdentificacion} {d.documento} · Nac. {d.fechaNacimiento}
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Estado inicial:{' '}
+                  <span className="font-medium text-foreground">Pendiente</span>
+                  {' · '}
+                  Equipo:{' '}
+                  <span className="font-medium text-foreground">Sin equipo asignado</span>
+                </p>
               </div>
               <div className="flex shrink-0 gap-1.5">
                 <Button
@@ -187,65 +170,14 @@ function DeportistaDialog({
   initialValue,
   onSubmit,
 }: DeportistaDialogProps) {
-  const errId = useId()
   const isEdit = !!initialValue
+  const [formKey, setFormKey] = React.useState(0)
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { errors },
-  } = useForm<DeportistaFormValues>({
-    resolver: zodResolver(deportistaSchema),
-    mode: 'onBlur',
-    defaultValues: {
-      id: '',
-      nombre: '',
-      apellidos: '',
-      fechaNacimiento: '',
-      tipoIdentificacion: 'DNI',
-      documento: '',
-      email: '',
-      telefono: '',
-      alergias: '',
-      tieneHermanos: 'no',
-      nombreHermano: '',
-      categoria: 'Bebés',
-    },
-  })
-
-  // Reset al abrir según modo
   React.useEffect(() => {
-    if (!open) return
-    if (initialValue) {
-      reset(initialValue)
-    } else {
-      reset({
-        id: newDeportistaId(),
-        nombre: '',
-        apellidos: '',
-        fechaNacimiento: '',
-        tipoIdentificacion: 'DNI',
-        documento: '',
-        email: '',
-        telefono: '',
-        alergias: '',
-        tieneHermanos: 'no',
-        nombreHermano: '',
-        categoria: 'Bebés',
-      })
+    if (open) {
+      setFormKey((current) => current + 1)
     }
-  }, [open, initialValue, reset])
-
-  const tieneHermanos = watch('tieneHermanos')
-
-  const submit = handleSubmit((values) => {
-    onSubmit({
-      ...values,
-      id: values.id || newDeportistaId(),
-    })
-  })
+  }, [open, initialValue])
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -282,233 +214,42 @@ function DeportistaDialog({
             </Dialog.Close>
           </div>
 
-          <form
-            noValidate
-            onSubmit={submit}
-            className="grid max-h-[70vh] gap-4 overflow-y-auto p-4"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-nombre`}>
-                  Nombre <span aria-hidden="true" className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={`${errId}-nombre`}
-                  autoComplete="given-name"
-                  aria-invalid={!!errors.nombre || undefined}
-                  aria-describedby={errors.nombre ? `${errId}-nombre-err` : undefined}
-                  {...register('nombre')}
-                />
-                <FieldError id={`${errId}-nombre-err`} message={errors.nombre?.message} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-apellidos`}>
-                  Apellidos <span aria-hidden="true" className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={`${errId}-apellidos`}
-                  autoComplete="family-name"
-                  aria-invalid={!!errors.apellidos || undefined}
-                  aria-describedby={errors.apellidos ? `${errId}-apellidos-err` : undefined}
-                  {...register('apellidos')}
-                />
-                <FieldError id={`${errId}-apellidos-err`} message={errors.apellidos?.message} />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-fnac`}>
-                  Fecha de nacimiento <span aria-hidden="true" className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={`${errId}-fnac`}
-                  type="date"
-                  aria-invalid={!!errors.fechaNacimiento || undefined}
-                  aria-describedby={errors.fechaNacimiento ? `${errId}-fnac-err` : undefined}
-                  {...register('fechaNacimiento')}
-                />
-                <FieldError id={`${errId}-fnac-err`} message={errors.fechaNacimiento?.message} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-categoria`}>
-                  Categoría solicitada para esta temporada{' '}
-                  <span aria-hidden="true" className="text-destructive">*</span>
-                </Label>
-                <select
-                  id={`${errId}-categoria`}
-                  className={selectClasses}
-                  aria-invalid={!!errors.categoria || undefined}
-                  aria-describedby={errors.categoria ? `${errId}-categoria-err` : undefined}
-                  {...register('categoria')}
-                >
-                  {CATEGORIAS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <FieldError id={`${errId}-categoria-err`} message={errors.categoria?.message} />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-tipoId`}>
-                  Tipo de identificación{' '}
-                  <span aria-hidden="true" className="text-destructive">*</span>
-                </Label>
-                <select
-                  id={`${errId}-tipoId`}
-                  className={selectClasses}
-                  aria-invalid={!!errors.tipoIdentificacion || undefined}
-                  {...register('tipoIdentificacion')}
-                >
-                  {TIPOS_IDENTIFICACION.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <FieldError
-                  id={`${errId}-tipoId-err`}
-                  message={errors.tipoIdentificacion?.message}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-documento`}>
-                  NIF / NIE o documento identificativo{' '}
-                  <span aria-hidden="true" className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={`${errId}-documento`}
-                  autoComplete="off"
-                  aria-invalid={!!errors.documento || undefined}
-                  aria-describedby={errors.documento ? `${errId}-documento-err` : undefined}
-                  {...register('documento')}
-                />
-                <FieldError id={`${errId}-documento-err`} message={errors.documento?.message} />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-email`}>
-                  Correo electrónico{' '}
-                  <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
-                </Label>
-                <Input
-                  id={`${errId}-email`}
-                  type="email"
-                  autoComplete="email"
-                  aria-invalid={!!errors.email || undefined}
-                  aria-describedby={errors.email ? `${errId}-email-err` : undefined}
-                  {...register('email')}
-                />
-                <FieldError id={`${errId}-email-err`} message={errors.email?.message} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-tel`}>
-                  Teléfono móvil{' '}
-                  <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
-                </Label>
-                <Input
-                  id={`${errId}-tel`}
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  aria-invalid={!!errors.telefono || undefined}
-                  aria-describedby={errors.telefono ? `${errId}-tel-err` : undefined}
-                  {...register('telefono')}
-                />
-                <FieldError id={`${errId}-tel-err`} message={errors.telefono?.message} />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor={`${errId}-alergias`}>
-                Enfermedades o alergias a tener en cuenta
-              </Label>
-              <textarea
-                id={`${errId}-alergias`}
-                rows={3}
-                className={cn(
-                  'w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base outline-none transition-colors',
-                  'focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
-                  'aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20',
-                  'md:text-sm',
-                )}
-                placeholder="Indica condiciones médicas relevantes, alergias o medicación."
-                aria-invalid={!!errors.alergias || undefined}
-                {...register('alergias')}
-              />
-              <FieldError id={`${errId}-alergias-err`} message={errors.alergias?.message} />
-            </div>
-
-            <fieldset className="grid gap-2">
-              <legend className="text-sm font-medium">
-                ¿Tiene hermanos inscritos en el club?{' '}
-                <span aria-hidden="true" className="text-destructive">*</span>
-              </legend>
-              <div className="flex flex-wrap gap-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm transition-colors has-[input:checked]:border-primary has-[input:checked]:bg-primary/5 has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring/40">
-                  <input
-                    type="radio"
-                    value="no"
-                    className="size-4 accent-[var(--primary)]"
-                    {...register('tieneHermanos')}
-                  />
-                  No
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm transition-colors has-[input:checked]:border-primary has-[input:checked]:bg-primary/5 has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring/40">
-                  <input
-                    type="radio"
-                    value="si"
-                    className="size-4 accent-[var(--primary)]"
-                    {...register('tieneHermanos')}
-                  />
-                  Sí
-                </label>
-              </div>
-              <FieldError
-                id={`${errId}-hermanos-err`}
-                message={errors.tieneHermanos?.message}
-              />
-            </fieldset>
-
-            {tieneHermanos === 'si' && (
-              <div className="grid gap-2">
-                <Label htmlFor={`${errId}-nhermano`}>
-                  Nombre del hermano inscrito{' '}
-                  <span aria-hidden="true" className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={`${errId}-nhermano`}
-                  autoComplete="off"
-                  aria-invalid={!!errors.nombreHermano || undefined}
-                  aria-describedby={
-                    errors.nombreHermano ? `${errId}-nhermano-err` : undefined
-                  }
-                  {...register('nombreHermano')}
-                />
-                <FieldError
-                  id={`${errId}-nhermano-err`}
-                  message={errors.nombreHermano?.message}
-                />
-              </div>
-            )}
-
-            <div className="mt-2 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-              <Dialog.Close
-                render={<Button type="button" variant="ghost" />}
-              >
+          <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-4">
+            <DeportistaForm
+              key={formKey}
+              defaultValues={
+                initialValue
+                  ? initialValue
+                  : {
+                      id: newDeportistaId(),
+                      nombre: '',
+                      apellidos: '',
+                      fechaNacimiento: '',
+                      tipoIdentificacion: 'DNI',
+                      documento: '',
+                      email: '',
+                      telefono: '',
+                      alergias: '',
+                      tieneHermanos: 'no',
+                      nombreHermano: '',
+                      categoria: 'Bebés',
+                    }
+              }
+              submitLabel={isEdit ? 'Guardar cambios' : 'Añadir deportista'}
+              readOnlyTeam={null}
+              onSubmit={(values) => {
+                onSubmit({
+                  ...values,
+                  id: values.id || newDeportistaId(),
+                })
+              }}
+            />
+            <div className="flex justify-end border-t border-border pt-4">
+              <Dialog.Close render={<Button type="button" variant="ghost" />}>
                 Cancelar
               </Dialog.Close>
-              <Button type="submit">
-                {isEdit ? 'Guardar cambios' : 'Añadir deportista'}
-              </Button>
             </div>
-          </form>
+          </div>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

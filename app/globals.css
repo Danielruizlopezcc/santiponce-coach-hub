@@ -130,3 +130,21 @@
     @apply font-sans;
   }
 }
+
+/* ── Animated background blobs ─────────────────────────────────────────────── */
+/* Respeta prefers-reduced-motion: usar siempre con la variante motion-safe:   */
+
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(30px, -20px) scale(1.05); }
+  66%       { transform: translate(-20px, 15px) scale(0.95); }
+}
+
+@layer utilities {
+  .animate-blob {
+    animation: blob 7s infinite ease-in-out;
+  }
+  .animate-blob-slow {
+    animation: blob 12s infinite ease-in-out 2s;
+  }
+}

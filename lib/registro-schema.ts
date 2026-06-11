@@ -85,6 +85,37 @@ const passwordSchema = z
   .regex(/[a-z]/, 'Debe incluir una minúscula')
   .regex(/\d/, 'Debe incluir un número')
 
+export const tutorProfileSchema = z.object({
+  nombre: z.string().trim().min(2, 'Introduce un nombre válido').max(60),
+  apellidos: z.string().trim().min(2, 'Introduce los apellidos').max(80),
+  email: z
+    .string()
+    .trim()
+    .min(1, REQ)
+    .email('Correo electrónico no válido')
+    .max(120),
+  telefono: z
+    .string()
+    .trim()
+    .min(1, REQ)
+    .regex(TELEFONO_ES, 'Teléfono español no válido'),
+  documento: z
+    .string()
+    .trim()
+    .min(1, REQ)
+    .regex(DNI_NIE, 'DNI/NIE no válido (ej. 12345678A o X1234567A)'),
+  direccion: z.string().trim().min(3, 'Introduce una dirección válida').max(120),
+  codigoPostal: z.string().trim().regex(CP_ES, 'Código postal español no válido'),
+  provincia: z.string().trim().min(2, REQ).max(60),
+  ciudad: z.string().trim().min(2, REQ).max(60),
+  pais: z.string().trim().min(2, REQ).max(60),
+  preferenciaPago: z.enum(['cuotas', 'unico'], {
+    message: 'Selecciona una preferencia de pago',
+  }),
+})
+
+export type TutorProfileFormValues = z.infer<typeof tutorProfileSchema>
+
 export const registroSchema = z
   .object({
     nombre: z.string().trim().min(2, 'Introduce un nombre válido').max(60),

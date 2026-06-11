@@ -1,10 +1,10 @@
-import { MobileDrawer } from '@/components/mobile-drawer'
+import { PrivateMobileNav } from '@/components/mobile-drawer'
 import { MOCK_USER } from '@/lib/club'
 
 export function PrivateHeader() {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/80 md:px-6">
-      <MobileDrawer />
+      <PrivateMobileNav />
 
       <div className="ml-auto flex items-center gap-3">
         <div className="hidden flex-col text-right leading-tight sm:flex">
