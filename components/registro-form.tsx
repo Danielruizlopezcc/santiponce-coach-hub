@@ -58,6 +58,12 @@ export function RegistroForm() {
       password: '',
       confirmPassword: '',
       consentimiento: '',
+      aceptaPrivacidad: false,
+      aceptaCondiciones: false,
+      consienteDatosMenor: false,
+      consienteDatosSalud: false,
+      autorizaImagenes: false,
+      consienteMetodoPago: false,
     },
   })
 
@@ -383,6 +389,84 @@ export function RegistroForm() {
             message={errors.consentimiento?.message}
           />
         </div>
+
+        {/* Consentimientos */}
+        <fieldset className="grid gap-3 rounded-lg border border-border bg-card/60 p-4">
+          <legend className="px-1 text-sm font-medium">Consentimientos</legend>
+
+          <ConsentItem
+            id={`${errId}-c-priv`}
+            required
+            error={errors.aceptaPrivacidad?.message}
+            register={register('aceptaPrivacidad')}
+          >
+            He leído y acepto la{' '}
+            <Link
+              href="/legal/privacidad"
+              className="rounded text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              política de privacidad
+            </Link>
+            .
+          </ConsentItem>
+
+          <ConsentItem
+            id={`${errId}-c-cond`}
+            required
+            error={errors.aceptaCondiciones?.message}
+            register={register('aceptaCondiciones')}
+          >
+            He leído y acepto las{' '}
+            <Link
+              href="/legal/condiciones-matricula"
+              className="rounded text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              condiciones de matrícula
+            </Link>
+            .
+          </ConsentItem>
+
+          <ConsentItem
+            id={`${errId}-c-menor`}
+            required
+            error={errors.consienteDatosMenor?.message}
+            register={register('consienteDatosMenor')}
+          >
+            Como tutor legal, autorizo el tratamiento de los datos personales del
+            menor para la gestión deportiva y administrativa del club.
+          </ConsentItem>
+
+          <ConsentItem
+            id={`${errId}-c-salud`}
+            required
+            error={errors.consienteDatosSalud?.message}
+            register={register('consienteDatosSalud')}
+          >
+            Autorizo de forma expresa el tratamiento de los datos de salud y
+            alergias del menor con el único fin de garantizar su seguridad
+            durante la actividad deportiva.
+          </ConsentItem>
+
+          <ConsentItem
+            id={`${errId}-c-img`}
+            error={errors.autorizaImagenes?.message}
+            register={register('autorizaImagenes')}
+          >
+            <span className="font-medium text-foreground">Opcional.</span>{' '}
+            Autorizo el uso de fotografías y vídeos del menor en los canales
+            oficiales del club con fines informativos y promocionales.
+          </ConsentItem>
+
+          <ConsentItem
+            id={`${errId}-c-pago`}
+            required
+            error={errors.consienteMetodoPago?.message}
+            register={register('consienteMetodoPago')}
+          >
+            Autorizo guardar mi método de pago de forma segura para cobrar las
+            cuotas futuras aprobadas por el club.
+          </ConsentItem>
+        </fieldset>
       </fieldset>
 
       {serverError && (
@@ -416,5 +500,49 @@ export function RegistroForm() {
         )}
       </Button>
     </form>
+  )
+}
+
+type ConsentItemProps = {
+  id: string
+  required?: boolean
+  error?: string
+  register: ReturnType<ReturnType<typeof useForm<RegistroFormValues>>['register']>
+  children: React.ReactNode
+}
+
+function ConsentItem({ id, required, error, register, children }: ConsentItemProps) {
+  return (
+    <div className="grid gap-1">
+      <label
+        htmlFor={id}
+        className={cn(
+          'flex cursor-pointer items-start gap-3 rounded-md border border-transparent p-2 text-sm transition-colors hover:bg-muted/40 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring/40',
+          error && 'border-destructive/40 bg-destructive/5',
+        )}
+      >
+        <input
+          id={id}
+          type="checkbox"
+          className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+          aria-invalid={!!error || undefined}
+          aria-describedby={error ? `${id}-err` : undefined}
+          {...register}
+        />
+        <span className="text-pretty">
+          {children}
+          {required && (
+            <span aria-hidden="true" className="ml-1 text-destructive">
+              *
+            </span>
+          )}
+        </span>
+      </label>
+      {error && (
+        <p id={`${id}-err`} role="alert" className="pl-9 text-xs font-medium text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
