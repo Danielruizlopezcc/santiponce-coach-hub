@@ -1,25 +1,40 @@
 'use client'
 
+import type { ComponentType } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Award, ClipboardList, House, User, Users } from 'lucide-react'
 import { SignOutButton } from '@/components/sign-out-button'
-import { PRIVATE_NAV } from '@/lib/club'
 import { cn } from '@/lib/utils'
+import type { PrivateNavItem } from '@/lib/club'
 
 type PrivateNavProps = {
+  items?: PrivateNavItem[]
+  isSocio?: boolean
+  isPaidSocio?: boolean
   onNavigate?: () => void
 }
 
-export function PrivateNav({ onNavigate }: PrivateNavProps) {
+const ICONS: Record<PrivateNavItem['icon'], ComponentType<{ className?: string; 'aria-hidden'?: boolean }>> = {
+  house: House,
+  user: User,
+  users: Users,
+  award: Award,
+  'clipboard-list': ClipboardList,
+}
+
+export function PrivateNav({ items, isSocio, isPaidSocio, onNavigate }: PrivateNavProps) {
   const pathname = usePathname()
+  const navItems = items ?? []
 
   return (
     <nav
       aria-label="Navegación principal"
       className="flex flex-1 flex-col gap-1 p-3"
     >
-      {PRIVATE_NAV.map((item) => {
-        const Icon = item.icon
+      {navItems.map((item) => {
+        const Icon = ICONS[item.icon] ?? House
+        const isUnavailable = item.requiresPaidSocio && isSocio && !isPaidSocio
         const isActive =
           item.href === '/app'
             ? pathname === '/app'
@@ -37,9 +52,10 @@ export function PrivateNav({ onNavigate }: PrivateNavProps) {
               isActive
                 ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                 : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+              isUnavailable && 'opacity-70',
             )}
           >
-            <Icon className="size-5 shrink-0" aria-hidden="true" />
+            <Icon className="size-5 shrink-0" aria-hidden={true} />
             {item.label}
           </Link>
         )

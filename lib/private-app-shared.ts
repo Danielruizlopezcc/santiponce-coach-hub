@@ -50,6 +50,14 @@ export type PrivateDashboardData = {
   seasonLabel: string
   matriculaImporte: number
   deportistas: PrivateAthleteSummary[]
+  hasGuardian: boolean
+  isPaidSocio: boolean
+}
+
+export type PrivateUserStatus = {
+  hasGuardian: boolean
+  isSocio: boolean
+  isPaidSocio: boolean
 }
 
 export function normalizeEmail(value: string) {

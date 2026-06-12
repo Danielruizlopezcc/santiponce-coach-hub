@@ -44,12 +44,14 @@ export function RegistroForm() {
   const {
     register,
     control,
+    watch,
     handleSubmit,
-    formState: { errors, isSubmitting, isSubmitSuccessful },
+    formState: { errors: rawErrors, isSubmitting, isSubmitSuccessful },
   } = useForm<RegistroFormValues>({
     resolver: zodResolver(registroSchema),
     mode: 'onBlur',
     defaultValues: {
+      accountType: 'tutor',
       nombre: '',
       apellidos: '',
       email: '',
@@ -72,6 +74,9 @@ export function RegistroForm() {
       deportistas: [],
     },
   })
+
+  const accountType = watch('accountType')
+  const errors = rawErrors as Record<string, any>
 
   const {
     fields: deportistaFields,
@@ -124,6 +129,43 @@ export function RegistroForm() {
       className="flex flex-col gap-5"
       aria-busy={isSubmitting || undefined}
     >
+      {/* Tipo de cuenta */}
+      <fieldset disabled={disabled} className="contents">
+        <div className="grid gap-2">
+          <legend className="text-sm font-medium">Tipo de cuenta</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/60 p-3 text-sm transition-colors hover:bg-muted/40 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/50 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5">
+              <input
+                type="radio"
+                value="tutor"
+                className="mt-0.5 size-4 accent-[var(--primary)]"
+                {...register('accountType')}
+              />
+              <span>
+                <span className="block font-medium text-foreground">Tutor</span>
+                <span className="block text-xs text-muted-foreground">
+                  Gestiona la matriculación de tus deportistas.
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/60 p-3 text-sm transition-colors hover:bg-muted/40 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/50 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5">
+              <input
+                type="radio"
+                value="socio"
+                className="mt-0.5 size-4 accent-[var(--primary)]"
+                {...register('accountType')}
+              />
+              <span>
+                <span className="block font-medium text-foreground">Socio</span>
+                <span className="block text-xs text-muted-foreground">
+                  Accede al panel básico y abona tu cuota de socio.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </fieldset>
+
       {/* Datos personales */}
       <fieldset disabled={disabled} className="contents">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -173,163 +215,190 @@ export function RegistroForm() {
             />
             <FieldError id={`${errId}-email`} message={errors.email?.message} />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="telefono">
-              Teléfono <span aria-hidden="true" className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="telefono"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="600 123 456"
-              aria-invalid={!!errors.telefono || undefined}
-              aria-describedby={errors.telefono ? `${errId}-telefono` : undefined}
-              {...register('telefono')}
-            />
-            <FieldError id={`${errId}-telefono`} message={errors.telefono?.message} />
-          </div>
-        </div>
+          {accountType === 'socio' ? (
+            <div className="rounded-2xl border border-border bg-card/60 p-4 text-sm text-muted-foreground">
+              <p className="font-semibold text-foreground">Cuenta de socio</p>
+              <p className="mt-2">
+                Solo necesitas nombre, correo electrónico y contraseña. Después de iniciar sesión,
+                podrás abonar la cuota de socio de 20€ para desbloquear el resto de funcionalidades.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="telefono">
+                    Teléfono <span aria-hidden="true" className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="telefono"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="600 123 456"
+                    aria-invalid={!!errors.telefono || undefined}
+                    aria-describedby={errors.telefono ? `${errId}-telefono` : undefined}
+                    {...register('telefono')}
+                  />
+                  <FieldError id={`${errId}-telefono`} message={errors.telefono?.message} />
+                </div>
+              </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="documento">
-            DNI / NIE <span aria-hidden="true" className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="documento"
-            autoComplete="off"
-            placeholder="12345678A o X1234567A"
-            aria-invalid={!!errors.documento || undefined}
-            aria-describedby={errors.documento ? `${errId}-documento` : undefined}
-            {...register('documento')}
-          />
-          <FieldError id={`${errId}-documento`} message={errors.documento?.message} />
-        </div>
+              <div className="grid gap-2">
+                <Label htmlFor="documento">
+                  DNI / NIE <span aria-hidden="true" className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="documento"
+                  autoComplete="off"
+                  placeholder="12345678A o X1234567A"
+                  aria-invalid={!!errors.documento || undefined}
+                  aria-describedby={errors.documento ? `${errId}-documento` : undefined}
+                  {...register('documento')}
+                />
+                <FieldError id={`${errId}-documento`} message={errors.documento?.message} />
+              </div>
 
-        {/* Dirección */}
-        <div className="grid gap-2">
-          <Label htmlFor="direccion">
-            Dirección <span aria-hidden="true" className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="direccion"
-            autoComplete="street-address"
-            placeholder="Calle, número, piso..."
-            aria-invalid={!!errors.direccion || undefined}
-            aria-describedby={errors.direccion ? `${errId}-direccion` : undefined}
-            {...register('direccion')}
-          />
-          <FieldError id={`${errId}-direccion`} message={errors.direccion?.message} />
-        </div>
+              {/* Dirección */}
+              <div className="grid gap-2">
+                <Label htmlFor="direccion">
+                  Dirección <span aria-hidden="true" className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="direccion"
+                  autoComplete="street-address"
+                  placeholder="Calle, número, piso..."
+                  aria-invalid={!!errors.direccion || undefined}
+                  aria-describedby={errors.direccion ? `${errId}-direccion` : undefined}
+                  {...register('direccion')}
+                />
+                <FieldError id={`${errId}-direccion`} message={errors.direccion?.message} />
+              </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="grid gap-2">
-            <Label htmlFor="codigoPostal">
-              Código postal <span aria-hidden="true" className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="codigoPostal"
-              inputMode="numeric"
-              autoComplete="postal-code"
-              placeholder="41907"
-              maxLength={5}
-              aria-invalid={!!errors.codigoPostal || undefined}
-              aria-describedby={errors.codigoPostal ? `${errId}-cp` : undefined}
-              {...register('codigoPostal')}
-            />
-            <FieldError id={`${errId}-cp`} message={errors.codigoPostal?.message} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="ciudad">
-              Ciudad <span aria-hidden="true" className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="ciudad"
-              autoComplete="address-level2"
-              placeholder="Santiponce"
-              aria-invalid={!!errors.ciudad || undefined}
-              aria-describedby={errors.ciudad ? `${errId}-ciudad` : undefined}
-              {...register('ciudad')}
-            />
-            <FieldError id={`${errId}-ciudad`} message={errors.ciudad?.message} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="provincia">
-              Provincia <span aria-hidden="true" className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="provincia"
-              autoComplete="address-level1"
-              placeholder="Sevilla"
-              aria-invalid={!!errors.provincia || undefined}
-              aria-describedby={errors.provincia ? `${errId}-provincia` : undefined}
-              {...register('provincia')}
-            />
-            <FieldError id={`${errId}-provincia`} message={errors.provincia?.message} />
-          </div>
-        </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="codigoPostal">
+                    Código postal <span aria-hidden="true" className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="codigoPostal"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    placeholder="41907"
+                    maxLength={5}
+                    aria-invalid={!!errors.codigoPostal || undefined}
+                    aria-describedby={errors.codigoPostal ? `${errId}-cp` : undefined}
+                    {...register('codigoPostal')}
+                  />
+                  <FieldError id={`${errId}-cp`} message={errors.codigoPostal?.message} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ciudad">
+                    Ciudad <span aria-hidden="true" className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="ciudad"
+                    autoComplete="address-level2"
+                    placeholder="Santiponce"
+                    aria-invalid={!!errors.ciudad || undefined}
+                    aria-describedby={errors.ciudad ? `${errId}-ciudad` : undefined}
+                    {...register('ciudad')}
+                  />
+                  <FieldError id={`${errId}-ciudad`} message={errors.ciudad?.message} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="provincia">
+                    Provincia <span aria-hidden="true" className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="provincia"
+                    autoComplete="address-level1"
+                    placeholder="Sevilla"
+                    aria-invalid={!!errors.provincia || undefined}
+                    aria-describedby={errors.provincia ? `${errId}-provincia` : undefined}
+                    {...register('provincia')}
+                  />
+                  <FieldError id={`${errId}-provincia`} message={errors.provincia?.message} />
+                </div>
+              </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="pais">
-            País <span aria-hidden="true" className="text-destructive">*</span>
-          </Label>
-          <select
-            id="pais"
-            autoComplete="country-name"
-            className={selectClasses}
-            aria-invalid={!!errors.pais || undefined}
-            aria-describedby={errors.pais ? `${errId}-pais` : undefined}
-            {...register('pais')}
-          >
-            <option value="España">España</option>
-            <option value="Portugal">Portugal</option>
-            <option value="Francia">Francia</option>
-            <option value="Andorra">Andorra</option>
-            <option value="Otro">Otro</option>
-          </select>
-          <FieldError id={`${errId}-pais`} message={errors.pais?.message} />
-        </div>
+              <div className="grid gap-2">
+                <Label htmlFor="pais">
+                  País <span aria-hidden="true" className="text-destructive">*</span>
+                </Label>
+                <select
+                  id="pais"
+                  autoComplete="country-name"
+                  className={selectClasses}
+                  aria-invalid={!!errors.pais || undefined}
+                  aria-describedby={errors.pais ? `${errId}-pais` : undefined}
+                  {...register('pais')}
+                >
+                  <option value="España">España</option>
+                  <option value="Portugal">Portugal</option>
+                  <option value="Francia">Francia</option>
+                  <option value="Andorra">Andorra</option>
+                  <option value="Otro">Otro</option>
+                </select>
+                <FieldError id={`${errId}-pais`} message={errors.pais?.message} />
+              </div>
 
-        {/* Preferencia de pago */}
-        <fieldset className="grid gap-2">
-          <legend className="text-sm font-medium">
-            Preferencia de pago <span aria-hidden="true" className="text-destructive">*</span>
-          </legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/60 p-3 text-sm transition-colors hover:bg-muted/40 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/50 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5">
-              <input
-                type="radio"
-                value="cuotas"
-                className="mt-0.5 size-4 accent-[var(--primary)]"
-                {...register('preferenciaPago')}
+              {/* Preferencia de pago */}
+              <fieldset className="grid gap-2">
+                <legend className="text-sm font-medium">
+                  Preferencia de pago <span aria-hidden="true" className="text-destructive">*</span>
+                </legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/60 p-3 text-sm transition-colors hover:bg-muted/40 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/50 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      value="cuotas"
+                      className="mt-0.5 size-4 accent-[var(--primary)]"
+                      {...register('preferenciaPago')}
+                    />
+                    <span>
+                      <span className="block font-medium text-foreground">Cuotas</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Pago fraccionado durante la temporada.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/60 p-3 text-sm transition-colors hover:bg-muted/40 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/50 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      value="unico"
+                      className="mt-0.5 size-4 accent-[var(--primary)]"
+                      {...register('preferenciaPago')}
+                    />
+                    <span>
+                      <span className="block font-medium text-foreground">Pago único</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Un solo pago al matricular.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+                <FieldError
+                  id={`${errId}-pago`}
+                  message={errors.preferenciaPago?.message}
+                />
+              </fieldset>
+
+              <DeportistasSection
+                deportistas={deportistaFields}
+                error={
+                  typeof errors.deportistas?.message === 'string'
+                    ? errors.deportistas?.message
+                    : undefined
+                }
+                disabled={disabled}
+                onAdd={(d) => appendDeportista(d)}
+                onUpdate={(index, d) => updateDeportista(index, d)}
+                onRemove={(index) => removeDeportista(index)}
               />
-              <span>
-                <span className="block font-medium text-foreground">Cuotas</span>
-                <span className="block text-xs text-muted-foreground">
-                  Pago fraccionado durante la temporada.
-                </span>
-              </span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-input bg-card/60 p-3 text-sm transition-colors hover:bg-muted/40 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/50 has-[input:checked]:border-primary has-[input:checked]:bg-primary/5">
-              <input
-                type="radio"
-                value="unico"
-                className="mt-0.5 size-4 accent-[var(--primary)]"
-                {...register('preferenciaPago')}
-              />
-              <span>
-                <span className="block font-medium text-foreground">Pago único</span>
-                <span className="block text-xs text-muted-foreground">
-                  Un solo pago al matricular.
-                </span>
-              </span>
-            </label>
-          </div>
-          <FieldError
-            id={`${errId}-pago`}
-            message={errors.preferenciaPago?.message}
-          />
-        </fieldset>
+            </>
+          )}
+        </div>
 
         {/* Contraseñas */}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -384,20 +453,6 @@ export function RegistroForm() {
           </div>
         </div>
 
-        {/* Deportistas relacionados */}
-        <DeportistasSection
-          deportistas={deportistaFields}
-          error={
-            typeof errors.deportistas?.message === 'string'
-              ? errors.deportistas?.message
-              : undefined
-          }
-          disabled={disabled}
-          onAdd={(d) => appendDeportista(d)}
-          onUpdate={(index, d) => updateDeportista(index, d)}
-          onRemove={(index) => removeDeportista(index)}
-        />
-
         {/* Consentimientos */}
         <fieldset className="grid gap-3 rounded-lg border border-border bg-card/60 p-4">
           <legend className="px-1 text-sm font-medium">Consentimientos</legend>
@@ -418,62 +473,66 @@ export function RegistroForm() {
             .
           </ConsentItem>
 
-          <ConsentItem
-            id={`${errId}-c-cond`}
-            required
-            error={errors.aceptaCondiciones?.message}
-            register={register('aceptaCondiciones')}
-          >
-            He leído y acepto las{' '}
-            <Link
-              href="/legal/condiciones-matricula"
-              className="rounded text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              condiciones de matrícula
-            </Link>
-            .
-          </ConsentItem>
+          {accountType === 'tutor' && (
+            <>
+              <ConsentItem
+                id={`${errId}-c-cond`}
+                required
+                error={errors.aceptaCondiciones?.message}
+                register={register('aceptaCondiciones')}
+              >
+                He leído y acepto las{' '}
+                <Link
+                  href="/legal/condiciones-matricula"
+                  className="rounded text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  condiciones de matrícula
+                </Link>
+                .
+              </ConsentItem>
 
-          <ConsentItem
-            id={`${errId}-c-menor`}
-            required
-            error={errors.consienteDatosMenor?.message}
-            register={register('consienteDatosMenor')}
-          >
-            Como tutor legal, autorizo el tratamiento de los datos personales del
-            menor para la gestión deportiva y administrativa del club.
-          </ConsentItem>
+              <ConsentItem
+                id={`${errId}-c-menor`}
+                required
+                error={errors.consienteDatosMenor?.message}
+                register={register('consienteDatosMenor')}
+              >
+                Como tutor legal, autorizo el tratamiento de los datos personales del
+                menor para la gestión deportiva y administrativa del club.
+              </ConsentItem>
 
-          <ConsentItem
-            id={`${errId}-c-salud`}
-            required
-            error={errors.consienteDatosSalud?.message}
-            register={register('consienteDatosSalud')}
-          >
-            Autorizo de forma expresa el tratamiento de los datos de salud y
-            alergias del menor con el único fin de garantizar su seguridad
-            durante la actividad deportiva.
-          </ConsentItem>
+              <ConsentItem
+                id={`${errId}-c-salud`}
+                required
+                error={errors.consienteDatosSalud?.message}
+                register={register('consienteDatosSalud')}
+              >
+                Autorizo de forma expresa el tratamiento de los datos de salud y
+                alergias del menor con el único fin de garantizar su seguridad
+                durante la actividad deportiva.
+              </ConsentItem>
 
-          <ConsentItem
-            id={`${errId}-c-img`}
-            error={errors.autorizaImagenes?.message}
-            register={register('autorizaImagenes')}
-          >
-            <span className="font-medium text-foreground">Opcional.</span>{' '}
-            Autorizo el uso de fotografías y vídeos del menor en los canales
-            oficiales del club con fines informativos y promocionales.
-          </ConsentItem>
+              <ConsentItem
+                id={`${errId}-c-img`}
+                error={errors.autorizaImagenes?.message}
+                register={register('autorizaImagenes')}
+              >
+                <span className="font-medium text-foreground">Opcional.</span>{' '}
+                Autorizo el uso de fotografías y vídeos del menor en los canales
+                oficiales del club con fines informativos y promocionales.
+              </ConsentItem>
 
-          <ConsentItem
-            id={`${errId}-c-pago`}
-            required
-            error={errors.consienteMetodoPago?.message}
-            register={register('consienteMetodoPago')}
-          >
-            Autorizo guardar mi método de pago en Stripe de forma segura para
-            usarlo en futuras cuotas autorizadas por el club.
-          </ConsentItem>
+              <ConsentItem
+                id={`${errId}-c-pago`}
+                required
+                error={errors.consienteMetodoPago?.message}
+                register={register('consienteMetodoPago')}
+              >
+                Autorizo guardar mi método de pago en Stripe de forma segura para
+                usarlo en futuras cuotas autorizadas por el club.
+              </ConsentItem>
+            </>
+          )}
         </fieldset>
       </fieldset>
 

@@ -6,6 +6,7 @@ import type {
   PrivateDashboardData,
   PrivateSponsor,
   PrivateTutorProfile,
+  PrivateUserStatus,
   PrivateViewer,
 } from '@/lib/private-app-shared'
 import { normalizeDocument, normalizeEmail, normalizeOptionalEmail, normalizeOptionalPhone, normalizePhone } from '@/lib/private-app-shared'
@@ -66,14 +67,33 @@ async function getPrivateCollections(userId: string): Promise<PrivateCollections
   }
 }
 
+export async function getPrivateUserStatus(userId: string): Promise<PrivateUserStatus> {
+  const supabase = await createClient()
+
+  const [{ data: guardian }, { data: profile }] = await Promise.all([
+    supabase.from('guardians').select('id').eq('user_id', userId).maybeSingle(),
+    supabase.from('profiles').select('is_paid_member').eq('id', userId).maybeSingle(),
+  ])
+
+  const hasGuardian = Boolean(guardian?.id)
+  const isSocio = !hasGuardian
+
+  return {
+    hasGuardian,
+    isSocio,
+    isPaidSocio: isSocio && Boolean(profile?.is_paid_member),
+  }
+}
+
 export async function getPrivateDashboardData(
   userId: string,
 ): Promise<PrivateDashboardData> {
   const supabase = await createClient()
 
-  const [viewer, collections] = await Promise.all([
+  const [viewer, collections, status] = await Promise.all([
     getPrivateViewer(userId),
     getPrivateCollections(userId),
+    getPrivateUserStatus(userId),
   ])
 
   if (!collections.guardianId) {
@@ -82,6 +102,8 @@ export async function getPrivateDashboardData(
       seasonLabel: collections.activeSeasonLabel,
       matriculaImporte: MATRICULA_IMPORTE,
       deportistas: [],
+      hasGuardian: false,
+      isPaidSocio: status.isPaidSocio,
     }
   }
 
@@ -108,6 +130,8 @@ export async function getPrivateDashboardData(
         : null,
       estado: athlete.status,
     })),
+    hasGuardian: true,
+    isPaidSocio: false,
   }
 }
 

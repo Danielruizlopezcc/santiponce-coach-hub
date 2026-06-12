@@ -169,56 +169,73 @@ export const tutorProfileSchema = z.object({
 
 export type TutorProfileFormValues = z.infer<typeof tutorProfileSchema>
 
+const socioRegistrationSchema = z.object({
+  accountType: z.literal('socio'),
+  nombre: z.string().trim().min(2, 'Introduce un nombre válido').max(60),
+  apellidos: z.string().trim().min(2, 'Introduce los apellidos').max(80),
+  email: z
+    .string()
+    .trim()
+    .min(1, REQ)
+    .email('Correo electrónico no válido')
+    .max(120),
+  password: passwordSchema,
+  confirmPassword: z.string().min(1, REQ),
+  aceptaPrivacidad: z.boolean().refine((v) => v === true, {
+    message: 'Debes aceptar la política de privacidad',
+  }),
+})
+
+const tutorRegistrationSchema = z.object({
+  accountType: z.literal('tutor'),
+  nombre: z.string().trim().min(2, 'Introduce un nombre válido').max(60),
+  apellidos: z.string().trim().min(2, 'Introduce los apellidos').max(80),
+  email: z
+    .string()
+    .trim()
+    .min(1, REQ)
+    .email('Correo electrónico no válido')
+    .max(120),
+  telefono: z
+    .string()
+    .trim()
+    .min(1, REQ)
+    .regex(TELEFONO_ES, 'Teléfono español no válido'),
+  documento: dniNieSchema,
+  direccion: z.string().trim().min(3, 'Introduce una dirección válida').max(120),
+  codigoPostal: z.string().trim().regex(CP_ES, 'Código postal español no válido'),
+  provincia: z.string().trim().min(2, REQ).max(60),
+  ciudad: z.string().trim().min(2, REQ).max(60),
+  pais: z.string().trim().min(2, REQ).max(60),
+  preferenciaPago: z.enum(['cuotas', 'unico'], {
+    message: 'Selecciona una preferencia de pago',
+  }),
+  password: passwordSchema,
+  confirmPassword: z.string().min(1, REQ),
+  aceptaPrivacidad: z.boolean().refine((v) => v === true, {
+    message: 'Debes aceptar la política de privacidad',
+  }),
+  aceptaCondiciones: z.boolean().refine((v) => v === true, {
+    message: 'Debes aceptar las condiciones de matrícula',
+  }),
+  consienteDatosMenor: z.boolean().refine((v) => v === true, {
+    message: 'Debes autorizar el tratamiento de datos del menor',
+  }),
+  consienteDatosSalud: z.boolean().refine((v) => v === true, {
+    message: 'Debes autorizar el tratamiento de datos de salud y alergias',
+  }),
+  autorizaImagenes: z.boolean(),
+  consienteMetodoPago: z.boolean().refine((v) => v === true, {
+    message:
+      'Debes autorizar guardar el método de pago para futuras cuotas',
+  }),
+  deportistas: z
+    .array(deportistaSchema)
+    .min(1, 'Debes añadir al menos un deportista'),
+})
+
 export const registroSchema = z
-  .object({
-    nombre: z.string().trim().min(2, 'Introduce un nombre válido').max(60),
-    apellidos: z.string().trim().min(2, 'Introduce los apellidos').max(80),
-    email: z
-      .string()
-      .trim()
-      .min(1, REQ)
-      .email('Correo electrónico no válido')
-      .max(120),
-    telefono: z
-      .string()
-      .trim()
-      .min(1, REQ)
-      .regex(TELEFONO_ES, 'Teléfono español no válido'),
-    documento: dniNieSchema,
-    direccion: z.string().trim().min(3, 'Introduce una dirección válida').max(120),
-    codigoPostal: z
-      .string()
-      .trim()
-      .regex(CP_ES, 'Código postal español no válido'),
-    provincia: z.string().trim().min(2, REQ).max(60),
-    ciudad: z.string().trim().min(2, REQ).max(60),
-    pais: z.string().trim().min(2, REQ).max(60),
-    preferenciaPago: z.enum(['cuotas', 'unico'], {
-      message: 'Selecciona una preferencia de pago',
-    }),
-    password: passwordSchema,
-    confirmPassword: z.string().min(1, REQ),
-    aceptaPrivacidad: z.boolean().refine((v) => v === true, {
-      message: 'Debes aceptar la política de privacidad',
-    }),
-    aceptaCondiciones: z.boolean().refine((v) => v === true, {
-      message: 'Debes aceptar las condiciones de matrícula',
-    }),
-    consienteDatosMenor: z.boolean().refine((v) => v === true, {
-      message: 'Debes autorizar el tratamiento de datos del menor',
-    }),
-    consienteDatosSalud: z.boolean().refine((v) => v === true, {
-      message: 'Debes autorizar el tratamiento de datos de salud y alergias',
-    }),
-    autorizaImagenes: z.boolean(),
-    consienteMetodoPago: z.boolean().refine((v) => v === true, {
-      message:
-        'Debes autorizar guardar el método de pago para futuras cuotas',
-    }),
-    deportistas: z
-      .array(deportistaSchema)
-      .min(1, 'Debes añadir al menos un deportista'),
-  })
+  .discriminatedUnion('accountType', [socioRegistrationSchema, tutorRegistrationSchema])
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],
     message: 'Las contraseñas no coinciden',

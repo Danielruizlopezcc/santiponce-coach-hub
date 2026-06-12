@@ -71,11 +71,12 @@ function DeportistaCard({ deportista }: { deportista: PrivateAthleteSummary }) {
 
 export default async function AppDashboardPage() {
   const user = await requireUser()
-  const { viewer, seasonLabel, matriculaImporte, deportistas } =
+  const { viewer, seasonLabel, matriculaImporte, deportistas, hasGuardian, isPaidSocio } =
     await getPrivateDashboardData(user.id)
-  const total        = deportistas.length
+  const isSocio = !hasGuardian
+  const total = deportistas.length
   const matriculados = deportistas.filter((d) => d.estado === 'matriculado').length
-  const pendientes   = deportistas.filter((d) => d.estado !== 'matriculado').length
+  const pendientes = deportistas.filter((d) => d.estado !== 'matriculado').length
 
   return (
     <PrivatePageContainer
@@ -96,97 +97,161 @@ export default async function AppDashboardPage() {
       </section>
 
       {/* ── Tarjetas de resumen ────────────────────────────────────────── */}
-      <section aria-label="Resumen" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className={cn('grid gap-4', isSocio ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4')} aria-label="Resumen">
         <ResumenCard
-          label="Total de deportistas"
-          value={String(total)}
-          icon={Users}
+          label={isSocio ? 'Tipo de cuenta' : 'Total de deportistas'}
+          value={isSocio ? 'Socio' : String(total)}
+          icon={isSocio ? UserCheck : Users}
         />
         <ResumenCard
-          label="Pendientes de matrícula"
-          value={String(pendientes)}
-          icon={UserPlus}
-          accent="bg-amber-100 text-amber-600"
+          label={isSocio ? 'Membresía pendiente' : 'Pendientes de matrícula'}
+          value={isSocio ? '20€' : String(pendientes)}
+          icon={isSocio ? ClipboardList : UserPlus}
+          accent={isSocio ? 'bg-violet-100 text-violet-600' : 'bg-amber-100 text-amber-600'}
         />
+        {!isSocio && (
+          <ResumenCard
+            label="Deportistas"
+            value={String(total)}
+            icon={Users}
+            accent="bg-primary/10 text-primary"
+          />
+        )}
         <ResumenCard
-          label="Matriculados"
-          value={String(matriculados)}
-          icon={UserCheck}
-          accent="bg-emerald-100 text-emerald-600"
-        />
-        <ResumenCard
-          label="Precio de matrícula"
-          value={formatEuro(matriculaImporte)}
+          label={isSocio ? 'Temporada' : 'Precio de matrícula'}
+          value={isSocio ? seasonLabel : formatEuro(matriculaImporte)}
           icon={ClipboardList}
           accent="bg-violet-100 text-violet-600"
         />
       </section>
 
-      {/* ── Acceso a matriculación ─────────────────────────────────────── */}
-      <section
-        aria-label="Matriculación"
-        className="mt-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/80 to-card p-6 shadow-sm backdrop-blur sm:p-7"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Acceso destacado
-            </p>
-            <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">
-              Matriculación temporada {seasonLabel}
-            </h2>
-            <p className="mt-1 text-sm text-pretty text-muted-foreground">
-              {pendientes > 0
-                ? `Tienes ${pendientes} ${pendientes === 1 ? 'deportista pendiente' : 'deportistas pendientes'} de matricular. Importe por deportista: ${formatEuro(matriculaImporte)}.`
-                : `Todos tus deportistas están matriculados. Importe por deportista: ${formatEuro(matriculaImporte)}.`}
-            </p>
+      {isSocio ? (
+        <section
+          aria-label="Pago de membresía"
+          className="mt-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/80 to-card p-6 shadow-sm backdrop-blur sm:p-7"
+        >
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-xl">
+              <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                Zona de socios
+              </p>
+              <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">
+                {isPaidSocio ? 'Tu membresía está activa' : 'Completa tu membresía'}
+              </h2>
+              <p className="mt-1 text-sm text-pretty text-muted-foreground">
+                {isPaidSocio
+                  ? 'Ya tienes acceso como socio. Navega a la sección de patrocinadores para ver las novedades del club.'
+                  : 'Tu cuenta está activa como socio, pero debes realizar el pago de 20€ con Stripe para completar la membresía.'}
+              </p>
+            </div>
+            {!isPaidSocio && (
+              <Button
+                nativeButton={false}
+                render={<Link href="/app/pago-socio" />}
+                size="lg"
+              >
+                Pagar 20€
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Button>
+            )}
           </div>
-          <Button
-            nativeButton={false}
-            render={<Link href="/app/matriculacion" />}
-            size="lg"
+        </section>
+      ) : (
+        <>
+          {/* ── Acceso a matriculación ─────────────────────────────────────── */}
+          <section
+            aria-label="Matriculación"
+            className="mt-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/80 to-card p-6 shadow-sm backdrop-blur sm:p-7"
           >
-            Ir a matriculación
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Button>
-        </div>
-      </section>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-xl">
+                <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                  Acceso destacado
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">
+                  Matriculación temporada {seasonLabel}
+                </h2>
+                <p className="mt-1 text-sm text-pretty text-muted-foreground">
+                  {pendientes > 0
+                    ? `Tienes ${pendientes} ${pendientes === 1 ? 'deportista pendiente' : 'deportistas pendientes'} de matricular. Importe por deportista: ${formatEuro(matriculaImporte)}.`
+                    : `Todos tus deportistas están matriculados. Importe por deportista: ${formatEuro(matriculaImporte)}.`}
+                </p>
+              </div>
+              <Button
+                nativeButton={false}
+                render={<Link href="/app/matriculacion" />}
+                size="lg"
+              >
+                Ir a matriculación
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Button>
+            </div>
+          </section>
 
-      {/* ── Listado de deportistas ─────────────────────────────────────── */}
-      <section aria-label="Tus deportistas" className="mt-6">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Tus deportistas</h2>
-            <p className="text-sm text-muted-foreground">
-              Resumen de los deportistas vinculados a tu cuenta.
-            </p>
-          </div>
-          <Link
-            href="/app/deportistas"
-            className="text-sm font-medium text-primary outline-none hover:underline focus-visible:underline"
+          <section
+            aria-label="Hazte socio"
+            className="mt-6 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/80 to-card p-6 shadow-sm backdrop-blur sm:p-7"
           >
-            Ver todos
-          </Link>
-        </div>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-xl">
+                <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                  Conviértete en socio
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">
+                  Hazte socio del club
+                </h2>
+                <p className="mt-1 text-sm text-pretty text-muted-foreground">
+                  Abona la cuota de 20€ y obtén acceso a las novedades y beneficios de socio.
+                </p>
+              </div>
+              <Button
+                nativeButton={false}
+                render={<Link href="/app/pago-socio" />}
+                size="lg"
+              >
+                Pagar 20€
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Button>
+            </div>
+          </section>
 
-        {total === 0 ? (
-          // Estado vacío
-          <div className="rounded-xl border border-dashed border-border bg-card/70 p-8 text-center backdrop-blur">
-            <p className="text-base font-medium text-foreground">
-              Aún no tienes deportistas registrados.
-            </p>
-            <p className="mt-1 text-sm text-pretty text-muted-foreground">
-              Cuando añadas deportistas a tu cuenta, aparecerán aquí.
-            </p>
-          </div>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2" role="list">
-            {deportistas.slice(0, 4).map((d) => (
-              <DeportistaCard key={d.id} deportista={d} />
-            ))}
-          </ul>
-        )}
-      </section>
+          {/* ── Listado de deportistas ─────────────────────────────────────── */}
+          <section aria-label="Tus deportistas" className="mt-6">
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Tus deportistas</h2>
+                <p className="text-sm text-muted-foreground">
+                  Resumen de los deportistas vinculados a tu cuenta.
+                </p>
+              </div>
+              <Link
+                href="/app/deportistas"
+                className="text-sm font-medium text-primary outline-none hover:underline focus-visible:underline"
+              >
+                Ver todos
+              </Link>
+            </div>
+
+            {total === 0 ? (
+              // Estado vacío
+              <div className="rounded-xl border border-dashed border-border bg-card/70 p-8 text-center backdrop-blur">
+                <p className="text-base font-medium text-foreground">
+                  Aún no tienes deportistas registrados.
+                </p>
+                <p className="mt-1 text-sm text-pretty text-muted-foreground">
+                  Cuando añadas deportistas a tu cuenta, aparecerán aquí.
+                </p>
+              </div>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2" role="list">
+                {deportistas.slice(0, 4).map((d) => (
+                  <DeportistaCard key={d.id} deportista={d} />
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
 
     </PrivatePageContainer>
   )

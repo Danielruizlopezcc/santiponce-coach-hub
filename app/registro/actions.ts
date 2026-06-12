@@ -59,6 +59,64 @@ export async function registerGuardianAccount(
   let createdUserId: string | null = null
 
   try {
+    if (values.accountType === 'socio') {
+      const email = normalizeEmail(values.email)
+
+      const [{ data: consentDocuments, error: consentError }, { data: existingProfile, error: profilesError }] =
+        await Promise.all([
+          supabase
+            .from('consent_documents')
+            .select('id, code')
+            .eq('code', 'privacy_policy'),
+          supabase.from('profiles').select('id').eq('email', email).maybeSingle(),
+        ])
+
+      if (consentError || !consentDocuments?.length) {
+        return {
+          success: false,
+          message: 'No se ha encontrado el documento de política de privacidad.',
+        }
+      }
+
+      if (profilesError) {
+        return {
+          success: false,
+          message: 'No se han podido validar los datos duplicados en Supabase.',
+        }
+      }
+
+      if (existingProfile) {
+        return {
+          success: false,
+          message: 'Ya existe una cuenta con ese correo electrónico.',
+        }
+      }
+
+      const { data: authResult, error: authError } =
+        await supabase.auth.admin.createUser({
+          email,
+          password: values.password,
+          email_confirm: true,
+          user_metadata: {
+            first_name: values.nombre,
+            last_name: values.apellidos,
+          },
+        })
+
+      if (authError || !authResult.user) {
+        return {
+          success: false,
+          message:
+            authError?.message ??
+            'No se ha podido crear el usuario en Supabase Auth.',
+        }
+      }
+
+      createdUserId = authResult.user.id
+
+      return { success: true }
+    }
+
     const guardianEmail = normalizeEmail(values.email)
     const guardianPhone = normalizePhone(values.telefono)
     const guardianDocument = normalizeDocument(values.documento)

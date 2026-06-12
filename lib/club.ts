@@ -1,4 +1,3 @@
-import type { LucideIcon } from 'lucide-react'
 import { Award, ClipboardList, House, User, Users } from 'lucide-react'
 
 export const CLUB = {
@@ -15,8 +14,16 @@ export type NavItem = {
   href: string
 }
 
+export type PrivateNavIcon =
+  | 'house'
+  | 'user'
+  | 'users'
+  | 'award'
+  | 'clipboard-list'
+
 export type PrivateNavItem = NavItem & {
-  icon: LucideIcon
+  icon: PrivateNavIcon
+  requiresPaidSocio?: boolean
 }
 
 export const PUBLIC_NAV: NavItem[] = [
@@ -34,9 +41,31 @@ export const LEGAL_NAV: NavItem[] = [
 ]
 
 export const PRIVATE_NAV: PrivateNavItem[] = [
-  { label: 'Inicio', href: '/app', icon: House },
-  { label: 'Perfil', href: '/app/perfil', icon: User },
-  { label: 'Mis deportistas', href: '/app/deportistas', icon: Users },
-  { label: 'Patrocinadores', href: '/app/patrocinadores', icon: Award },
-  { label: 'Matriculación', href: '/app/matriculacion', icon: ClipboardList },
+  { label: 'Inicio', href: '/app', icon: 'house' },
+  { label: 'Perfil', href: '/app/perfil', icon: 'user' },
+  { label: 'Mis deportistas', href: '/app/deportistas', icon: 'users' },
+  { label: 'Patrocinadores', href: '/app/patrocinadores', icon: 'award', requiresPaidSocio: true },
+  { label: 'Matriculación', href: '/app/matriculacion', icon: 'clipboard-list' },
 ]
+
+export function getPrivateNavItems({
+  hasGuardian = false,
+  isPaidSocio = false,
+}: {
+  hasGuardian?: boolean
+  isPaidSocio?: boolean
+} = {}): PrivateNavItem[] {
+  const baseItems = PRIVATE_NAV.filter((item) =>
+    item.href === '/app' || item.href === '/app/perfil' || item.href === '/app/patrocinadores',
+  )
+
+  if (hasGuardian) {
+    return [
+      ...baseItems,
+      PRIVATE_NAV.find((item) => item.href === '/app/deportistas')!,
+      PRIVATE_NAV.find((item) => item.href === '/app/matriculacion')!,
+    ]
+  }
+
+  return baseItems
+}

@@ -33,12 +33,10 @@ export default function RegistroPage() {
         />
         <Card className="w-full border-border/70 bg-card/90 backdrop-blur">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-balance">
-              Crear cuenta de tutor
-            </CardTitle>
+            <CardTitle className="text-2xl text-balance">Crear cuenta</CardTitle>
             <CardDescription className="text-pretty">
-              Regístrate como tutor para gestionar la matriculación de tus deportistas
-              en el {CLUB.legalName}.
+              Elige entre crear una cuenta de tutor o de socio para acceder a tu
+              área privada del {CLUB.legalName}.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -12,8 +12,15 @@ import {
 } from '@/components/ui/sheet'
 import { ClubLogo } from '@/components/club-logo'
 import { PrivateNav } from '@/components/private-nav'
+import type { PrivateNavItem } from '@/lib/club'
 
-export function PrivateMobileNav() {
+type PrivateMobileNavProps = {
+  items: PrivateNavItem[]
+  isSocio?: boolean
+  isPaidSocio?: boolean
+}
+
+export function PrivateMobileNav({ items, isSocio, isPaidSocio }: PrivateMobileNavProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -31,7 +38,12 @@ export function PrivateMobileNav() {
           <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
           <ClubLogo size={36} href="/app" />
         </SheetHeader>
-        <PrivateNav onNavigate={() => setOpen(false)} />
+        <PrivateNav
+          items={items}
+          isSocio={isSocio}
+          isPaidSocio={isPaidSocio}
+          onNavigate={() => setOpen(false)}
+        />
       </SheetContent>
     </Sheet>
   )
