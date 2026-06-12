@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ClipboardList, House, User, Users } from 'lucide-react'
+import { Award, ClipboardList, House, User, Users } from 'lucide-react'
 
 export const CLUB = {
   shortName: 'CD Santiponce',
@@ -37,5 +37,6 @@ export const PRIVATE_NAV: PrivateNavItem[] = [
   { label: 'Inicio', href: '/app', icon: House },
   { label: 'Perfil', href: '/app/perfil', icon: User },
   { label: 'Mis deportistas', href: '/app/deportistas', icon: Users },
+  { label: 'Patrocinadores', href: '/app/patrocinadores', icon: Award },
   { label: 'Matriculación', href: '/app/matriculacion', icon: ClipboardList },
 ]

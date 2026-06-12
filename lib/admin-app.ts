@@ -171,6 +171,15 @@ export type AdminManagerRow = {
   estado: 'Activo'
 }
 
+export type AdminSponsorRow = {
+  id: string
+  title: string
+  imageUrl: string
+  isActive: boolean
+  sortOrder: number
+  createdAt: string
+}
+
 export type AdminConfigRow = {
   id: string
   titulo: string
@@ -478,6 +487,23 @@ export async function getAdminTeams(): Promise<AdminTeamRow[]> {
       } as AdminTeamRow
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+export async function getAdminSponsors(): Promise<AdminSponsorRow[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('sponsors')
+    .select('id, title, image_url, is_active, sort_order, created_at')
+    .order('sort_order', { ascending: true })
+
+  return (data ?? []).map((sponsor) => ({
+    id: sponsor.id,
+    title: sponsor.title,
+    imageUrl: sponsor.image_url,
+    isActive: sponsor.is_active,
+    sortOrder: sponsor.sort_order,
+    createdAt: sponsor.created_at,
+  }))
 }
 
 export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetail | null> {

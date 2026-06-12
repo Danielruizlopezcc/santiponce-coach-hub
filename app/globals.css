@@ -126,7 +126,7 @@
   body {
     @apply bg-background text-foreground;
     /* Usa la imagen de fondo en public/images/background.avif */
-    background-image: url('../public/images/background.png');
+    background-image: url('../public/images/Fondo1.png');
     background-position: center center;
     background-repeat: no-repeat;
     background-size: cover;

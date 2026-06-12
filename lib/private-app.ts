@@ -4,6 +4,7 @@ import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
 import type {
   PrivateAthleteDetail,
   PrivateDashboardData,
+  PrivateSponsor,
   PrivateTutorProfile,
   PrivateViewer,
 } from '@/lib/private-app-shared'
@@ -181,6 +182,21 @@ export async function getPrivateAthletes(userId: string): Promise<PrivateAthlete
     temporada: collections.seasonsById.get(athlete.season_id) ?? collections.activeSeasonLabel,
     estado: athlete.status,
     pagoEstado: athlete.status === 'matriculado' ? 'pagado' : 'pendiente',
+  }))
+}
+
+export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('sponsors')
+    .select('id, title, image_url')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+
+  return (data ?? []).map((sponsor) => ({
+    id: sponsor.id,
+    title: sponsor.title,
+    imageUrl: sponsor.image_url,
   }))
 }
 

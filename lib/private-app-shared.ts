@@ -39,6 +39,12 @@ export type PrivateTutorProfile = TutorProfileFormValues & {
   }
 }
 
+export type PrivateSponsor = {
+  id: string
+  title: string
+  imageUrl: string
+}
+
 export type PrivateDashboardData = {
   viewer: PrivateViewer
   seasonLabel: string
