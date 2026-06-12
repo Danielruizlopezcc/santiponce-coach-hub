@@ -227,7 +227,7 @@ async function getAdminCollections() {
         'id, guardian_id, first_name, last_name, status, requested_category_id, assigned_team_id, season_id, created_at',
       ),
     supabase.from('categories').select('id, name, sort_order, is_active'),
-    supabase.from('teams').select('id, name, category_id, season_id, is_active'),
+    supabase.from('teams').select('id, name, category_id, season_id, is_active, notes'),
     supabase.from('seasons').select('id, name, starts_at, ends_at, is_active'),
     supabase
       .from('consents')

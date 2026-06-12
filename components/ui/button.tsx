@@ -1,4 +1,4 @@
-import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -40,18 +40,61 @@ const buttonVariants = cva(
   }
 )
 
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+    render?: React.ReactElement
+    nativeButton?: boolean
+  }
+
 function Button({
   className,
   variant = "default",
   size = "default",
+  asChild = false,
+  render,
+  nativeButton = true,
+  type,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonProps) {
+  const resolvedClassName = cn(buttonVariants({ variant, size, className }))
+
+  if (asChild && React.isValidElement(children)) {
+    const child = children as React.ReactElement<{ className?: string; children?: React.ReactNode }>
+    const childProps = child.props
+
+    return React.cloneElement(child, {
+      ...(props as Record<string, unknown>),
+      ...(type ? { type } : {}),
+      className: cn(resolvedClassName, childProps.className),
+      children: childProps.children,
+      ["data-slot"]: "button",
+    } as Record<string, unknown>)
+  }
+
+  if (render && React.isValidElement(render)) {
+    const element = render as React.ReactElement<{ className?: string; children?: React.ReactNode }>
+    const elementProps = element.props
+
+    return React.cloneElement(element, {
+      ...(props as Record<string, unknown>),
+      ...(type ? { type } : {}),
+      className: cn(resolvedClassName, elementProps.className),
+      children: children ?? elementProps.children,
+      ["data-slot"]: "button",
+    } as Record<string, unknown>)
+  }
+
   return (
-    <ButtonPrimitive
+    <button
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={resolvedClassName}
+      type={nativeButton ? type ?? "button" : type}
       {...props}
-    />
+    >
+      {children}
+    </button>
   )
 }
 
