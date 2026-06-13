@@ -30,38 +30,42 @@ export function PrivateNav({ items, isSocio, isPaidSocio, onNavigate }: PrivateN
   return (
     <nav
       aria-label="Navegación principal"
-      className="flex flex-1 flex-col gap-1 p-3"
+      className="flex min-h-0 flex-1 flex-col"
     >
-      {navItems.map((item) => {
-        const Icon = ICONS[item.icon] ?? House
-        const isUnavailable = item.requiresPaidSocio && isSocio && !isPaidSocio
-        const isActive =
-          item.href === '/app'
-            ? pathname === '/app'
-            : pathname === item.href || pathname.startsWith(`${item.href}/`)
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="grid gap-1">
+          {navItems.map((item) => {
+            const Icon = ICONS[item.icon] ?? House
+            const isUnavailable = item.requiresPaidSocio && isSocio && !isPaidSocio
+            const isActive =
+              item.href === '/app'
+                ? pathname === '/app'
+                : pathname === item.href || pathname.startsWith(`${item.href}/`)
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            aria-current={isActive ? 'page' : undefined}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-              'outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              isActive
-                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              isUnavailable && 'opacity-70',
-            )}
-          >
-            <Icon className="size-5 shrink-0" aria-hidden={true} />
-            {item.label}
-          </Link>
-        )
-      })}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  'outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  isActive
+                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                  isUnavailable && 'opacity-70',
+                )}
+              >
+                <Icon className="size-5 shrink-0" aria-hidden={true} />
+                {item.label}
+              </Link>
+            )
+          })}
+        </div>
+      </div>
 
-      <div className="mt-auto pt-3">
+      <div className="shrink-0 border-t border-sidebar-border p-3">
         <SignOutButton
           variant="ghost"
           className={cn(

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { unstable_noStore as noStore } from 'next/cache'
 import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
 import type {
   PrivateAthleteDetail,
@@ -10,6 +11,8 @@ import type {
   PrivateViewer,
 } from '@/lib/private-app-shared'
 import { normalizeDocument, normalizeEmail, normalizeOptionalEmail, normalizeOptionalPhone, normalizePhone } from '@/lib/private-app-shared'
+import { getSavedStripeCardByEmail } from '@/lib/stripe-payment-methods'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type PrivateCollections = {
@@ -100,25 +103,28 @@ async function getPrivateCollections(userId: string): Promise<PrivateCollections
 }
 
 export async function getPrivateUserStatus(userId: string): Promise<PrivateUserStatus> {
-  const supabase = await createClient()
+  noStore()
+
+  const supabase = createAdminClient()
 
   const [{ data: guardian }, { data: profile }] = await Promise.all([
     supabase.from('guardians').select('id').eq('user_id', userId).maybeSingle(),
     supabase
       .from('profiles')
-      .select('is_paid_member, stripe_payment_method_id')
+      .select('is_paid_member, email')
       .eq('id', userId)
       .maybeSingle(),
   ])
 
   const hasGuardian = Boolean(guardian?.id)
   const isSocio = !hasGuardian
+  const savedStripeCard = hasGuardian ? await getSavedStripeCardByEmail(profile?.email) : null
 
   return {
     hasGuardian,
     isSocio,
     isPaidSocio: Boolean(profile?.is_paid_member),
-    hasSavedPaymentMethod: Boolean(profile?.stripe_payment_method_id),
+    hasSavedPaymentMethod: Boolean(savedStripeCard),
   }
 }
 
@@ -180,7 +186,7 @@ export async function getPrivateTutorProfile(userId: string): Promise<PrivateTut
     supabase
       .from('profiles')
       .select(
-        'email, first_name, last_name, stripe_payment_method_id, payment_method_brand, payment_method_last4, payment_method_exp_month, payment_method_exp_year',
+        'email, first_name, last_name',
       )
       .eq('id', userId)
       .maybeSingle(),
@@ -197,6 +203,8 @@ export async function getPrivateTutorProfile(userId: string): Promise<PrivateTut
     return null
   }
 
+  const savedStripeCard = await getSavedStripeCardByEmail(profile.email)
+
   return {
     nombre: guardian.first_name,
     apellidos: guardian.last_name,
@@ -210,10 +218,12 @@ export async function getPrivateTutorProfile(userId: string): Promise<PrivateTut
     pais: guardian.country,
     preferenciaPago: guardian.payment_preference,
     metodoPago: {
-      estado: profile.stripe_payment_method_id ? 'Método de pago guardado' : 'Pendiente de configurar',
+      estado: savedStripeCard ? 'Método de pago guardado' : 'Pendiente de configurar',
+      marca: savedStripeCard?.brand ?? undefined,
+      ultimos4Digitos: savedStripeCard?.last4 ?? undefined,
       detalle:
-        profile.stripe_payment_method_id && profile.payment_method_brand && profile.payment_method_last4
-          ? `${profile.payment_method_brand.toUpperCase()} terminada en ${profile.payment_method_last4}${profile.payment_method_exp_month && profile.payment_method_exp_year ? ` · ${String(profile.payment_method_exp_month).padStart(2, '0')}/${profile.payment_method_exp_year}` : ''}`
+        savedStripeCard?.brand && savedStripeCard.last4
+          ? `${savedStripeCard.brand.toUpperCase()} terminada en ${savedStripeCard.last4}${savedStripeCard.expMonth && savedStripeCard.expYear ? ` · ${String(savedStripeCard.expMonth).padStart(2, '0')}/${savedStripeCard.expYear}` : ''}`
           : 'Añade una tarjeta para futuros cargos autorizados.',
     },
   }

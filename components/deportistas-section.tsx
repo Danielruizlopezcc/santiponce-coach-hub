@@ -66,8 +66,8 @@ export function DeportistasSection({
         <div>
           <legend className="text-sm font-medium">Deportistas relacionados</legend>
           <p className="text-xs text-muted-foreground">
-            Añade al menos un deportista para continuar. Podrás editar o eliminar
-            cada ficha antes de finalizar el registro.
+            Puedes añadir deportistas ahora o hacerlo más adelante desde tu panel.
+            Podrás editar o eliminar cada ficha antes de finalizar el registro.
           </p>
         </div>
       </div>
@@ -83,7 +83,7 @@ export function DeportistasSection({
             Aún no has añadido ningún deportista
           </p>
           <p className="text-xs text-muted-foreground">
-            Pulsa “Añadir deportista” para crear el primero.
+            Este paso es opcional. Pulsa “Añadir deportista” si quieres crear una ficha ahora.
           </p>
           <Button type="button" variant="default" size="sm" onClick={openCreate}>
             <Plus aria-hidden="true" />

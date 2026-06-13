@@ -37,6 +37,8 @@ export type PrivateTutorProfile = TutorProfileFormValues & {
   metodoPago: {
     estado: string
     detalle?: string
+    marca?: string
+    ultimos4Digitos?: string
   }
 }
 

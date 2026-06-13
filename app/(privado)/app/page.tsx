@@ -97,12 +97,14 @@ export default async function AppDashboardPage() {
       </section>
 
       {/* ── Tarjetas de resumen ────────────────────────────────────────── */}
-      <section className={cn('grid gap-4', isSocio ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4')} aria-label="Resumen">
-        <ResumenCard
-          label={isSocio ? 'Tipo de cuenta' : 'Total de deportistas'}
-          value={isSocio ? 'Socio' : String(total)}
-          icon={isSocio ? UserCheck : Users}
-        />
+      <section className={cn('grid gap-4', isSocio ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-3')} aria-label="Resumen">
+        {isSocio && (
+          <ResumenCard
+            label="Tipo de cuenta"
+            value="Socio"
+            icon={UserCheck}
+          />
+        )}
         <ResumenCard
           label={isSocio ? (isPaidSocio ? 'Membresía activa' : 'Membresía pendiente') : 'Pendientes de matrícula'}
           value={isSocio ? (isPaidSocio ? 'Pagada' : `${MEMBERSHIP_IMPORTE}€`) : String(pendientes)}

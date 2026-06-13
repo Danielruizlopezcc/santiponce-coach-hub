@@ -49,12 +49,12 @@ async function uploadSponsorImage(supabase: ReturnType<typeof createAdminClient>
     throw new Error(uploadError.message)
   }
 
-  const { data: publicUrlData, error: publicUrlError } = await supabase.storage
+  const { data: publicUrlData } = supabase.storage
     .from(BUCKET_NAME)
     .getPublicUrl(imagePath)
 
-  if (publicUrlError || !publicUrlData?.publicUrl) {
-    throw new Error(publicUrlError?.message ?? 'No se pudo obtener la URL pública de la imagen.')
+  if (!publicUrlData?.publicUrl) {
+    throw new Error('No se pudo obtener la URL pública de la imagen.')
   }
 
   return publicUrlData.publicUrl

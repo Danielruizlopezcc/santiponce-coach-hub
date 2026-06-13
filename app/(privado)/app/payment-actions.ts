@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth'
 import { MATRICULA_IMPORTE, MEMBERSHIP_IMPORTE } from '@/lib/club'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import {
   getEnrollmentAmountCents,
@@ -112,17 +113,6 @@ async function attachStripeSession(paymentId: string, sessionId: string, metadat
 }
 
 async function findOrCreateStripeCustomer(userId: string, email: string, name: string) {
-  const supabase = await createClient()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('stripe_customer_id')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (profile?.stripe_customer_id) {
-    return profile.stripe_customer_id
-  }
-
   const stripe = getStripeClient()
   const customer = await stripe.customers.create({
     email,
@@ -131,13 +121,6 @@ async function findOrCreateStripeCustomer(userId: string, email: string, name: s
       userId,
     },
   })
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({ stripe_customer_id: customer.id })
-    .eq('id', userId)
-
-  if (error) throw new Error(error.message)
 
   return customer.id
 }
@@ -315,17 +298,61 @@ export async function createEnrollmentCheckoutAction(athleteId: string): Promise
 export async function createPaymentMethodSetupAction(): Promise<CheckoutResult> {
   try {
     const user = await requireUser()
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data: profile } = await supabase
       .from('profiles')
       .select(
-        'email, first_name, last_name, stripe_customer_id, stripe_payment_method_id',
+        'email, first_name, last_name',
       )
       .eq('id', user.id)
       .maybeSingle()
 
     if (!profile?.email) {
-      return { success: false, message: 'No se ha encontrado la cuenta del usuario.' }
+      const fallbackEmail = user.email?.trim().toLowerCase()
+
+      if (!fallbackEmail) {
+        return { success: false, message: 'No se ha encontrado la cuenta del usuario.' }
+      }
+
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: user.id,
+          email: fallbackEmail,
+          first_name: user.user_metadata?.first_name ?? '',
+          last_name: user.user_metadata?.last_name ?? '',
+        },
+        { onConflict: 'id' },
+      )
+
+      if (profileError) {
+        return { success: false, message: profileError.message }
+      }
+
+      const customerId = await findOrCreateStripeCustomer(
+        user.id,
+        fallbackEmail,
+        `${user.user_metadata?.first_name ?? ''} ${user.user_metadata?.last_name ?? ''}`.trim() ||
+          fallbackEmail,
+      )
+
+      const stripe = getStripeClient()
+      const siteUrl = getSiteUrl()
+      const session = await stripe.checkout.sessions.create({
+        mode: 'setup',
+        customer: customerId,
+        currency: 'eur',
+        success_url: `${siteUrl}/app/configurar-pago/exito?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${siteUrl}/app/configurar-pago/cancelada`,
+        metadata: {
+          flowType: 'payment_method_setup',
+          userId: user.id,
+        },
+      })
+
+      revalidatePath('/app/configurar-pago')
+      revalidatePath('/app/perfil')
+
+      return { success: true, url: session.url ?? undefined }
     }
 
     const customerId = await findOrCreateStripeCustomer(

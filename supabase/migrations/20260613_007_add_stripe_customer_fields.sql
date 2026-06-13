@@ -18,3 +18,5 @@ alter table public.profiles
 
 alter table public.profiles
   add column if not exists payment_method_saved_at timestamptz;
+
+notify pgrst, 'reload schema';

@@ -218,20 +218,33 @@ const tutorRegistrationSchema = z.object({
   aceptaCondiciones: z.boolean().refine((v) => v === true, {
     message: 'Debes aceptar las condiciones de matrícula',
   }),
-  consienteDatosMenor: z.boolean().refine((v) => v === true, {
-    message: 'Debes autorizar el tratamiento de datos del menor',
-  }),
-  consienteDatosSalud: z.boolean().refine((v) => v === true, {
-    message: 'Debes autorizar el tratamiento de datos de salud y alergias',
-  }),
+  consienteDatosMenor: z.boolean(),
+  consienteDatosSalud: z.boolean(),
   autorizaImagenes: z.boolean(),
   consienteMetodoPago: z.boolean().refine((v) => v === true, {
     message:
       'Debes autorizar guardar el método de pago para futuras cuotas',
   }),
   deportistas: z
-    .array(deportistaSchema)
-    .min(1, 'Debes añadir al menos un deportista'),
+    .array(deportistaSchema),
+}).superRefine((data, ctx) => {
+  if (data.deportistas.length === 0) return
+
+  if (!data.consienteDatosMenor) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['consienteDatosMenor'],
+      message: 'Debes autorizar el tratamiento de datos del menor',
+    })
+  }
+
+  if (!data.consienteDatosSalud) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['consienteDatosSalud'],
+      message: 'Debes autorizar el tratamiento de datos de salud y alergias',
+    })
+  }
 })
 
 export const registroSchema = z

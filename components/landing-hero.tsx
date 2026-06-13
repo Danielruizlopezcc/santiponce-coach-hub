@@ -1,7 +1,5 @@
 import Image from 'next/image'
-import Link from 'next/link'
-import { ArrowRight, CalendarDays, ShieldCheck, Users } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { CalendarDays, ShieldCheck, Users } from 'lucide-react'
 import { CLUB } from '@/lib/club'
 
 const HIGHLIGHTS = [
@@ -53,24 +51,6 @@ export function LandingHero() {
             </p>
           </div>
 
-          <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <Button
-              render={<Link href="/registro" />}
-              nativeButton={false}
-              size="lg"
-            >
-              Registrarse
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
-            <Button
-              render={<Link href="/iniciar-sesion" />}
-              nativeButton={false}
-              size="lg"
-              variant="outline"
-            >
-              Iniciar sesión
-            </Button>
-          </div>
         </div>
 
         <div className="relative flex justify-center">
