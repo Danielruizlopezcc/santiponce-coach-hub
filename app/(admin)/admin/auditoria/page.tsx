@@ -15,7 +15,7 @@ export default async function AdminAuditoriaPage() {
   return (
     <AdminPageShell
       title="Auditoría"
-      description="Eventos derivados de los datos reales disponibles en Supabase."
+      description="Seguimiento de eventos recientes de la plataforma."
       data={data}
       columns={columns}
       searchPlaceholder="Buscar por acción, entidad o usuario"

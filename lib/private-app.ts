@@ -20,10 +20,42 @@ type PrivateCollections = {
   seasonsById: Map<string, string>
 }
 
+type EnrollmentPaymentStatus = 'pending' | 'paid' | 'canceled' | 'failed'
+
 function getInitials(firstName: string, lastName: string) {
   const first = firstName.trim().charAt(0)
   const last = lastName.trim().charAt(0)
   return `${first}${last}`.toUpperCase() || 'U'
+}
+
+async function getLatestEnrollmentPaymentByAthlete(
+  guardianId: string,
+): Promise<Map<string, EnrollmentPaymentStatus>> {
+  const supabase = await createClient()
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('athlete_id, status, created_at')
+    .eq('guardian_id', guardianId)
+    .eq('payment_type', 'enrollment')
+    .not('athlete_id', 'is', null)
+    .order('created_at', { ascending: false })
+
+  const paymentByAthlete = new Map<string, EnrollmentPaymentStatus>()
+  for (const payment of payments ?? []) {
+    if (!payment.athlete_id || paymentByAthlete.has(payment.athlete_id)) continue
+    paymentByAthlete.set(payment.athlete_id, payment.status as EnrollmentPaymentStatus)
+  }
+
+  return paymentByAthlete
+}
+
+function getAthleteDisplayStatus(
+  status: 'pendiente' | 'matriculado' | 'en_revision',
+  paymentStatus?: EnrollmentPaymentStatus,
+) {
+  if (status === 'matriculado') return 'matriculado' as const
+  if (paymentStatus === 'pending') return 'en_revision' as const
+  return status
 }
 
 export async function getPrivateViewer(userId: string): Promise<PrivateViewer> {
@@ -81,7 +113,7 @@ export async function getPrivateUserStatus(userId: string): Promise<PrivateUserS
   return {
     hasGuardian,
     isSocio,
-    isPaidSocio: isSocio && Boolean(profile?.is_paid_member),
+    isPaidSocio: Boolean(profile?.is_paid_member),
   }
 }
 
@@ -115,6 +147,8 @@ export async function getPrivateDashboardData(
     .eq('guardian_id', collections.guardianId)
     .order('created_at', { ascending: true })
 
+  const paymentByAthlete = await getLatestEnrollmentPaymentByAthlete(collections.guardianId)
+
   return {
     viewer,
     seasonLabel: collections.activeSeasonLabel,
@@ -128,10 +162,10 @@ export async function getPrivateDashboardData(
       equipoAsignado: athlete.assigned_team_id
         ? collections.teamsById.get(athlete.assigned_team_id) ?? 'Equipo pendiente'
         : null,
-      estado: athlete.status,
+      estado: getAthleteDisplayStatus(athlete.status, paymentByAthlete.get(athlete.id)),
     })),
     hasGuardian: true,
-    isPaidSocio: false,
+    isPaidSocio: status.isPaidSocio,
   }
 }
 
@@ -165,7 +199,7 @@ export async function getPrivateTutorProfile(userId: string): Promise<PrivateTut
     pais: guardian.country,
     preferenciaPago: guardian.payment_preference,
     metodoPago: {
-      estado: 'Pendiente de integrar con Stripe',
+      estado: 'Pendiente de configurar',
     },
   }
 }
@@ -186,6 +220,8 @@ export async function getPrivateAthletes(userId: string): Promise<PrivateAthlete
     .eq('guardian_id', collections.guardianId)
     .order('created_at', { ascending: true })
 
+  const paymentByAthlete = await getLatestEnrollmentPaymentByAthlete(collections.guardianId)
+
   return (athletes ?? []).map((athlete) => ({
     id: athlete.id,
     nombre: athlete.first_name,
@@ -204,8 +240,11 @@ export async function getPrivateAthletes(userId: string): Promise<PrivateAthlete
       ? collections.teamsById.get(athlete.assigned_team_id) ?? 'Equipo pendiente'
       : null,
     temporada: collections.seasonsById.get(athlete.season_id) ?? collections.activeSeasonLabel,
-    estado: athlete.status,
-    pagoEstado: athlete.status === 'matriculado' ? 'pagado' : 'pendiente',
+    estado: getAthleteDisplayStatus(athlete.status, paymentByAthlete.get(athlete.id)),
+    pagoEstado:
+      athlete.status === 'matriculado' || paymentByAthlete.get(athlete.id) === 'paid'
+        ? 'pagado'
+        : 'pendiente',
   }))
 }
 

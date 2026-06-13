@@ -8,7 +8,7 @@ export default async function AdminConfiguracionPage() {
   return (
     <PageContainer
       title="Configuración"
-      description="Resumen de configuración basado en el estado real disponible en Supabase."
+      description="Resumen del estado actual de la plataforma."
       className="max-w-7xl"
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

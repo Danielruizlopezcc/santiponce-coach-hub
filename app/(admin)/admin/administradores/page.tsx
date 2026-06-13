@@ -14,7 +14,7 @@ export default async function AdminAdministradoresPage() {
   return (
     <AdminPageShell
       title="Gestión de administradores"
-      description="Usuarios con rol admin leídos directamente desde Supabase."
+      description="Usuarios con permisos de administración."
       data={data}
       columns={columns}
       searchPlaceholder="Buscar por nombre o rol"

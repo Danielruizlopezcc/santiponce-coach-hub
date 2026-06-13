@@ -90,7 +90,7 @@ export default async function PerfilPage() {
         description="Consulta y gestiona los datos del tutor responsable."
       >
         <div className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center text-sm text-muted-foreground">
-          No se ha encontrado el perfil del tutor en Supabase.
+          No se ha encontrado el perfil del tutor.
         </div>
       </PrivatePageContainer>
     )

@@ -7,6 +7,7 @@ export const CLUB = {
   crest: '/images/escudo-santiponce.png',
 } as const
 
+export const MEMBERSHIP_IMPORTE = 20
 export const MATRICULA_IMPORTE = 50
 
 export type NavItem = {

@@ -34,23 +34,24 @@ export function LandingHero() {
             Plataforma oficial · Temporada {CLUB.season}
           </span>
 
-          <h1 className="mt-5 text-4xl font-bold tracking-tight text-balance text-foreground sm:text-5xl lg:text-6xl">
-            Bienvenido al {CLUB.shortName}
-          </h1>
-
-          <p className="mt-5 max-w-prose text-lg text-pretty text-muted-foreground leading-relaxed">
-            Esta es la plataforma oficial del {CLUB.legalName}, pensada para{' '}
-            <strong className="font-semibold text-foreground">familias</strong>,{' '}
-            <strong className="font-semibold text-foreground">
-              deportistas
-            </strong>{' '}
-            y la{' '}
-            <strong className="font-semibold text-foreground">
-              gestión de matrículas
-            </strong>
-            . Regístrate para acceder a la información y a los servicios del
-            club.
-          </p>
+          <div className="mt-5 w-full max-w-2xl rounded-3xl border border-border/60 bg-card/72 p-5 shadow-sm backdrop-blur md:p-6">
+            <h1 className="text-4xl font-bold tracking-tight text-balance text-foreground sm:text-5xl lg:text-6xl">
+              Bienvenido al {CLUB.shortName}
+            </h1>
+            <p className="mt-5 max-w-prose text-lg leading-relaxed text-pretty text-muted-foreground">
+              Esta es la plataforma oficial del {CLUB.legalName}, pensada para{' '}
+              <strong className="font-semibold text-foreground">familias</strong>,{' '}
+              <strong className="font-semibold text-foreground">
+                deportistas
+              </strong>{' '}
+              y la{' '}
+              <strong className="font-semibold text-foreground">
+                gestión de matrículas
+              </strong>
+              . Regístrate para acceder a la información y a los servicios del
+              club.
+            </p>
+          </div>
 
           <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <Button

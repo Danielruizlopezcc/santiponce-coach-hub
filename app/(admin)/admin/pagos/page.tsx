@@ -34,7 +34,7 @@ export default async function AdminPagosPage() {
   return (
     <AdminPageShell
       title="Pagos"
-      description="Operaciones pendientes leídas desde Supabase mientras Stripe termina de integrarse."
+      description="Histórico y seguimiento de operaciones registradas en la plataforma."
       data={data}
       columns={columns}
       searchPlaceholder="Buscar por operación, tutor o deportista"

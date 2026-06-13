@@ -200,7 +200,7 @@ export function TutorProfileForm({ profile }: TutorProfileFormProps) {
             <div>
               <h2 className="text-lg font-semibold text-foreground">Método de pago guardado</h2>
               <p className="text-sm text-muted-foreground">
-                Información de ejemplo para la futura integración con Stripe.
+                Información disponible para tu cuenta.
               </p>
             </div>
           </div>
@@ -215,7 +215,7 @@ export function TutorProfileForm({ profile }: TutorProfileFormProps) {
           </dl>
 
           <Button variant="outline" className="mt-4 w-full" type="button" disabled>
-            Próximamente con Stripe
+            Próximamente
           </Button>
         </section>
       </aside>

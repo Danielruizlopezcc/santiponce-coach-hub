@@ -3,7 +3,7 @@ import { ArrowRight, ClipboardList, UserCheck, UserPlus, Users } from 'lucide-re
 import { ClubLogo } from '@/components/club-logo'
 import { PrivatePageContainer } from '@/components/private-page-container'
 import { Button } from '@/components/ui/button'
-import { CLUB } from '@/lib/club'
+import { CLUB, MEMBERSHIP_IMPORTE } from '@/lib/club'
 import { requireUser } from '@/lib/auth'
 import { formatEuro } from '@/lib/format'
 import { getPrivateDashboardData } from '@/lib/private-app'
@@ -104,8 +104,8 @@ export default async function AppDashboardPage() {
           icon={isSocio ? UserCheck : Users}
         />
         <ResumenCard
-          label={isSocio ? 'Membresía pendiente' : 'Pendientes de matrícula'}
-          value={isSocio ? '20€' : String(pendientes)}
+          label={isSocio ? (isPaidSocio ? 'Membresía activa' : 'Membresía pendiente') : 'Pendientes de matrícula'}
+          value={isSocio ? (isPaidSocio ? 'Pagada' : `${MEMBERSHIP_IMPORTE}€`) : String(pendientes)}
           icon={isSocio ? ClipboardList : UserPlus}
           accent={isSocio ? 'bg-violet-100 text-violet-600' : 'bg-amber-100 text-amber-600'}
         />
@@ -141,7 +141,7 @@ export default async function AppDashboardPage() {
               <p className="mt-1 text-sm text-pretty text-muted-foreground">
                 {isPaidSocio
                   ? 'Ya tienes acceso como socio. Navega a la sección de patrocinadores para ver las novedades del club.'
-                  : 'Tu cuenta está activa como socio, pero debes realizar el pago de 20€ con Stripe para completar la membresía.'}
+                  : `Tu cuenta está activa como socio, pero debes realizar el pago de ${MEMBERSHIP_IMPORTE}€ para completar la membresía.`}
               </p>
             </div>
             {!isPaidSocio && (
@@ -150,7 +150,7 @@ export default async function AppDashboardPage() {
                 render={<Link href="/app/pago-socio" />}
                 size="lg"
               >
-                Pagar 20€
+                Pagar {MEMBERSHIP_IMPORTE}€
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Button>
             )}
@@ -198,20 +198,24 @@ export default async function AppDashboardPage() {
                   Conviértete en socio
                 </p>
                 <h2 className="mt-1 text-xl font-bold text-foreground md:text-2xl">
-                  Hazte socio del club
+                  {isPaidSocio ? 'Tu cuota de socio está al día' : 'Hazte socio del club'}
                 </h2>
                 <p className="mt-1 text-sm text-pretty text-muted-foreground">
-                  Abona la cuota de 20€ y obtén acceso a las novedades y beneficios de socio.
+                  {isPaidSocio
+                    ? 'Ya puedes acceder a las novedades y beneficios de socio desde tu zona privada.'
+                    : `Abona la cuota de ${MEMBERSHIP_IMPORTE}€ y obtén acceso a las novedades y beneficios de socio.`}
                 </p>
               </div>
-              <Button
-                nativeButton={false}
-                render={<Link href="/app/pago-socio" />}
-                size="lg"
-              >
-                Pagar 20€
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Button>
+              {!isPaidSocio && (
+                <Button
+                  nativeButton={false}
+                  render={<Link href="/app/pago-socio" />}
+                  size="lg"
+                >
+                  Pagar {MEMBERSHIP_IMPORTE}€
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Button>
+              )}
             </div>
           </section>
 

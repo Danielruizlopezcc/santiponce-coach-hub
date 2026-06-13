@@ -528,7 +528,7 @@ export function RegistroForm() {
                 error={errors.consienteMetodoPago?.message}
                 register={register('consienteMetodoPago')}
               >
-                Autorizo guardar mi método de pago en Stripe de forma segura para
+                Autorizo guardar mi método de pago de forma segura para
                 usarlo en futuras cuotas autorizadas por el club.
               </ConsentItem>
             </>

@@ -64,7 +64,7 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
   return (
     <PageContainer
       title="Matrículas"
-      description="Confirma pagos en efectivo o revisa el estado de cada matrícula."
+      description="Supervisa el estado de cada matrícula y usa acciones manuales solo en incidencias."
       className="max-w-7xl"
     >
       {/* ── Resumen rápido ───────────────────────────────────────── */}
@@ -74,7 +74,7 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
         </span>
         {enRevision > 0 && (
           <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-            {enRevision} pendiente{enRevision !== 1 ? 's' : ''} de confirmar
+            {enRevision} en revisión
           </span>
         )}
         {matriculados > 0 && (
@@ -169,9 +169,9 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
                     {/* Confirmación de pago */}
                     {isConfirming && (
                       <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Pago recibido?</span>
+                        <span className="text-xs text-muted-foreground">¿Marcar como cobro validado?</span>
                         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" disabled={isPending} onClick={() => handleConfirm(row.id)}>
-                          Sí, confirmar
+                          Sí, validar
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => setConfirmId(null)}>
                           Cancelar
@@ -182,9 +182,9 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
                     {/* Confirmación de rechazo */}
                     {isRejecting && (
                       <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Devolver a pendiente?</span>
+                        <span className="text-xs text-muted-foreground">¿Cancelar el intento y devolver a pendiente?</span>
                         <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleReject(row.id)}>
-                          Sí, rechazar
+                          Sí, devolver
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => setRejectId(null)}>
                           Cancelar
@@ -209,7 +209,7 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
                               className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700"
                               onClick={() => { setRejectId(null); setConfirmId(row.id) }}
                             >
-                              Confirmar pago
+                              Validar manualmente
                             </Button>
                             <Button
                               size="sm"
@@ -217,12 +217,12 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
                               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                               onClick={() => { setConfirmId(null); setRejectId(row.id) }}
                             >
-                              Rechazar
+                              Devolver a pendiente
                             </Button>
                           </>
                         )}
                         {row.estadoMatricula === 'Pendiente' && (
-                          <span className="text-xs text-muted-foreground">Sin enviar</span>
+                          <span className="text-xs text-muted-foreground">Sin iniciar checkout</span>
                         )}
                       </div>
                     )}

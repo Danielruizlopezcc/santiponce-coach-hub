@@ -5,10 +5,10 @@ import {
   CreditCard,
   Info,
   LoaderCircle,
+  Medal,
   ShieldCheck,
   Trophy,
   UserCheck,
-  Users,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
@@ -58,20 +58,35 @@ export default async function AdminDashboardPage() {
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Número de usuarios
+                Tutores
               </CardTitle>
-              <p className="mt-2 text-3xl font-bold text-foreground">{data.summary.usuarios}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{data.summary.tutores}</p>
             </div>
-            <Users className="size-5 text-primary" aria-hidden="true" />
+            <UserCheck className="size-5 text-primary" aria-hidden="true" />
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Número de tutores
+                Socios activos
               </CardTitle>
-              <p className="mt-2 text-3xl font-bold text-foreground">{data.summary.tutores}</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">
+                {data.summary.sociosActivos}
+              </p>
+            </div>
+            <Medal className="size-5 text-primary" aria-hidden="true" />
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Tutores que también son socios
+              </CardTitle>
+              <p className="mt-2 text-3xl font-bold text-foreground">
+                {data.summary.tutoresSocios}
+              </p>
             </div>
             <UserCheck className="size-5 text-primary" aria-hidden="true" />
           </CardHeader>
@@ -139,6 +154,19 @@ export default async function AdminDashboardPage() {
               </p>
             </div>
             <CreditCard className="size-5 text-primary" aria-hidden="true" />
+          </CardHeader>
+        </Card>
+        <Card className="md:col-span-2">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Ingresos por socios
+              </CardTitle>
+              <p className="mt-2 text-3xl font-bold text-foreground">
+                {formatEuro(data.summary.ingresosSociosEuros)}
+              </p>
+            </div>
+            <Medal className="size-5 text-primary" aria-hidden="true" />
           </CardHeader>
         </Card>
       </section>

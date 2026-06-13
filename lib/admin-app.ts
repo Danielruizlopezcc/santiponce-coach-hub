@@ -13,10 +13,14 @@ export type AdminViewer = PrivateViewer & {
 export type AdminSummary = {
   usuarios: number
   tutores: number
+  sociosActivos: number
+  tutoresSocios: number
+  tutoresOSocios: number
   deportistasMatriculados: number
   deportistasEnRevision: number
   deportistasPendientes: number
   deportistasSinEquipo: number
+  ingresosSociosEuros: number
   ingresosEuros: number
 }
 
@@ -139,8 +143,8 @@ export type AdminPaymentRow = {
   deportista: string
   tutor: string
   importe: number
-  estado: 'pendiente'
-  proveedor: 'Stripe'
+  estado: 'pagado' | 'pendiente' | 'fallido' | 'reembolsado'
+  proveedor: 'Stripe' | 'Manual'
   fecha: string
 }
 
@@ -200,6 +204,21 @@ type GuardianLookup = {
   name: string
 }
 
+type AdminPaymentRecord = {
+  id: string
+  user_id: string
+  guardian_id: string | null
+  athlete_id: string | null
+  season_id: string | null
+  payment_type: 'membership' | 'enrollment'
+  provider: 'stripe' | 'manual'
+  status: 'pending' | 'paid' | 'canceled' | 'failed'
+  amount_cents: number
+  description: string
+  paid_at: string | null
+  created_at: string
+}
+
 function mapStatusLabel(
   status: 'pendiente' | 'matriculado' | 'en_revision',
 ): AdminAthleteRow['estadoMatricula'] {
@@ -226,6 +245,7 @@ async function getAdminCollections() {
     { data: seasons },
     { data: consents },
     { data: consentDocuments },
+    { data: payments },
   ] = await Promise.all([
     supabase.from('profiles').select('id, email, first_name, last_name, created_at'),
     supabase.from('user_roles').select('user_id, role'),
@@ -242,6 +262,12 @@ async function getAdminCollections() {
       .from('consents')
       .select('id, guardian_id, athlete_id, document_id, accepted, signer_full_name, accepted_at, revoked_at'),
     supabase.from('consent_documents').select('id, title, version'),
+    supabase
+      .from('payments')
+      .select(
+        'id, user_id, guardian_id, athlete_id, season_id, payment_type, provider, status, amount_cents, description, paid_at, created_at',
+      )
+      .order('created_at', { ascending: false }),
   ])
 
   return {
@@ -254,6 +280,7 @@ async function getAdminCollections() {
     seasons: seasons ?? [],
     consents: consents ?? [],
     consentDocuments: consentDocuments ?? [],
+    payments: (payments ?? []) as AdminPaymentRecord[],
   }
 }
 
@@ -271,14 +298,52 @@ function createGuardianNameLookup(
   )
 }
 
+function createLatestEnrollmentPaymentByAthlete(payments: AdminPaymentRecord[]) {
+  const latestByAthlete = new Map<string, AdminPaymentRecord>()
+
+  for (const payment of payments) {
+    if (payment.payment_type !== 'enrollment' || !payment.athlete_id) continue
+    if (!latestByAthlete.has(payment.athlete_id)) {
+      latestByAthlete.set(payment.athlete_id, payment)
+    }
+  }
+
+  return latestByAthlete
+}
+
+function mapPaymentStatusLabel(
+  status: AdminPaymentRecord['status'],
+): AdminPaymentRow['estado'] {
+  if (status === 'paid') return 'pagado'
+  if (status === 'pending') return 'pendiente'
+  if (status === 'canceled') return 'fallido'
+  return 'fallido'
+}
+
+function mapPaymentProviderLabel(
+  provider: AdminPaymentRecord['provider'],
+): AdminPaymentRow['proveedor'] {
+  return provider === 'manual' ? 'Manual' : 'Stripe'
+}
+
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
-  const { profiles, guardians, athletes, categories, teams, seasons, consents } =
+  const { profiles, guardians, athletes, categories, teams, seasons, consents, payments } =
     await getAdminCollections()
 
   const guardianById = createGuardianNameLookup(guardians)
+  const profileById = new Map(
+    profiles.map((profile) => [
+      profile.id,
+      `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || profile.email,
+    ]),
+  )
   const categoryById = new Map(categories.map((category) => [category.id, category.name]))
   const teamById = new Map(teams.map((team) => [team.id, team]))
   const seasonById = new Map(seasons.map((season) => [season.id, season.name]))
+  const athleteById = new Map(
+    athletes.map((athlete) => [athlete.id, `${athlete.first_name} ${athlete.last_name}`.trim()]),
+  )
+  const latestEnrollmentPaymentByAthlete = createLatestEnrollmentPaymentByAthlete(payments)
 
   const athletesByCategoryMap = new Map<string, number>()
   for (const athlete of athletes) {
@@ -306,16 +371,39 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   const activeSeason = seasons.find((season) => season.is_active)
   const today = formatSpanishDate(new Date().toISOString())
+  const tutorUserIds = new Set(guardians.map((guardian) => guardian.user_id))
+  const activeMemberIds = new Set(
+    payments
+      .filter((payment) => payment.payment_type === 'membership' && payment.status === 'paid')
+      .map((payment) => payment.user_id),
+  )
+  const tutoresSocios = Array.from(tutorUserIds).filter((userId) =>
+    activeMemberIds.has(userId),
+  ).length
+  const tutoresOSocios = new Set([...tutorUserIds, ...activeMemberIds]).size
 
   const summary: AdminSummary = {
     usuarios: profiles.length,
     tutores: guardians.length,
+    sociosActivos: activeMemberIds.size,
+    tutoresSocios,
+    tutoresOSocios,
     deportistasMatriculados: athletes.filter((athlete) => athlete.status === 'matriculado').length,
-    deportistasEnRevision: athletes.filter((athlete) => athlete.status === 'en_revision').length,
-    deportistasPendientes: athletes.filter((athlete) => athlete.status === 'pendiente').length,
+    deportistasEnRevision: athletes.filter((athlete) => {
+      if (athlete.status === 'matriculado') return false
+      return latestEnrollmentPaymentByAthlete.get(athlete.id)?.status === 'pending'
+    }).length,
+    deportistasPendientes: athletes.filter((athlete) => {
+      if (athlete.status === 'matriculado') return false
+      return latestEnrollmentPaymentByAthlete.get(athlete.id)?.status !== 'pending'
+    }).length,
     deportistasSinEquipo: athletes.filter((athlete) => !athlete.assigned_team_id).length,
-    ingresosEuros:
-      athletes.filter((athlete) => athlete.status === 'matriculado').length * MATRICULA_IMPORTE,
+    ingresosSociosEuros: payments
+      .filter((payment) => payment.payment_type === 'membership' && payment.status === 'paid')
+      .reduce((total, payment) => total + payment.amount_cents, 0) / 100,
+    ingresosEuros: payments
+      .filter((payment) => payment.payment_type === 'enrollment' && payment.status === 'paid')
+      .reduce((total, payment) => total + payment.amount_cents, 0) / 100,
   }
 
   const alerts: AdminAlert[] = []
@@ -356,17 +444,23 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     })
   }
 
-  const recentPayments = athletes
-    .filter((athlete) => athlete.status === 'matriculado')
+  const recentPayments = payments
+    .filter((payment) => payment.status === 'paid')
     .slice(0, 5)
-    .map((athlete) => ({
-      id: `MAT-${athlete.id.slice(0, 8).toUpperCase()}`,
-      familia: guardianById.get(athlete.guardian_id)?.name ?? 'Tutor no disponible',
-      deportista: `${athlete.first_name} ${athlete.last_name}`.trim(),
-      concepto: `Matrícula ${seasonById.get(athlete.season_id) ?? CLUB.season}`,
-      importe: MATRICULA_IMPORTE,
+    .map((payment) => ({
+      id: payment.id,
+      familia:
+        (payment.guardian_id ? guardianById.get(payment.guardian_id)?.name : null) ??
+        profileById.get(payment.user_id) ??
+        'Usuario no disponible',
+      deportista: payment.athlete_id ? athleteById.get(payment.athlete_id) ?? 'Deportista no disponible' : 'Cuota de socio',
+      concepto:
+        payment.payment_type === 'membership'
+          ? 'Cuota de socio'
+          : payment.description || `Matrícula ${seasonById.get(payment.season_id ?? '') ?? CLUB.season}`,
+      importe: payment.amount_cents / 100,
       estado: 'pagado' as const,
-      fecha: formatSpanishDate(athlete.created_at),
+      fecha: formatSpanishDate(payment.paid_at ?? payment.created_at),
     }))
 
   return {
@@ -422,11 +516,12 @@ export async function getAdminTutors(): Promise<AdminTutorRow[]> {
 }
 
 export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
-  const { guardians, athletes, categories, teams, seasons } = await getAdminCollections()
+  const { guardians, athletes, categories, teams, seasons, payments } = await getAdminCollections()
   const guardianById = createGuardianNameLookup(guardians)
   const categoryById = new Map(categories.map((category) => [category.id, category.name]))
   const teamById = new Map(teams.map((team) => [team.id, team.name]))
   const seasonById = new Map(seasons.map((season) => [season.id, season.name]))
+  const latestEnrollmentPaymentByAthlete = createLatestEnrollmentPaymentByAthlete(payments)
 
   return athletes
     .map((athlete) => ({
@@ -439,7 +534,12 @@ export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
         ? teamById.get(athlete.assigned_team_id) ?? 'Equipo pendiente'
         : 'Sin equipo asignado',
       temporada: seasonById.get(athlete.season_id) ?? CLUB.season,
-      estadoMatricula: mapStatusLabel(athlete.status),
+      estadoMatricula:
+        athlete.status === 'matriculado'
+          ? 'Matriculado'
+          : latestEnrollmentPaymentByAthlete.get(athlete.id)?.status === 'pending'
+            ? 'En revisión'
+            : mapStatusLabel(athlete.status),
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
@@ -577,32 +677,53 @@ export async function getAdminSeasons(): Promise<AdminSeasonRow[]> {
 }
 
 export async function getAdminEnrollments(): Promise<AdminEnrollmentRow[]> {
-  const athletes = await getAdminAthletes()
-  return athletes.map((athlete) => ({
+  const { payments } = await getAdminCollections()
+  const latestEnrollmentPaymentByAthlete = createLatestEnrollmentPaymentByAthlete(payments)
+
+  const athleteRows = await getAdminAthletes()
+  return athleteRows.map((athlete) => ({
     id: athlete.id,
     deportista: athlete.nombre,
     tutor: athlete.tutor,
     temporada: athlete.temporada,
     estadoMatricula: athlete.estadoMatricula,
-    estadoPago: athlete.estadoMatricula === 'Matriculado' ? 'Pagado' : 'Pendiente',
+    estadoPago:
+      athlete.estadoMatricula === 'Matriculado' ||
+      latestEnrollmentPaymentByAthlete.get(athlete.id)?.status === 'paid'
+        ? 'Pagado'
+        : 'Pendiente',
     importe: MATRICULA_IMPORTE,
   }))
 }
 
 export async function getAdminPayments(): Promise<AdminPaymentRow[]> {
-  const enrollments = await getAdminEnrollments()
-  return enrollments
-    .filter((enrollment) => enrollment.estadoPago === 'Pendiente')
-    .map((enrollment) => ({
-      id: enrollment.id,
-      operacion: 'Matrícula inicial',
-      deportista: enrollment.deportista,
-      tutor: enrollment.tutor,
-      importe: enrollment.importe,
-      estado: 'pendiente',
-      proveedor: 'Stripe',
-      fecha: formatSpanishDate(new Date().toISOString()),
-    }))
+  const { guardians, athletes, payments, profiles } = await getAdminCollections()
+  const guardianById = createGuardianNameLookup(guardians)
+  const athleteById = new Map(
+    athletes.map((athlete) => [athlete.id, `${athlete.first_name} ${athlete.last_name}`.trim()]),
+  )
+  const profileById = new Map(
+    profiles.map((profile) => [
+      profile.id,
+      `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || profile.email,
+    ]),
+  )
+
+  return payments.map((payment) => ({
+    id: payment.id,
+    operacion: payment.payment_type === 'membership' ? 'Cuota de socio' : 'Matrícula inicial',
+    deportista: payment.athlete_id
+      ? athleteById.get(payment.athlete_id) ?? 'Deportista no disponible'
+      : 'Cuota de socio',
+    tutor:
+      (payment.guardian_id ? guardianById.get(payment.guardian_id)?.name : null) ??
+      profileById.get(payment.user_id) ??
+      'Usuario no disponible',
+    importe: payment.amount_cents / 100,
+    estado: mapPaymentStatusLabel(payment.status),
+    proveedor: mapPaymentProviderLabel(payment.provider),
+    fecha: formatSpanishDate(payment.paid_at ?? payment.created_at),
+  }))
 }
 
 export async function getAdminConsents(): Promise<AdminConsentRow[]> {
@@ -637,7 +758,7 @@ export async function getAdminAudit(): Promise<AdminAuditRow[]> {
     id: payment.id,
     fecha: payment.fecha,
     usuarioAdmin: 'Sistema',
-    accion: 'Pago pendiente de conciliación',
+    accion: `Pago ${payment.estado}`,
     entidad: payment.deportista,
     resultado: 'Pendiente',
   }))
@@ -665,7 +786,7 @@ export async function getAdminConfig(): Promise<AdminConfigRow[]> {
       id: 'cfg-season',
       titulo: 'Temporada activa',
       valor: activeSeason?.name ?? CLUB.season,
-      descripcion: 'Se está leyendo directamente desde la tabla de temporadas de Supabase.',
+      descripcion: 'Temporada marcada actualmente como activa en la plataforma.',
     },
     {
       id: 'cfg-fee',
@@ -677,19 +798,19 @@ export async function getAdminConfig(): Promise<AdminConfigRow[]> {
       id: 'cfg-categories',
       titulo: 'Categorías activas',
       valor: String(categories.filter((category) => category.is_active).length),
-      descripcion: 'Número real de categorías activas registradas en Supabase.',
+      descripcion: 'Número de categorías activas disponibles actualmente.',
     },
     {
       id: 'cfg-teams',
       titulo: 'Equipos activos',
       valor: String(teams.filter((team) => team.is_active).length),
-      descripcion: 'Número real de equipos activos configurados en Supabase.',
+      descripcion: 'Número de equipos activos configurados actualmente.',
     },
     {
       id: 'cfg-stripe',
-      titulo: 'Estado de Stripe',
-      valor: 'Pendiente de tabla/flujo real',
-      descripcion: 'La app ya no muestra pagos mock, pero falta persistencia real de Stripe.',
+      titulo: 'Estado de pagos',
+      valor: 'Activo',
+      descripcion: 'Los pagos están disponibles y su estado se actualiza automáticamente.',
     },
     {
       id: 'cfg-audit',

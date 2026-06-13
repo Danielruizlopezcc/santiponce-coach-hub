@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2, CreditCard, Loader2, X } from 'lucide-react'
-import { startEnrollmentAction } from '@/app/(privado)/app/actions'
+import { createEnrollmentCheckoutAction } from '@/app/(privado)/app/payment-actions'
 import { Button } from '@/components/ui/button'
 import { formatEuro } from '@/lib/format'
 import { type PrivateAthleteDetail } from '@/lib/private-app-shared'
@@ -43,13 +43,13 @@ export function MatriculacionPanel({
     if (!selectedId) return
     setLoading(true)
     setServerError(null)
-    const result = await startEnrollmentAction(selectedId)
+    const result = await createEnrollmentCheckoutAction(selectedId)
     setLoading(false)
-    if (!result.success) {
+    if (!result.success || !result.url) {
       setServerError(result.message ?? 'No se ha podido iniciar la matriculación.')
       return
     }
-    router.push(`/app/matriculacion/exito?deportista=${selectedId}`)
+    window.location.assign(result.url)
   }
 
   return (
@@ -64,8 +64,8 @@ export function MatriculacionPanel({
             </p>
             <ul className="mt-4 grid gap-2 text-sm text-muted-foreground">
               <li>La matrícula es individual por deportista.</li>
-              <li>Al continuar, el deportista pasará a estado "En revisión".</li>
-              <li>Cuando Stripe esté integrado, este flujo enlazará con el cobro real.</li>
+              <li>Al continuar, se abrirá la pasarela de pago segura.</li>
+              <li>La matrícula quedará confirmada cuando el pago termine correctamente.</li>
             </ul>
           </div>
 
@@ -75,7 +75,7 @@ export function MatriculacionPanel({
               {formatEuro(importe)}
             </p>
             <p className="mt-2 text-muted-foreground">
-              La persistencia ya usa Supabase; el cobro real sigue pendiente de Stripe.
+              El estado de la matrícula se actualizará automáticamente al completar el pago.
             </p>
           </div>
         </div>
@@ -96,8 +96,7 @@ export function MatriculacionPanel({
           <div>
             <h3 className="font-semibold text-foreground">Aviso importante</h3>
             <p className="text-sm text-muted-foreground">
-              Este panel ya trabaja con deportistas reales de Supabase. De momento
-              la matrícula cambia su estado a revisión hasta completar Stripe.
+              Si inicias el proceso de pago, la matrícula quedará en revisión hasta recibir la confirmación final.
             </p>
           </div>
         </div>
@@ -122,7 +121,7 @@ export function MatriculacionPanel({
                   Seleccionar deportista
                 </Dialog.Title>
                 <Dialog.Description className="text-sm text-muted-foreground">
-                  Elige un único deportista para continuar al pago visual de la matrícula.
+                  Elige un único deportista para continuar con la matrícula.
                 </Dialog.Description>
               </div>
               <Dialog.Close
@@ -214,7 +213,7 @@ export function MatriculacionPanel({
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-5">
               <p className="text-sm text-muted-foreground">
-                El estado se guardará en Supabase al continuar.
+                El estado del pago se guardará automáticamente al continuar.
               </p>
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => setOpen(false)}>
