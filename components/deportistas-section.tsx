@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
-import { Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DeportistaForm } from '@/components/deportista-form'
 import { cn } from '@/lib/utils'
@@ -70,10 +70,6 @@ export function DeportistasSection({
             cada ficha antes de finalizar el registro.
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={openCreate}>
-          <UserPlus aria-hidden="true" />
-          Crear un deportista nuevo
-        </Button>
       </div>
 
       {deportistas.length === 0 ? (
@@ -87,7 +83,7 @@ export function DeportistasSection({
             Aún no has añadido ningún deportista
           </p>
           <p className="text-xs text-muted-foreground">
-            Pulsa “Crear un deportista nuevo” para añadir el primero.
+            Pulsa “Añadir deportista” para crear el primero.
           </p>
           <Button type="button" variant="default" size="sm" onClick={openCreate}>
             <Plus aria-hidden="true" />

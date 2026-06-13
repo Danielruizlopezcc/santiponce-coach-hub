@@ -26,6 +26,37 @@ export async function POST(request: Request) {
     const session = event.data.object
     const supabase = createAdminClient()
     const paymentId = session.metadata?.paymentId
+    const flowType = session.metadata?.flowType
+
+    if (flowType === 'payment_method_setup' && session.metadata?.userId) {
+      const setupIntentId =
+        typeof session.setup_intent === 'string' ? session.setup_intent : null
+
+      if (setupIntentId) {
+        const setupIntent = await stripe.setupIntents.retrieve(setupIntentId)
+        const paymentMethodId =
+          typeof setupIntent.payment_method === 'string' ? setupIntent.payment_method : null
+
+        if (paymentMethodId) {
+          const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
+          const card = paymentMethod.card
+
+          await supabase
+            .from('profiles')
+            .update({
+              stripe_customer_id:
+                typeof session.customer === 'string' ? session.customer : null,
+              stripe_payment_method_id: paymentMethod.id,
+              payment_method_brand: card?.brand ?? null,
+              payment_method_last4: card?.last4 ?? null,
+              payment_method_exp_month: card?.exp_month ?? null,
+              payment_method_exp_year: card?.exp_year ?? null,
+              payment_method_saved_at: new Date().toISOString(),
+            })
+            .eq('id', session.metadata.userId)
+        }
+      }
+    }
 
     if (paymentId) {
       const { data: payment } = await supabase
@@ -81,8 +112,10 @@ export async function POST(request: Request) {
     }
 
     revalidatePath('/app')
+    revalidatePath('/app/configurar-pago')
     revalidatePath('/app/pago-socio')
     revalidatePath('/app/matriculacion')
+    revalidatePath('/app/perfil')
     revalidatePath('/admin')
     revalidatePath('/admin/matriculas')
     revalidatePath('/admin/pagos')

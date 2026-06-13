@@ -112,7 +112,7 @@ export function RegistroForm() {
       }
 
       setSubmitted(true)
-      router.push('/app')
+      router.push(values.accountType === 'tutor' ? '/app/configurar-pago' : '/app')
     } catch (err) {
       setServerError(
         err instanceof Error
@@ -550,7 +550,9 @@ export function RegistroForm() {
           role="status"
           className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary"
         >
-          Tu cuenta se ha creado correctamente. Redirigiendo a tu zona privada...
+          {accountType === 'tutor'
+            ? 'Tu cuenta se ha creado correctamente. Preparando el siguiente paso...'
+            : 'Tu cuenta se ha creado correctamente. Entrando en tu zona privada...'}
         </div>
       )}
 
@@ -558,12 +560,12 @@ export function RegistroForm() {
         {isSubmitting ? (
           <>
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            Creando cuenta...
+            {accountType === 'tutor' ? 'Continuando...' : 'Creando cuenta...'}
           </>
         ) : submitted ? (
-          'Cuenta creada'
+          accountType === 'tutor' ? 'Continuando' : 'Cuenta creada'
         ) : (
-          'Crear cuenta'
+          accountType === 'tutor' ? 'Continuar' : 'Crear cuenta'
         )}
       </Button>
     </form>

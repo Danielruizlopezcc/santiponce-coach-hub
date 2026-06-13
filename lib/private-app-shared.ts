@@ -36,6 +36,7 @@ export type PrivateAthleteDetail = PrivateAthleteSummary & {
 export type PrivateTutorProfile = TutorProfileFormValues & {
   metodoPago: {
     estado: string
+    detalle?: string
   }
 }
 
@@ -58,6 +59,7 @@ export type PrivateUserStatus = {
   hasGuardian: boolean
   isSocio: boolean
   isPaidSocio: boolean
+  hasSavedPaymentMethod: boolean
 }
 
 export function normalizeEmail(value: string) {

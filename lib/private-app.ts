@@ -104,7 +104,11 @@ export async function getPrivateUserStatus(userId: string): Promise<PrivateUserS
 
   const [{ data: guardian }, { data: profile }] = await Promise.all([
     supabase.from('guardians').select('id').eq('user_id', userId).maybeSingle(),
-    supabase.from('profiles').select('is_paid_member').eq('id', userId).maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('is_paid_member, stripe_payment_method_id')
+      .eq('id', userId)
+      .maybeSingle(),
   ])
 
   const hasGuardian = Boolean(guardian?.id)
@@ -114,6 +118,7 @@ export async function getPrivateUserStatus(userId: string): Promise<PrivateUserS
     hasGuardian,
     isSocio,
     isPaidSocio: Boolean(profile?.is_paid_member),
+    hasSavedPaymentMethod: Boolean(profile?.stripe_payment_method_id),
   }
 }
 
@@ -172,7 +177,13 @@ export async function getPrivateDashboardData(
 export async function getPrivateTutorProfile(userId: string): Promise<PrivateTutorProfile | null> {
   const supabase = await createClient()
   const [{ data: profile }, { data: guardian }] = await Promise.all([
-    supabase.from('profiles').select('email, first_name, last_name').eq('id', userId).maybeSingle(),
+    supabase
+      .from('profiles')
+      .select(
+        'email, first_name, last_name, stripe_payment_method_id, payment_method_brand, payment_method_last4, payment_method_exp_month, payment_method_exp_year',
+      )
+      .eq('id', userId)
+      .maybeSingle(),
     supabase
       .from('guardians')
       .select(
@@ -199,7 +210,11 @@ export async function getPrivateTutorProfile(userId: string): Promise<PrivateTut
     pais: guardian.country,
     preferenciaPago: guardian.payment_preference,
     metodoPago: {
-      estado: 'Pendiente de configurar',
+      estado: profile.stripe_payment_method_id ? 'Método de pago guardado' : 'Pendiente de configurar',
+      detalle:
+        profile.stripe_payment_method_id && profile.payment_method_brand && profile.payment_method_last4
+          ? `${profile.payment_method_brand.toUpperCase()} terminada en ${profile.payment_method_last4}${profile.payment_method_exp_month && profile.payment_method_exp_year ? ` · ${String(profile.payment_method_exp_month).padStart(2, '0')}/${profile.payment_method_exp_year}` : ''}`
+          : 'Añade una tarjeta para futuros cargos autorizados.',
     },
   }
 }

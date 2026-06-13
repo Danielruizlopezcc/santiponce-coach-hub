@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useState } from 'react'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreditCard, Loader2 } from 'lucide-react'
@@ -211,11 +212,14 @@ export function TutorProfileForm({ profile }: TutorProfileFormProps) {
               <dd className="mt-1 inline-flex items-center gap-2 font-medium text-foreground">
                 {profile.metodoPago.estado}
               </dd>
+              {profile.metodoPago.detalle && (
+                <dd className="mt-2 text-xs text-muted-foreground">{profile.metodoPago.detalle}</dd>
+              )}
             </div>
           </dl>
 
-          <Button variant="outline" className="mt-4 w-full" type="button" disabled>
-            Próximamente
+          <Button variant="outline" className="mt-4 w-full" type="button" nativeButton={false} render={<Link href="/app/configurar-pago" />}>
+            {profile.metodoPago.estado === 'Método de pago guardado' ? 'Actualizar tarjeta' : 'Configurar tarjeta'}
           </Button>
         </section>
       </aside>

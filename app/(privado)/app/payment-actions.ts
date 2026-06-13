@@ -111,6 +111,37 @@ async function attachStripeSession(paymentId: string, sessionId: string, metadat
   if (error) throw new Error(error.message)
 }
 
+async function findOrCreateStripeCustomer(userId: string, email: string, name: string) {
+  const supabase = await createClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (profile?.stripe_customer_id) {
+    return profile.stripe_customer_id
+  }
+
+  const stripe = getStripeClient()
+  const customer = await stripe.customers.create({
+    email,
+    name,
+    metadata: {
+      userId,
+    },
+  })
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ stripe_customer_id: customer.id })
+    .eq('id', userId)
+
+  if (error) throw new Error(error.message)
+
+  return customer.id
+}
+
 export async function createMembershipCheckoutAction(): Promise<CheckoutResult> {
   try {
     const user = await requireUser()
@@ -277,6 +308,54 @@ export async function createEnrollmentCheckoutAction(athleteId: string): Promise
     return {
       success: false,
       message: error instanceof Error ? error.message : 'No se ha podido iniciar el pago.',
+    }
+  }
+}
+
+export async function createPaymentMethodSetupAction(): Promise<CheckoutResult> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select(
+        'email, first_name, last_name, stripe_customer_id, stripe_payment_method_id',
+      )
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!profile?.email) {
+      return { success: false, message: 'No se ha encontrado la cuenta del usuario.' }
+    }
+
+    const customerId = await findOrCreateStripeCustomer(
+      user.id,
+      profile.email,
+      `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || profile.email,
+    )
+
+    const stripe = getStripeClient()
+    const siteUrl = getSiteUrl()
+    const session = await stripe.checkout.sessions.create({
+      mode: 'setup',
+      customer: customerId,
+      currency: 'eur',
+      success_url: `${siteUrl}/app/configurar-pago/exito?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/app/configurar-pago/cancelada`,
+      metadata: {
+        flowType: 'payment_method_setup',
+        userId: user.id,
+      },
+    })
+
+    revalidatePath('/app/configurar-pago')
+    revalidatePath('/app/perfil')
+
+    return { success: true, url: session.url ?? undefined }
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'No se ha podido preparar el método de pago.',
     }
   }
 }
