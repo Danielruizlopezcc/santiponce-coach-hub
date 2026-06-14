@@ -5,6 +5,7 @@ import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
 import type {
   PrivateAthleteDetail,
   PrivateDashboardData,
+  PrivateNewsData,
   PrivateSponsor,
   PrivateTeamDetail,
   PrivateTeamPlayer,
@@ -298,6 +299,48 @@ export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
     title: sponsor.title,
     imageUrl: sponsor.image_url,
   }))
+}
+
+export async function getPrivateNewsData(): Promise<PrivateNewsData> {
+  noStore()
+
+  const supabase = createAdminClient()
+  const [{ data: sections }, { data: news }] = await Promise.all([
+    supabase
+      .from('news_sections')
+      .select('id, name, sort_order, is_active')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true }),
+    supabase
+      .from('news')
+      .select('id, title, body, image_url, section_id, created_at, news_sections(name, is_active)')
+      .order('created_at', { ascending: false }),
+  ])
+
+  const activeSectionIds = new Set((sections ?? []).map((section) => section.id))
+
+  return {
+    sections: (sections ?? []).map((section) => ({
+      id: section.id,
+      name: section.name,
+    })),
+    news: (news ?? [])
+      .filter((item) => !item.section_id || activeSectionIds.has(item.section_id))
+      .map((item) => {
+        const section = Array.isArray(item.news_sections) ? item.news_sections[0] : item.news_sections
+
+        return {
+          id: item.id,
+          title: item.title,
+          body: item.body ?? null,
+          imageUrl: item.image_url,
+          sectionId: item.section_id ?? null,
+          sectionName: section?.name ?? 'General',
+          createdAt: item.created_at,
+        }
+      }),
+  }
 }
 
 export async function getPrivateTeams(): Promise<PrivateTeamSummary[]> {

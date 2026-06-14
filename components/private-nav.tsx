@@ -3,7 +3,7 @@
 import type { ComponentType } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Award, ClipboardList, House, Shield, User, Users } from 'lucide-react'
+import { Award, ClipboardList, House, Newspaper, Shield, User, Users } from 'lucide-react'
 import { SignOutButton } from '@/components/sign-out-button'
 import { cn } from '@/lib/utils'
 import type { PrivateNavItem } from '@/lib/club'
@@ -23,6 +23,7 @@ const ICONS: Record<PrivateNavItem['icon'], ComponentType<{ className?: string; 
   users: Users,
   shield: Shield,
   award: Award,
+  newspaper: Newspaper,
   'clipboard-list': ClipboardList,
 }
 

@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
-import { formatSpanishDate } from '@/lib/format'
+import { formatSpanishDate, formatSpanishDateTime } from '@/lib/format'
 import { getPrivateViewer } from '@/lib/private-app'
 import type { PlayerPosition, PrivateViewer } from '@/lib/private-app-shared'
 import { createClient } from '@/lib/supabase/server'
@@ -160,15 +160,6 @@ export type AdminConsentRow = {
   firmante: string
 }
 
-export type AdminAuditRow = {
-  id: string
-  fecha: string
-  usuarioAdmin: string
-  accion: string
-  entidad: string
-  resultado: 'Pendiente'
-}
-
 export type AdminManagerRow = {
   id: string
   nombre: string
@@ -183,6 +174,25 @@ export type AdminSponsorRow = {
   imageUrl: string
   isActive: boolean
   sortOrder: number
+  createdAt: string
+}
+
+export type AdminNewsSectionRow = {
+  id: string
+  name: string
+  sortOrder: number
+  isActive: boolean
+  newsCount: number
+  createdAt: string
+}
+
+export type AdminNewsRow = {
+  id: string
+  title: string
+  body: string | null
+  imageUrl: string
+  sectionId: string | null
+  sectionName: string
   createdAt: string
 }
 
@@ -609,6 +619,55 @@ export async function getAdminSponsors(): Promise<AdminSponsorRow[]> {
   }))
 }
 
+export async function getAdminNews(): Promise<AdminNewsRow[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('news')
+    .select('id, title, body, image_url, section_id, created_at, news_sections(name)')
+    .order('created_at', { ascending: false })
+
+  return (data ?? []).map((item) => {
+    const section = Array.isArray(item.news_sections) ? item.news_sections[0] : item.news_sections
+
+    return {
+      id: item.id,
+      title: item.title,
+      body: item.body ?? null,
+      imageUrl: item.image_url,
+      sectionId: item.section_id ?? null,
+      sectionName: section?.name ?? 'Sin sección',
+      createdAt: formatSpanishDateTime(item.created_at),
+    }
+  })
+}
+
+export async function getAdminNewsSections(): Promise<AdminNewsSectionRow[]> {
+  const supabase = await createClient()
+  const [{ data: sections }, { data: news }] = await Promise.all([
+    supabase
+      .from('news_sections')
+      .select('id, name, sort_order, is_active, created_at')
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true }),
+    supabase.from('news').select('id, section_id'),
+  ])
+
+  const newsCountBySection = new Map<string, number>()
+  for (const item of news ?? []) {
+    if (!item.section_id) continue
+    newsCountBySection.set(item.section_id, (newsCountBySection.get(item.section_id) ?? 0) + 1)
+  }
+
+  return (sections ?? []).map((section) => ({
+    id: section.id,
+    name: section.name,
+    sortOrder: section.sort_order,
+    isActive: section.is_active,
+    newsCount: newsCountBySection.get(section.id) ?? 0,
+    createdAt: formatSpanishDateTime(section.created_at),
+  }))
+}
+
 export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetail | null> {
   const { guardians, athletes, categories, teams, seasons } = await getAdminCollections()
 
@@ -756,18 +815,6 @@ export async function getAdminConsents(): Promise<AdminConsentRow[]> {
     .sort((a, b) => a.usuario.localeCompare(b.usuario, 'es'))
 }
 
-export async function getAdminAudit(): Promise<AdminAuditRow[]> {
-  const payments = await getAdminPayments()
-  return payments.map((payment) => ({
-    id: payment.id,
-    fecha: payment.fecha,
-    usuarioAdmin: 'Sistema',
-    accion: `Pago ${payment.estado}`,
-    entidad: payment.deportista,
-    resultado: 'Pendiente',
-  }))
-}
-
 export async function getAdminManagers(): Promise<AdminManagerRow[]> {
   const users = await getAdminUsers()
   return users
@@ -815,12 +862,6 @@ export async function getAdminConfig(): Promise<AdminConfigRow[]> {
       titulo: 'Estado de pagos',
       valor: 'Activo',
       descripcion: 'Los pagos están disponibles y su estado se actualiza automáticamente.',
-    },
-    {
-      id: 'cfg-audit',
-      titulo: 'Auditoría',
-      valor: 'Sin tabla dedicada',
-      descripcion: 'La pantalla de auditoría usa únicamente eventos derivados mientras no exista una tabla propia.',
     },
   ]
 }

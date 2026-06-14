@@ -48,6 +48,26 @@ export type PrivateSponsor = {
   imageUrl: string
 }
 
+export type PrivateNewsSection = {
+  id: string
+  name: string
+}
+
+export type PrivateNewsItem = {
+  id: string
+  title: string
+  body: string | null
+  imageUrl: string
+  sectionId: string | null
+  sectionName: string
+  createdAt: string
+}
+
+export type PrivateNewsData = {
+  sections: PrivateNewsSection[]
+  news: PrivateNewsItem[]
+}
+
 export type PlayerPosition = 'goalkeeper' | 'defender' | 'midfielder' | 'forward'
 
 export type PrivateTeamPlayer = {

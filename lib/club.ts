@@ -19,6 +19,7 @@ export type PrivateNavIcon =
   | 'users'
   | 'shield'
   | 'award'
+  | 'newspaper'
   | 'clipboard-list'
 
 export type PrivateNavItem = NavItem & {
@@ -43,6 +44,7 @@ export const LEGAL_NAV: NavItem[] = [
 export const PRIVATE_NAV: PrivateNavItem[] = [
   { label: 'Inicio', href: '/app', icon: 'house' },
   { label: 'Perfil', href: '/app/perfil', icon: 'user' },
+  { label: 'Noticias', href: '/app/noticias', icon: 'newspaper' },
   { label: 'Mis deportistas', href: '/app/deportistas', icon: 'users' },
   { label: 'Equipos', href: '/app/equipos', icon: 'shield', requiresPaidSocio: true },
   { label: 'Patrocinadores', href: '/app/patrocinadores', icon: 'award', requiresPaidSocio: true },
@@ -59,6 +61,7 @@ export function getPrivateNavItems({
   const baseItems = PRIVATE_NAV.filter((item) =>
     item.href === '/app' ||
     item.href === '/app/perfil' ||
+    item.href === '/app/noticias' ||
     item.href === '/app/equipos' ||
     item.href === '/app/patrocinadores',
   )
