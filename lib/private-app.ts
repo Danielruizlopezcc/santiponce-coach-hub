@@ -6,6 +6,9 @@ import type {
   PrivateAthleteDetail,
   PrivateDashboardData,
   PrivateSponsor,
+  PrivateTeamDetail,
+  PrivateTeamPlayer,
+  PrivateTeamSummary,
   PrivateTutorProfile,
   PrivateUserStatus,
   PrivateViewer,
@@ -59,6 +62,14 @@ function getAthleteDisplayStatus(
   if (status === 'matriculado') return 'matriculado' as const
   if (paymentStatus === 'pending') return 'en_revision' as const
   return status
+}
+
+function mapPrivateTeamPlayerStatus(
+  status: 'pendiente' | 'matriculado' | 'en_revision',
+): PrivateTeamPlayer['estadoMatricula'] {
+  if (status === 'matriculado') return 'Matriculado'
+  if (status === 'en_revision') return 'En revisión'
+  return 'Pendiente'
 }
 
 export async function getPrivateViewer(userId: string): Promise<PrivateViewer> {
@@ -286,6 +297,92 @@ export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
     title: sponsor.title,
     imageUrl: sponsor.image_url,
   }))
+}
+
+export async function getPrivateTeams(): Promise<PrivateTeamSummary[]> {
+  noStore()
+
+  const supabase = createAdminClient()
+  const [{ data: teams }, { data: athletes }, { data: categories }, { data: seasons }] =
+    await Promise.all([
+      supabase.from('teams').select('id, name, category_id, season_id, is_active'),
+      supabase.from('athletes').select('assigned_team_id'),
+      supabase.from('categories').select('id, name'),
+      supabase.from('seasons').select('id, name'),
+    ])
+
+  const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
+  const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const athleteCountByTeam = new Map<string, number>()
+
+  for (const athlete of athletes ?? []) {
+    if (!athlete.assigned_team_id) continue
+    athleteCountByTeam.set(
+      athlete.assigned_team_id,
+      (athleteCountByTeam.get(athlete.assigned_team_id) ?? 0) + 1,
+    )
+  }
+
+  return (teams ?? [])
+    .map((team) => {
+      const total = athleteCountByTeam.get(team.id) ?? 0
+
+      return {
+        id: team.id,
+        nombre: team.name,
+        categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+        temporada: seasonById.get(team.season_id) ?? CLUB.season,
+        jugadores: total,
+        estado: !team.is_active ? 'Pendiente' : total >= 15 ? 'Completo' : 'Abierto',
+      } as PrivateTeamSummary
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+export async function getPrivateTeamDetail(teamId: string): Promise<PrivateTeamDetail | null> {
+  noStore()
+
+  const supabase = createAdminClient()
+  const [{ data: team }, { data: categories }, { data: seasons }] = await Promise.all([
+    supabase
+      .from('teams')
+      .select('id, name, category_id, season_id, is_active, notes')
+      .eq('id', teamId)
+      .maybeSingle(),
+    supabase.from('categories').select('id, name'),
+    supabase.from('seasons').select('id, name'),
+  ])
+
+  if (!team) return null
+
+  const { data: athletes } = await supabase
+    .from('athletes')
+    .select('id, first_name, last_name, requested_category_id, status')
+    .eq('assigned_team_id', teamId)
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true })
+
+  const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
+  const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const players: PrivateTeamPlayer[] = (athletes ?? []).map((athlete) => ({
+    id: athlete.id,
+    nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
+    categoriaSolicitada:
+      categoryById.get(athlete.requested_category_id) ?? 'Categoría pendiente',
+    estadoMatricula: mapPrivateTeamPlayerStatus(athlete.status),
+  }))
+
+  return {
+    id: team.id,
+    nombre: team.name,
+    categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+    temporada: seasonById.get(team.season_id) ?? CLUB.season,
+    jugadores: players.length,
+    estado: !team.is_active ? 'Pendiente' : players.length >= 15 ? 'Completo' : 'Abierto',
+    isActive: team.is_active,
+    notes: team.notes ?? null,
+    players,
+  }
 }
 
 export async function getPrivateAthleteById(

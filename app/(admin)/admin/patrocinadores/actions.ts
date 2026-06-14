@@ -1,13 +1,13 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAdmin } from '@/lib/auth'
+import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const BUCKET_NAME = 'sponsors'
 
 async function getAdminSupabase() {
-  await requireAdmin()
+  await requireAdminAction()
   return createAdminClient()
 }
 

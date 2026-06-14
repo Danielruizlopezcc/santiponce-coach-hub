@@ -48,6 +48,28 @@ export type PrivateSponsor = {
   imageUrl: string
 }
 
+export type PrivateTeamPlayer = {
+  id: string
+  nombre: string
+  categoriaSolicitada: string
+  estadoMatricula: 'Pendiente' | 'Matriculado' | 'En revisión'
+}
+
+export type PrivateTeamSummary = {
+  id: string
+  nombre: string
+  categoria: string
+  temporada: string
+  jugadores: number
+  estado: 'Abierto' | 'Completo' | 'Pendiente'
+}
+
+export type PrivateTeamDetail = PrivateTeamSummary & {
+  isActive: boolean
+  notes: string | null
+  players: PrivateTeamPlayer[]
+}
+
 export type PrivateDashboardData = {
   viewer: PrivateViewer
   seasonLabel: string

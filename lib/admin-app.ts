@@ -75,6 +75,7 @@ export type AdminAthleteRow = {
   id: string
   nombre: string
   tutor: string
+  categoriaSolicitadaId: string
   categoriaSolicitada: string
   equipoAsignado: string
   temporada: string
@@ -528,6 +529,7 @@ export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
       id: athlete.id,
       nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
       tutor: guardianById.get(athlete.guardian_id)?.name ?? 'Tutor no disponible',
+      categoriaSolicitadaId: athlete.requested_category_id,
       categoriaSolicitada:
         categoryById.get(athlete.requested_category_id) ?? 'Categoría pendiente',
       equipoAsignado: athlete.assigned_team_id

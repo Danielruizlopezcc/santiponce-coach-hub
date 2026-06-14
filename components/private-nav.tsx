@@ -3,7 +3,7 @@
 import type { ComponentType } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Award, ClipboardList, House, User, Users } from 'lucide-react'
+import { Award, ClipboardList, House, Shield, User, Users } from 'lucide-react'
 import { SignOutButton } from '@/components/sign-out-button'
 import { cn } from '@/lib/utils'
 import type { PrivateNavItem } from '@/lib/club'
@@ -19,6 +19,7 @@ const ICONS: Record<PrivateNavItem['icon'], ComponentType<{ className?: string; 
   house: House,
   user: User,
   users: Users,
+  shield: Shield,
   award: Award,
   'clipboard-list': ClipboardList,
 }
@@ -53,8 +54,9 @@ export function PrivateNav({ items, isSocio, isPaidSocio, onNavigate }: PrivateN
                   'outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   isActive
                     ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                  isUnavailable && 'opacity-70',
+                    : isUnavailable
+                      ? 'text-muted-foreground opacity-70 hover:bg-sidebar-accent'
+                      : 'text-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                 )}
               >
                 <Icon className="size-5 shrink-0" aria-hidden={true} />
