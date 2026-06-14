@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdminAction } from '@/lib/auth'
+import type { PlayerPosition } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 async function getAdminSupabase() {
@@ -50,13 +51,23 @@ export async function updateTeamAction(
 export async function deleteTeamAction(id: string): Promise<void> {
   const supabase = await getAdminSupabase()
   // Remove team from all athletes first
-  await supabase.from('athletes').update({ assigned_team_id: null }).eq('assigned_team_id', id)
+  await supabase.from('athletes').update({ assigned_team_id: null, position: null }).eq('assigned_team_id', id)
   const { error } = await supabase.from('teams').delete().eq('id', id)
   if (error) throw new Error(error.message)
   teamPaths()
 }
 
-export async function assignAthleteAction(teamId: string, athleteId: string): Promise<void> {
+const VALID_POSITIONS: PlayerPosition[] = ['goalkeeper', 'defender', 'midfielder', 'forward']
+
+export async function assignAthleteAction(
+  teamId: string,
+  athleteId: string,
+  position: PlayerPosition,
+): Promise<void> {
+  if (!VALID_POSITIONS.includes(position)) {
+    throw new Error('Selecciona una posición válida para el jugador.')
+  }
+
   const supabase = await getAdminSupabase()
   const { data: team, error: teamError } = await supabase
     .from('teams')
@@ -70,7 +81,7 @@ export async function assignAthleteAction(teamId: string, athleteId: string): Pr
 
   const { data: assignedAthlete, error } = await supabase
     .from('athletes')
-    .update({ assigned_team_id: teamId })
+    .update({ assigned_team_id: teamId, position })
     .select('id')
     .eq('id', athleteId)
     .eq('season_id', team.season_id)
@@ -88,7 +99,7 @@ export async function removeAthleteAction(teamId: string, athleteId: string): Pr
   const supabase = await getAdminSupabase()
   const { error } = await supabase
     .from('athletes')
-    .update({ assigned_team_id: null })
+    .update({ assigned_team_id: null, position: null })
     .eq('id', athleteId)
     .eq('assigned_team_id', teamId)
   if (error) throw new Error(error.message)

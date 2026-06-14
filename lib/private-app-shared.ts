@@ -48,10 +48,13 @@ export type PrivateSponsor = {
   imageUrl: string
 }
 
+export type PlayerPosition = 'goalkeeper' | 'defender' | 'midfielder' | 'forward'
+
 export type PrivateTeamPlayer = {
   id: string
   nombre: string
   categoriaSolicitada: string
+  position: PlayerPosition | null
   estadoMatricula: 'Pendiente' | 'Matriculado' | 'En revisión'
 }
 

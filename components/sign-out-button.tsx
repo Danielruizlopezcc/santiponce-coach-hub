@@ -8,11 +8,13 @@ import { createClient } from '@/lib/supabase/client'
 type SignOutButtonProps = {
   className?: string
   variant?: 'ghost' | 'outline'
+  label?: string
 }
 
 export function SignOutButton({
   className,
   variant = 'ghost',
+  label = 'Cerrar sesión',
 }: SignOutButtonProps) {
   const router = useRouter()
 
@@ -31,7 +33,7 @@ export function SignOutButton({
       onClick={handleSignOut}
     >
       <LogOut className="size-4 shrink-0" aria-hidden="true" />
-      Cerrar sesión
+      {label}
     </Button>
   )
 }

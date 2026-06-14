@@ -12,6 +12,7 @@ import type {
   PrivateTutorProfile,
   PrivateUserStatus,
   PrivateViewer,
+  PlayerPosition,
 } from '@/lib/private-app-shared'
 import { normalizeDocument, normalizeEmail, normalizeOptionalEmail, normalizeOptionalPhone, normalizePhone } from '@/lib/private-app-shared'
 import { getSavedStripeCardByEmail } from '@/lib/stripe-payment-methods'
@@ -357,8 +358,9 @@ export async function getPrivateTeamDetail(teamId: string): Promise<PrivateTeamD
 
   const { data: athletes } = await supabase
     .from('athletes')
-    .select('id, first_name, last_name, requested_category_id, status')
+    .select('id, first_name, last_name, requested_category_id, position, status')
     .eq('assigned_team_id', teamId)
+    .order('position', { ascending: true, nullsFirst: false })
     .order('last_name', { ascending: true })
     .order('first_name', { ascending: true })
 
@@ -369,6 +371,7 @@ export async function getPrivateTeamDetail(teamId: string): Promise<PrivateTeamD
     nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
     categoriaSolicitada:
       categoryById.get(athlete.requested_category_id) ?? 'Categoría pendiente',
+    position: (athlete.position ?? null) as PlayerPosition | null,
     estadoMatricula: mapPrivateTeamPlayerStatus(athlete.status),
   }))
 

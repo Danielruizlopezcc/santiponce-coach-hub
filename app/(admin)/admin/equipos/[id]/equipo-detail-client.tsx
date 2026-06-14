@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import type { AdminCategoryRow, AdminSeasonRow, AdminTeamDetail } from '@/lib/admin-app'
+import type { PlayerPosition } from '@/lib/private-app-shared'
 import { assignAthleteAction, removeAthleteAction, updateTeamAction } from '../actions'
 
 const MATRICULA_STYLES = {
@@ -26,6 +27,20 @@ const TEAM_ESTADO_STYLES = {
   Pendiente:'bg-amber-100 text-amber-700',
 }
 
+const POSITION_OPTIONS: Array<{ value: PlayerPosition; label: string }> = [
+  { value: 'goalkeeper', label: 'Portero' },
+  { value: 'defender', label: 'Defensa' },
+  { value: 'midfielder', label: 'Mediocampista' },
+  { value: 'forward', label: 'Delantero' },
+]
+
+const POSITION_LABELS: Record<PlayerPosition, string> = {
+  goalkeeper: 'Portero',
+  defender: 'Defensa',
+  midfielder: 'Mediocampista',
+  forward: 'Delantero',
+}
+
 type Props = {
   team: AdminTeamDetail
   categories: AdminCategoryRow[]
@@ -38,6 +53,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
   // jugadores
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [selectedAdd, setSelectedAdd]         = useState('')
+  const [selectedPosition, setSelectedPosition] = useState<PlayerPosition | ''>('')
   const [actionError, setActionError]         = useState<string | null>(null)
 
   // edición
@@ -89,11 +105,16 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
 
   function handleAdd() {
     if (!selectedAdd) return
+    if (!selectedPosition) {
+      setActionError('Selecciona una posición para el jugador.')
+      return
+    }
     setActionError(null)
     startTransition(async () => {
       try {
-        await assignAthleteAction(team.id, selectedAdd)
+        await assignAthleteAction(team.id, selectedAdd, selectedPosition)
         setSelectedAdd('')
+        setSelectedPosition('')
       } catch (e) {
         setActionError(e instanceof Error ? e.message : 'Error al añadir al jugador.')
       }
@@ -180,6 +201,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
               <tr className="border-b border-border bg-muted/40">
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Deportista</th>
                 <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground sm:table-cell">Tutor</th>
+                <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground md:table-cell">Posición</th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Matrícula</th>
                 <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Acciones</th>
               </tr>
@@ -187,7 +209,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
             <tbody className="divide-y divide-border bg-card">
               {team.members.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center">
+                  <td colSpan={5} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <Users className="size-8 opacity-25" aria-hidden="true" />
                       <p className="text-sm">El equipo aún no tiene jugadores</p>
@@ -206,6 +228,9 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
                 >
                   <td className="px-4 py-3 font-medium">{member.nombre}</td>
                   <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{member.tutor}</td>
+                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
+                    {member.position ? POSITION_LABELS[member.position] : 'Sin posición'}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', MATRICULA_STYLES[member.estadoMatricula])}>
                       {member.estadoMatricula}
@@ -257,11 +282,11 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
             <p className="mb-3 text-xs text-muted-foreground">
               {team.available.length} deportista{team.available.length !== 1 ? 's' : ''} de categoría {team.categoria} sin equipo asignado.
             </p>
-            <div className="flex gap-2">
+            <div className="grid gap-2 md:grid-cols-[1fr_180px_auto]">
               <select
                 value={selectedAdd}
                 onChange={(e) => setSelectedAdd(e.target.value)}
-                className="h-9 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Selecciona un deportista…</option>
                 {team.available.map((a) => (
@@ -270,7 +295,19 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
                   </option>
                 ))}
               </select>
-              <Button disabled={!selectedAdd || isPending} onClick={handleAdd}>
+              <select
+                value={selectedPosition}
+                onChange={(e) => setSelectedPosition(e.target.value as PlayerPosition | '')}
+                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Posición…</option>
+                {POSITION_OPTIONS.map((position) => (
+                  <option key={position.value} value={position.value}>
+                    {position.label}
+                  </option>
+                ))}
+              </select>
+              <Button disabled={!selectedAdd || !selectedPosition || isPending} onClick={handleAdd}>
                 <UserPlus className="size-4" aria-hidden="true" />
                 Añadir
               </Button>

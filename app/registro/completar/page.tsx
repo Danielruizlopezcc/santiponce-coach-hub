@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { SiteFooter } from '@/components/site-footer'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -73,7 +74,8 @@ export default function CompletarRegistroPage() {
   }, [searchParams, router])
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10 sm:py-14">
+    <div className="flex min-h-screen flex-col">
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:py-14">
       <Card className="w-full max-w-md border-border/70 bg-card/90 backdrop-blur">
         <CardContent className="pt-8">
           {status === 'loading' && (
@@ -133,6 +135,8 @@ export default function CompletarRegistroPage() {
           )}
         </CardContent>
       </Card>
+      </main>
+      <SiteFooter />
     </div>
   )
 }

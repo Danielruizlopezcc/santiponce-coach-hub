@@ -3,7 +3,7 @@ import 'server-only'
 import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
 import { formatSpanishDate } from '@/lib/format'
 import { getPrivateViewer } from '@/lib/private-app'
-import type { PrivateViewer } from '@/lib/private-app-shared'
+import type { PlayerPosition, PrivateViewer } from '@/lib/private-app-shared'
 import { createClient } from '@/lib/supabase/server'
 
 export type AdminViewer = PrivateViewer & {
@@ -106,6 +106,7 @@ export type AdminTeamMember = {
   id: string
   nombre: string
   tutor: string
+  position: PlayerPosition | null
   estadoMatricula: AdminAthleteRow['estadoMatricula']
 }
 
@@ -254,7 +255,7 @@ async function getAdminCollections() {
     supabase
       .from('athletes')
       .select(
-        'id, guardian_id, first_name, last_name, status, requested_category_id, assigned_team_id, season_id, created_at',
+        'id, guardian_id, first_name, last_name, status, requested_category_id, assigned_team_id, position, season_id, created_at',
       ),
     supabase.from('categories').select('id, name, sort_order, is_active'),
     supabase.from('teams').select('id, name, category_id, season_id, is_active, notes'),
@@ -625,6 +626,7 @@ export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetai
     id: a.id,
     nombre: `${a.first_name} ${a.last_name}`.trim(),
     tutor: guardianById.get(a.guardian_id)?.name ?? 'Tutor no disponible',
+    position: (a.position ?? null) as PlayerPosition | null,
     estadoMatricula: mapStatusLabel(a.status),
   }))
 

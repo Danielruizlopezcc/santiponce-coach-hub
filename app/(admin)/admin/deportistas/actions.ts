@@ -50,12 +50,22 @@ export async function updateAthleteRequestedCategoryAction(
     }
   }
 
+  const updates: {
+    requested_category_id: string
+    assigned_team_id: string | null
+    position?: null
+  } = {
+    requested_category_id: categoryId,
+    assigned_team_id: assignedTeamId,
+  }
+
+  if (!assignedTeamId) {
+    updates.position = null
+  }
+
   const { error } = await supabase
     .from('athletes')
-    .update({
-      requested_category_id: categoryId,
-      assigned_team_id: assignedTeamId,
-    })
+    .update(updates)
     .eq('id', athleteId)
 
   if (error) throw new Error(error.message)
