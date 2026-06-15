@@ -7,18 +7,17 @@ const FOOTER_COLUMNS = [
     title: 'Club',
     links: [
       { label: 'Inicio', href: '/' },
-      { label: 'Perfil', href: '/app/perfil' },
-      { label: 'Patrocinadores', href: '/app/patrocinadores' },
-      { label: 'Equipos', href: '/app/equipos' },
+      { label: 'Noticias', href: '/noticias' },
+      { label: 'Patrocinadores', href: '/patrocinadores' },
+      { label: 'Equipos', href: '/equipos' },
     ],
   },
   {
     title: 'Familias',
     links: [
-      { label: 'Mis deportistas', href: '/app/deportistas' },
-      { label: 'Matriculación', href: '/app/matriculacion' },
       { label: 'Registro', href: '/registro' },
       { label: 'Acceso', href: '/iniciar-sesion' },
+      { label: 'Perfil', href: '/app/perfil' },
     ],
   },
   {

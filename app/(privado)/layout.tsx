@@ -33,7 +33,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
             </div>
           </div>
         </header>
-        <main className="flex-1 pb-32">{children}</main>
+        <main className="flex-1 pb-44">{children}</main>
         <SiteFooter />
       </div>
     )
@@ -52,7 +52,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
         isSocio={status.isSocio}
         isPaidSocio={status.isPaidSocio}
       />
-      <main className="min-h-[calc(100svh-12rem)] flex-1 pb-40">{children}</main>
+      <main className="min-h-[calc(100svh-12rem)] flex-1 pb-56">{children}</main>
       <SiteFooter />
     </div>
   )

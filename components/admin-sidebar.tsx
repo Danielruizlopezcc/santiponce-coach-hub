@@ -6,7 +6,7 @@ import { CLUB } from '@/lib/club'
 
 export function AdminSidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col bg-blue-900 md:flex">
+    <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col bg-blue-900 md:flex">
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-4">
         <Link
           href="/admin"

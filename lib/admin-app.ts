@@ -5,6 +5,7 @@ import { formatSpanishDate, formatSpanishDateTime } from '@/lib/format'
 import { getPrivateViewer } from '@/lib/private-app'
 import type { PlayerPosition, PrivateViewer } from '@/lib/private-app-shared'
 import { createClient } from '@/lib/supabase/server'
+import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
 export type AdminViewer = PrivateViewer & {
   roleLabel: string
@@ -574,6 +575,10 @@ export async function getAdminTeams(): Promise<AdminTeamRow[]> {
   const categoryById = new Map(categories.map((category) => [category.id, category.name]))
   const seasonById = new Map(seasons.map((season) => [season.id, season.name]))
   const athleteCountByTeam = new Map<string, number>()
+  type AdminTeamSortRow = AdminTeamRow & {
+    categoryOrder: number
+    suffixOrder: number
+  }
 
   for (const athlete of athletes) {
     if (!athlete.assigned_team_id) continue
@@ -586,10 +591,13 @@ export async function getAdminTeams(): Promise<AdminTeamRow[]> {
   return teams
     .map((team) => {
       const total = athleteCountByTeam.get(team.id) ?? 0
+      const categoryName = categoryById.get(team.category_id) ?? 'Sin categoría'
+      const sortInfo = getTeamCategorySortInfo(team.name, categoryName)
+
       return {
         id: team.id,
         nombre: team.name,
-        categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+        categoria: sortInfo.label,
         categoryId: team.category_id,
         temporada: seasonById.get(team.season_id) ?? CLUB.season,
         seasonId: team.season_id,
@@ -597,9 +605,20 @@ export async function getAdminTeams(): Promise<AdminTeamRow[]> {
         isActive: team.is_active,
         notes: team.notes ?? null,
         estado: !team.is_active ? 'Pendiente' : total >= 15 ? 'Completo' : 'Abierto',
-      } as AdminTeamRow
+        categoryOrder: sortInfo.order,
+        suffixOrder: getTeamSuffixOrder(team.name),
+      } as AdminTeamSortRow
     })
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    .sort((a, b) => {
+      if (a.categoryOrder !== b.categoryOrder) {
+        return a.categoryOrder - b.categoryOrder
+      }
+      if (a.suffixOrder !== b.suffixOrder) {
+        return a.suffixOrder - b.suffixOrder
+      }
+      return a.nombre.localeCompare(b.nombre, 'es')
+    })
+    .map(({ categoryOrder, suffixOrder, ...team }) => team)
 }
 
 export async function getAdminSponsors(): Promise<AdminSponsorRow[]> {

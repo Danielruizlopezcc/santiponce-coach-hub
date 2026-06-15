@@ -1,25 +1,50 @@
 import Image from 'next/image'
-import { CalendarDays, ShieldCheck, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Award, CalendarDays, Newspaper, Shield, ShieldCheck, Users } from 'lucide-react'
 import { CLUB } from '@/lib/club'
 
 const HIGHLIGHTS = [
   {
-    icon: Users,
-    title: 'Para familias y deportistas',
+    icon: Newspaper,
+    title: 'Noticias',
     description:
-      'Un único espacio para seguir la actividad del club, comunicaciones y temporada.',
+      'Sigue la actualidad del club organizada por secciones.',
+    href: '/noticias',
+  },
+  {
+    icon: Shield,
+    title: 'Equipos',
+    description:
+      'Consulta los equipos, categorías y jugadores disponibles.',
+    href: '/equipos',
+  },
+  {
+    icon: Award,
+    title: 'Patrocinadores',
+    description:
+      'Conoce las empresas y entidades que apoyan al club.',
+    href: '/patrocinadores',
+  },
+  {
+    icon: Users,
+    title: 'Área de tutores',
+    description:
+      'Registro, perfil, deportistas y matriculación para familias.',
+    href: '/registro',
   },
   {
     icon: ShieldCheck,
-    title: 'Gestión de matrículas',
+    title: 'Socios',
     description:
-      'Inscripciones y documentación del club de forma sencilla, ordenada y segura.',
+      'Accede a tu cuenta de socio para gestionar tu perfil y membresía.',
+    href: '/iniciar-sesion',
   },
   {
     icon: CalendarDays,
     title: 'Temporada 2026/2027',
     description:
-      'Toda la información oficial del club centralizada y siempre actualizada.',
+      'Información oficial del club centralizada y actualizada.',
+    href: '/noticias',
   },
 ]
 
@@ -69,8 +94,9 @@ export function LandingHero() {
 
       <div className="grid gap-4 pb-16 sm:grid-cols-2 lg:grid-cols-3">
         {HIGHLIGHTS.map((item) => (
-          <div
+          <Link
             key={item.title}
+            href={item.href}
             className="rounded-2xl border border-border/60 bg-card/70 p-6 backdrop-blur"
           >
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -82,7 +108,7 @@ export function LandingHero() {
             <p className="mt-2 text-sm text-pretty text-muted-foreground leading-relaxed">
               {item.description}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
     </section>

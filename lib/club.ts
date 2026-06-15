@@ -29,6 +29,9 @@ export type PrivateNavItem = NavItem & {
 
 export const PUBLIC_NAV: NavItem[] = [
   { label: 'Inicio', href: '/' },
+  { label: 'Noticias', href: '/noticias' },
+  { label: 'Equipos', href: '/equipos' },
+  { label: 'Patrocinadores', href: '/patrocinadores' },
   { label: 'Registrarse', href: '/registro' },
   { label: 'Iniciar sesión', href: '/iniciar-sesion' },
 ]
@@ -46,8 +49,8 @@ export const PRIVATE_NAV: PrivateNavItem[] = [
   { label: 'Perfil', href: '/app/perfil', icon: 'user' },
   { label: 'Noticias', href: '/app/noticias', icon: 'newspaper' },
   { label: 'Mis deportistas', href: '/app/deportistas', icon: 'users' },
-  { label: 'Equipos', href: '/app/equipos', icon: 'shield', requiresPaidSocio: true },
-  { label: 'Patrocinadores', href: '/app/patrocinadores', icon: 'award', requiresPaidSocio: true },
+  { label: 'Equipos', href: '/app/equipos', icon: 'shield' },
+  { label: 'Patrocinadores', href: '/app/patrocinadores', icon: 'award' },
   { label: 'Matriculación', href: '/app/matriculacion', icon: 'clipboard-list' },
 ]
 

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, Shield, Users } from 'lucide-react'
-import { PrivatePageContainer } from '@/components/private-page-container'
+import { PageContainer } from '@/components/page-container'
+import { PublicShell } from '@/components/public-shell'
 import { getPrivateTeams } from '@/lib/private-app'
 import { cn } from '@/lib/utils'
 
@@ -10,15 +11,16 @@ const TEAM_ESTADO_STYLES = {
   Pendiente: 'bg-amber-100 text-amber-700',
 } as const
 
-export default async function PrivateEquiposPage() {
+export default async function EquiposPage() {
   const teams = await getPrivateTeams()
 
   return (
-    <PrivatePageContainer
-      title="Equipos"
-      description="Consulta los equipos del club y sus jugadores."
-    >
-      <div className="relative">
+    <PublicShell>
+      <PageContainer
+        title="Equipos"
+        description="Consulta los equipos del club y sus jugadores."
+        className="max-w-7xl"
+      >
         {teams.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card/80 p-8 text-center shadow-sm backdrop-blur">
             <p className="text-base font-medium text-foreground">Aún no hay equipos disponibles.</p>
@@ -31,7 +33,7 @@ export default async function PrivateEquiposPage() {
                 key={team.id}
                 className="overflow-hidden rounded-2xl border border-border bg-card/80 shadow-sm backdrop-blur transition-colors hover:border-primary/30"
               >
-                <Link href={`/app/equipos/${team.id}`} className="block p-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Link href={`/equipos/${team.id}`} className="block p-5 outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <div className="mb-5 flex items-start justify-between gap-3">
                     <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       <Shield className="size-5" aria-hidden="true" />
@@ -63,8 +65,7 @@ export default async function PrivateEquiposPage() {
             ))}
           </ul>
         )}
-
-      </div>
-    </PrivatePageContainer>
+      </PageContainer>
+    </PublicShell>
   )
 }

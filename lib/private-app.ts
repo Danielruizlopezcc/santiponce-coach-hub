@@ -287,7 +287,9 @@ export async function getPrivateAthletes(userId: string): Promise<PrivateAthlete
 }
 
 export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
-  const supabase = await createClient()
+  noStore()
+
+  const supabase = createAdminClient()
   const { data } = await supabase
     .from('sponsors')
     .select('id, title, image_url')

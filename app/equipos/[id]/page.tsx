@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PublicShell } from '@/components/public-shell'
 import { getPrivateTeamDetail } from '@/lib/private-app'
 import type { PlayerPosition, PrivateTeamPlayer } from '@/lib/private-app-shared'
 
@@ -14,7 +15,7 @@ const POSITION_SECTIONS: Array<{
   { key: 'defender', title: 'DEFENSAS', singular: 'Defensa' },
   { key: 'midfielder', title: 'MEDIOCAMPISTAS', singular: 'Mediocampista' },
   { key: 'forward', title: 'DELANTEROS', singular: 'Delantero' },
-  { key: 'unassigned', title: 'SIN POSICIÓN', singular: 'Jugador' },
+  { key: 'unassigned', title: 'SIN POSICION', singular: 'Jugador' },
 ]
 
 const CARD_PATTERN = {
@@ -83,7 +84,7 @@ function PlayerCard({
   )
 }
 
-export default async function PrivateEquipoDetailPage({ params }: Props) {
+export default async function EquipoDetailPage({ params }: Props) {
   const { id } = await params
   const team = await getPrivateTeamDetail(id)
 
@@ -99,13 +100,13 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
   }).filter((section) => section.players.length > 0 || section.key !== 'unassigned')
 
   return (
-    <div className="relative min-h-[calc(100svh-9rem)] bg-background">
-      <div>
-      <section className="relative overflow-hidden bg-[#071c44] text-white">
+    <PublicShell>
+      <div className="relative min-h-[calc(100svh-9rem)] bg-background">
+        <section className="relative overflow-hidden bg-[#071c44] text-white">
           <div className="absolute inset-0" style={HERO_PATTERN} aria-hidden="true" />
           <div className="relative mx-auto flex min-h-56 w-full max-w-7xl flex-col justify-center px-4 py-10 md:px-8 md:py-16">
             <Button variant="ghost" size="sm" asChild className="mb-8 w-fit gap-1.5 text-white/80 hover:bg-white/10 hover:text-white">
-              <Link href="/app/equipos">
+              <Link href="/equipos">
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 Equipos
               </Link>
@@ -117,23 +118,19 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
               {team.nombre}
             </h1>
           </div>
-      </section>
+        </section>
 
-      <div className="border-b border-border bg-background">
+        <div className="border-b border-border bg-background">
           <div className="mx-auto flex w-full max-w-7xl gap-8 px-4 md:px-8">
-            <span className="border-b-2 border-primary py-5 text-sm font-bold text-primary">
-              Equipo
-            </span>
+            <span className="border-b-2 border-primary py-5 text-sm font-bold text-primary">Equipo</span>
             <span className="py-5 text-sm font-semibold text-muted-foreground">
               {team.jugadores} jugador{team.jugadores !== 1 ? 'es' : ''}
             </span>
-            <span className="py-5 text-sm font-semibold text-muted-foreground">
-              {team.estado}
-            </span>
+            <span className="py-5 text-sm font-semibold text-muted-foreground">{team.estado}</span>
           </div>
-      </div>
+        </div>
 
-      <div className="mx-auto w-full max-w-7xl space-y-16 px-4 py-12 md:px-8">
+        <div className="mx-auto w-full max-w-7xl space-y-16 px-4 py-12 md:px-8">
           {team.players.length === 0 ? (
             <div className="rounded-2xl border border-border bg-card p-10 text-center">
               <p className="text-base font-semibold text-foreground">Este equipo aún no tiene jugadores asignados.</p>
@@ -145,9 +142,7 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
                   <h2 className="font-serif text-4xl font-black uppercase text-foreground md:text-5xl">
                     {section.title}
                   </h2>
-                  <span className="text-sm font-semibold text-muted-foreground">
-                    {section.players.length}
-                  </span>
+                  <span className="text-sm font-semibold text-muted-foreground">{section.players.length}</span>
                 </div>
 
                 {section.players.length === 0 ? (
@@ -158,12 +153,7 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
                   <div className="-mx-4 overflow-x-auto px-4 pb-3">
                     <div className="flex gap-6">
                       {section.players.map((player, index) => (
-                        <PlayerCard
-                          key={player.id}
-                          player={player}
-                          positionLabel={section.singular}
-                          index={index}
-                        />
+                        <PlayerCard key={player.id} player={player} positionLabel={section.singular} index={index} />
                       ))}
                     </div>
                   </div>
@@ -171,8 +161,8 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
               </section>
             ))
           )}
+        </div>
       </div>
-      </div>
-    </div>
+    </PublicShell>
   )
 }
