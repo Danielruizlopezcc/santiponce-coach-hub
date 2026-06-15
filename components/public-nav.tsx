@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import Image from 'next/image'
-import { ChevronDown, LogIn, Menu, UserPlus } from 'lucide-react'
+import { ArrowRight, ChevronDown, LogIn, Menu, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -143,33 +143,60 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
     activeMegaHref === '/equipos'
       ? 'Selecciona un equipo para ver su plantilla.'
       : 'Elige una sección para consultar sus noticias.'
+  const megaPrimaryHref = activeMegaHref === '/equipos' ? '/equipos' : '/noticias'
+  const megaPrimaryLabel = activeMegaHref === '/equipos' ? 'Ver todos los equipos' : 'Ver todas las noticias'
+  const megaVisibleItems = activeMegaHref === '/noticias' ? megaItems.slice(1) : megaItems
+  const megaGroups =
+    activeMegaHref === '/equipos'
+      ? Array.from(
+          megaVisibleItems.reduce((groups, item) => {
+            const group = groups.get(item.description) ?? []
+            group.push(item)
+            groups.set(item.description, group)
+            return groups
+          }, new Map<string, DropdownItem[]>()),
+        ).map(([title, items]) => ({ title, items }))
+      : [{ title: 'Secciones de noticias', items: megaVisibleItems }]
 
   return (
     <header
-      className="sticky top-0 z-40 w-full bg-primary text-primary-foreground shadow-lg"
+      className="sticky top-0 z-40 w-full overflow-visible bg-[linear-gradient(135deg,#061a3d_0%,#0b3f86_48%,#1f72c8_100%)] text-primary-foreground shadow-[0_18px_45px_rgba(4,20,46,0.28)]"
       onMouseLeave={() => setActiveMegaHref(null)}
     >
-      <div className="mx-auto flex min-h-24 max-w-7xl items-center justify-between gap-5 px-4 py-4 md:px-8">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-35"
+        aria-hidden="true"
+        style={{
+          backgroundImage:
+            'linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+          backgroundSize: '72px 72px',
+          maskImage: 'linear-gradient(90deg, transparent, black 16%, black 84%, transparent)',
+        }}
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/45" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-black/20" aria-hidden="true" />
+
+      <div className="relative mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-5 px-4 py-3 md:px-8">
         <Link
           href="/"
           className="flex min-w-0 items-center gap-5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           aria-label={`${CLUB.shortName} — Inicio`}
         >
-          <span className="flex size-[4.5rem] shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/25 md:size-[5.5rem]">
+          <span className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/25 md:size-20">
             <Image
               src={CLUB.crest}
               alt={`Escudo del ${CLUB.legalName}`}
               width={86}
               height={86}
               priority
-              className="size-14 rounded-lg object-contain md:size-[4.5rem]"
+              className="size-12 rounded-lg object-contain md:size-16"
             />
           </span>
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className="text-2xl font-black tracking-tight text-white md:text-3xl">
+            <span className="text-2xl font-black tracking-tight text-white md:text-[1.7rem]">
               {CLUB.shortName}
             </span>
-            <span className="mt-1 text-base font-bold text-white/75 md:text-lg">
+            <span className="mt-1 text-sm font-bold text-white/75 md:text-base">
               Temporada {CLUB.season}
             </span>
           </span>
@@ -177,21 +204,21 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
 
         <div className="hidden items-center gap-3 md:flex">
           <div className="mr-2 flex flex-col text-right leading-tight">
-            <span className="text-base font-bold text-white">Plataforma oficial</span>
-            <span className="text-sm text-white/70">{CLUB.legalName}</span>
+            <span className="text-sm font-bold text-white">Plataforma oficial</span>
+            <span className="text-xs text-white/70">{CLUB.legalName}</span>
           </div>
           <Link
             href="/registro"
-            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-black uppercase text-white outline-none ring-1 ring-white/20 transition-colors hover:bg-white hover:text-primary focus-visible:ring-2 focus-visible:ring-white/80"
+            className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2.5 text-xs font-black uppercase text-white outline-none ring-1 ring-white/20 transition-colors hover:bg-white hover:text-primary focus-visible:ring-2 focus-visible:ring-white/80"
           >
-            <UserPlus className="size-4" aria-hidden="true" />
+            <UserPlus className="size-3.5" aria-hidden="true" />
             Registrarse
           </Link>
           <Link
             href="/iniciar-sesion"
-            className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black uppercase text-primary shadow-sm outline-none transition-colors hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/80"
+            className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2.5 text-xs font-black uppercase text-primary shadow-sm outline-none transition-colors hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/80"
           >
-            <LogIn className="size-4" aria-hidden="true" />
+            <LogIn className="size-3.5" aria-hidden="true" />
             Iniciar sesión
           </Link>
         </div>
@@ -245,8 +272,8 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
         </div>
       </div>
 
-      <div className="border-t border-white/20">
-        <div className="mx-auto hidden max-w-7xl px-2 py-2 md:block md:px-8">
+      <div className="relative border-t border-white/16 bg-[#0b3b7e]/38 backdrop-blur">
+        <div className="mx-auto hidden max-w-7xl px-2 py-1.5 md:block md:px-8">
           <nav aria-label="Navegación principal">
             <NavLinks pathname={pathname} navData={navData} onMegaOpen={setActiveMegaHref} />
           </nav>
@@ -255,44 +282,61 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
 
       {activeMegaHref ? (
         <div
-          className="absolute left-0 top-full hidden w-full border-t border-border bg-white text-foreground shadow-2xl md:block"
+          className="absolute left-0 top-full hidden w-full border-t border-border bg-white text-foreground shadow-[0_24px_55px_rgba(3,18,43,0.18)] md:block"
           onMouseEnter={() => setActiveMegaHref(activeMegaHref)}
         >
-          <div className="mx-auto grid w-full max-w-7xl grid-cols-[220px_1fr] gap-10 px-8 py-8">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-[240px_1fr] gap-12 px-8 py-10">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-primary">
+              <p className="text-xs font-black uppercase tracking-[0.32em] text-primary">
                 {megaTitle}
               </p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              <p className="mt-4 max-w-48 text-base font-semibold leading-7 text-muted-foreground">
                 {megaDescription}
               </p>
+              <Link
+                href={megaPrimaryHref}
+                onClick={() => setActiveMegaHref(null)}
+                className="mt-7 inline-flex items-center gap-2 text-sm font-black uppercase text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {megaPrimaryLabel}
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
             </div>
 
-            {megaItems.length === 0 ? (
-              <p className="py-3 text-sm font-medium text-muted-foreground">
+            {megaVisibleItems.length === 0 ? (
+              <p className="py-5 text-sm font-bold text-muted-foreground">
                 No hay elementos disponibles.
               </p>
             ) : (
-              <div className="grid gap-x-10 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-                {megaItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setActiveMegaHref(null)}
-                    className="group flex items-center justify-between gap-4 border-b border-border/70 px-1 py-4 outline-none transition-colors hover:text-primary focus-visible:text-primary"
-                  >
-                    <span>
-                      <span className="block text-base font-black text-foreground group-hover:text-primary">
-                        {item.label}
-                      </span>
-                      <span className="mt-1 block text-sm font-medium text-muted-foreground">
-                        {item.description}
-                      </span>
-                    </span>
-                    <span className="text-xl font-black text-primary opacity-60 transition-transform group-hover:translate-x-1">
-                      ›
-                    </span>
-                  </Link>
+              <div className="grid content-start gap-x-14 gap-y-8 lg:grid-cols-3">
+                {megaGroups.map((group) => (
+                  <section key={group.title}>
+                    <h3 className="border-b border-border pb-3 text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">
+                      {group.title}
+                    </h3>
+                    <div className="mt-2">
+                      {group.items.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setActiveMegaHref(null)}
+                          className="group flex items-center justify-between gap-5 border-b border-border/70 py-4 text-foreground outline-none transition-colors hover:text-primary focus-visible:text-primary"
+                        >
+                          <span>
+                            <span className="block text-base font-black leading-tight">
+                              {item.label}
+                            </span>
+                            {activeMegaHref === '/noticias' ? (
+                              <span className="mt-1 block text-sm font-semibold text-muted-foreground">
+                                {item.description}
+                              </span>
+                            ) : null}
+                          </span>
+                          <ArrowRight className="size-4 shrink-0 text-primary/70 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             )}

@@ -10,7 +10,6 @@ export default async function PatrocinadoresPage() {
     <PublicShell>
       <PageContainer
         title="Patrocinadores"
-        description="Descubre las empresas y entidades que apoyan al club."
         className="max-w-7xl"
       >
         {sponsors.length === 0 ? (

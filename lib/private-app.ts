@@ -19,6 +19,7 @@ import { normalizeDocument, normalizeEmail, normalizeOptionalEmail, normalizeOpt
 import { getSavedStripeCardByEmail } from '@/lib/stripe-payment-methods'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
 type PrivateCollections = {
   guardianId: string | null
@@ -360,6 +361,10 @@ export async function getPrivateTeams(): Promise<PrivateTeamSummary[]> {
   const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
   const athleteCountByTeam = new Map<string, number>()
+  type PrivateTeamSortRow = PrivateTeamSummary & {
+    categoryOrder: number
+    suffixOrder: number
+  }
 
   for (const athlete of athletes ?? []) {
     if (!athlete.assigned_team_id) continue
@@ -372,17 +377,26 @@ export async function getPrivateTeams(): Promise<PrivateTeamSummary[]> {
   return (teams ?? [])
     .map((team) => {
       const total = athleteCountByTeam.get(team.id) ?? 0
+      const categoryName = categoryById.get(team.category_id) ?? 'Sin categoría'
+      const sortInfo = getTeamCategorySortInfo(team.name, categoryName)
 
       return {
         id: team.id,
         nombre: team.name,
-        categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+        categoria: sortInfo.label,
         temporada: seasonById.get(team.season_id) ?? CLUB.season,
         jugadores: total,
         estado: !team.is_active ? 'Pendiente' : total >= 15 ? 'Completo' : 'Abierto',
-      } as PrivateTeamSummary
+        categoryOrder: sortInfo.order,
+        suffixOrder: getTeamSuffixOrder(team.name),
+      } as PrivateTeamSortRow
     })
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    .sort((a, b) => {
+      if (a.categoryOrder !== b.categoryOrder) return a.categoryOrder - b.categoryOrder
+      if (a.suffixOrder !== b.suffixOrder) return a.suffixOrder - b.suffixOrder
+      return a.nombre.localeCompare(b.nombre, 'es')
+    })
+    .map(({ categoryOrder, suffixOrder, ...team }) => team)
 }
 
 export async function getPrivateTeamDetail(teamId: string): Promise<PrivateTeamDetail | null> {

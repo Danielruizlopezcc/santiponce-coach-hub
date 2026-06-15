@@ -16,7 +16,6 @@ export default async function PrivateEquiposPage() {
   return (
     <PrivatePageContainer
       title="Equipos"
-      description="Consulta los equipos del club y sus jugadores."
     >
       <div className="relative">
         {teams.length === 0 ? (

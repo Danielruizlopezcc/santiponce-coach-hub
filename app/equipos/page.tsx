@@ -18,7 +18,6 @@ export default async function EquiposPage() {
     <PublicShell>
       <PageContainer
         title="Equipos"
-        description="Consulta los equipos del club y sus jugadores."
         className="max-w-7xl"
       >
         {teams.length === 0 ? (

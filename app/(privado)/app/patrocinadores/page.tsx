@@ -8,7 +8,6 @@ export default async function PrivatePatrocinadoresPage() {
   return (
     <PrivatePageContainer
       title="Patrocinadores"
-      description="Descubre las empresas y entidades que apoyan al club."
     >
       <div className="relative">
         {sponsors.length === 0 ? (

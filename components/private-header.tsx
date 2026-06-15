@@ -15,8 +15,21 @@ type PrivateHeaderProps = {
 
 export function PrivateHeader({ viewer, navItems, isSocio, isPaidSocio }: PrivateHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 bg-primary text-primary-foreground shadow-lg">
-      <div className="mx-auto flex min-h-28 w-full max-w-7xl items-center justify-between gap-5 px-4 py-5 md:px-8">
+    <header className="sticky top-0 z-40 overflow-visible bg-[linear-gradient(135deg,#061a3d_0%,#0b3f86_48%,#1f72c8_100%)] text-primary-foreground shadow-[0_18px_45px_rgba(4,20,46,0.28)]">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-35"
+        aria-hidden="true"
+        style={{
+          backgroundImage:
+            'linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+          backgroundSize: '72px 72px',
+          maskImage: 'linear-gradient(90deg, transparent, black 16%, black 84%, transparent)',
+        }}
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/45" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-black/20" aria-hidden="true" />
+
+      <div className="relative mx-auto flex min-h-28 w-full max-w-7xl items-center justify-between gap-5 px-4 py-5 md:px-8">
         <Link
           href="/app"
           className="flex min-w-0 items-center gap-5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/80"
@@ -65,7 +78,7 @@ export function PrivateHeader({ viewer, navItems, isSocio, isPaidSocio }: Privat
         </div>
       </div>
 
-      <div className="border-t border-white/20">
+      <div className="relative border-t border-white/16 bg-[#0b3b7e]/38 backdrop-blur">
         <div className="mx-auto w-full max-w-7xl px-2 py-2 md:px-8">
           <PrivateNav
             items={navItems}
