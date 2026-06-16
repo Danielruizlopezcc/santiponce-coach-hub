@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Award, CalendarDays, Newspaper, Shield, Trophy, Users } from 'lucide-react'
+import { ArrowRight, Award, CalendarDays, Newspaper, Shield, Users } from 'lucide-react'
+import { HomeNewsCarousel } from '@/components/home-news-carousel'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateSponsor, PrivateTeamSummary } from '@/lib/private-app-shared'
 
@@ -44,125 +45,15 @@ function SectionTitle({ label, title }: { label: string; title: string }) {
 export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
   const featuredNews = news[0]
   const moreNews = news.slice(1, 4)
+  const carouselNews = news.slice(0, 3)
   const featuredTeams = teams.slice(0, 6)
   const featuredSponsors = sponsors.slice(0, 8)
 
   return (
     <div className="bg-white">
-      <section className="relative overflow-hidden bg-[#061a3b] text-white">
-        <Image
-          src="/images/Fondo1.png"
-          alt=""
-          fill
-          priority
-          className="object-cover opacity-34"
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(105deg,#03142f_0%,#07285b_48%,rgba(14,75,150,0.55)_100%)]" />
-        <div
-          className="absolute inset-0 opacity-35"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              'linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-            backgroundSize: '88px 88px',
-            maskImage: 'linear-gradient(90deg, black, black 72%, transparent)',
-          }}
-        />
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white to-transparent" />
+      <HomeNewsCarousel news={carouselNews} />
 
-        <div className="relative mx-auto grid min-h-[590px] max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1fr_440px]">
-          <div className="max-w-4xl">
-            <div className="inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-blue-100 ring-1 ring-white/18">
-              <Trophy className="size-4" aria-hidden="true" />
-              Plataforma oficial · Temporada {CLUB.season}
-            </div>
-            <h1 className="mt-7 max-w-4xl text-5xl font-black leading-[0.92] tracking-tight md:text-7xl">
-              Club Deportivo Santiponce
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg font-semibold leading-8 text-white/82 md:text-xl">
-              Cantera, competición y sentimiento de club para seguir creciendo temporada tras
-              temporada.
-            </p>
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Link
-                href="/noticias"
-                className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black uppercase text-primary shadow-lg transition-colors hover:bg-blue-50"
-              >
-                Últimas noticias
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
-              <Link
-                href="/equipos"
-                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-3 text-sm font-black uppercase text-white ring-1 ring-white/25 transition-colors hover:bg-white/16"
-              >
-                Ver equipos
-              </Link>
-            </div>
-
-            <div className="mt-12 grid max-w-2xl gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-white/9 p-4 ring-1 ring-white/14">
-                <p className="text-3xl font-black">{teams.length}</p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-white/58">Equipos</p>
-              </div>
-              <div className="rounded-lg bg-white/9 p-4 ring-1 ring-white/14">
-                <p className="text-3xl font-black">{news.length}</p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-white/58">Noticias</p>
-              </div>
-              <div className="rounded-lg bg-white/9 p-4 ring-1 ring-white/14">
-                <p className="text-3xl font-black">{sponsors.length}</p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-white/58">Apoyos</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden lg:block">
-            <div className="overflow-hidden rounded-lg bg-white text-foreground shadow-2xl ring-1 ring-white/20">
-              {featuredNews ? (
-                <Link href="/noticias" className="group block">
-                  <div className="relative aspect-[4/3] bg-muted">
-                    <Image
-                      src={featuredNews.imageUrl}
-                      alt={featuredNews.title}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      sizes="440px"
-                    />
-                    <div className="absolute left-4 top-4 rounded-full bg-primary px-3 py-1 text-xs font-black uppercase text-white">
-                      Última noticia
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">
-                      {featuredNews.sectionName} · {formatRelativeDate(featuredNews.createdAt)}
-                    </p>
-                    <h2 className="mt-3 text-2xl font-black leading-tight">
-                      {featuredNews.title}
-                    </h2>
-                    <p className="mt-5 inline-flex items-center gap-2 text-sm font-black uppercase text-primary">
-                      Leer actualidad
-                      <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                    </p>
-                  </div>
-                </Link>
-              ) : (
-                <div className="p-8">
-                  <Image
-                    src={CLUB.crest}
-                    alt={`Escudo del ${CLUB.legalName}`}
-                    width={180}
-                    height={180}
-                    className="mx-auto size-40 object-contain"
-                  />
-                  <p className="mt-6 text-center text-xl font-black">Actualidad del club</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="relative z-10 mx-auto -mt-10 max-w-7xl px-4 sm:px-6">
+      <section className="relative z-10 mx-auto -mt-4 max-w-7xl px-4 sm:px-6">
         <div className="grid overflow-hidden rounded-lg bg-white shadow-xl ring-1 ring-black/5 sm:grid-cols-2 lg:grid-cols-4">
           {QUICK_LINKS.map((item) => (
             <Link

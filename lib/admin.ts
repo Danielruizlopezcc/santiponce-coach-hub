@@ -22,7 +22,7 @@ export type AdminNavItem = {
 
 export const ADMIN_NAV: AdminNavItem[] = [
   { label: 'Resumen', href: '/admin', icon: LayoutDashboard },
-  { label: 'Tutores', href: '/admin/tutores', icon: UserCheck },
+  { label: 'Tutores / Socios', href: '/admin/tutores', icon: UserCheck },
   { label: 'Deportistas', href: '/admin/deportistas', icon: Trophy },
   { label: 'Categorías', href: '/admin/categorias', icon: Tag },
   { label: 'Equipos', href: '/admin/equipos', icon: Shield },

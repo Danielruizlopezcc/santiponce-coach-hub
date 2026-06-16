@@ -13,16 +13,21 @@ export type AdminViewer = PrivateViewer & {
 
 export type AdminSummary = {
   usuarios: number
+  administradores: number
   tutores: number
   sociosActivos: number
   tutoresSocios: number
   tutoresOSocios: number
+  deportistas: number
   deportistasMatriculados: number
   deportistasEnRevision: number
   deportistasPendientes: number
   deportistasSinEquipo: number
-  ingresosSociosEuros: number
-  ingresosEuros: number
+  equipos: number
+  categorias: number
+  patrocinadores: number
+  noticias: number
+  temporadas: number
 }
 
 export type AdminCategoryBreakdown = {
@@ -65,11 +70,22 @@ export type AdminUserRow = {
 
 export type AdminTutorRow = {
   id: string
+  userId: string
   nombre: string
+  email: string
   documento: string
   telefono: string
   ciudad: string
+  isSocio: boolean
   deportistasAsociados: number
+}
+
+export type AdminMemberRow = {
+  id: string
+  nombre: string
+  email: string
+  estado: 'Socio pagado' | 'Pendiente'
+  fechaAlta: string
 }
 
 export type AdminAthleteRow = {
@@ -127,6 +143,9 @@ export type AdminSeasonRow = {
   nombre: string
   fechaInicio: string
   fechaFin: string
+  startsAt: string
+  endsAt: string
+  isActive: boolean
   estado: 'Activa' | 'Planificada' | 'Cerrada'
 }
 
@@ -148,6 +167,15 @@ export type AdminPaymentRow = {
   importe: number
   estado: 'pagado' | 'pendiente' | 'fallido' | 'reembolsado'
   proveedor: 'Stripe' | 'Manual'
+  fecha: string
+}
+
+export type AdminFinanceMovementRow = {
+  id: string
+  tipo: 'ingreso' | 'gasto'
+  concepto: string
+  detalle: string
+  importe: number
   fecha: string
 }
 
@@ -232,6 +260,15 @@ type AdminPaymentRecord = {
   created_at: string
 }
 
+type AdminFinanceMovementRecord = {
+  id: string
+  movement_type: 'income' | 'expense'
+  concept: string
+  detail: string | null
+  amount_cents: number
+  recorded_at: string
+}
+
 function mapStatusLabel(
   status: 'pendiente' | 'matriculado' | 'en_revision',
 ): AdminAthleteRow['estadoMatricula'] {
@@ -259,8 +296,10 @@ async function getAdminCollections() {
     { data: consents },
     { data: consentDocuments },
     { data: payments },
+    { data: sponsors },
+    { data: news },
   ] = await Promise.all([
-    supabase.from('profiles').select('id, email, first_name, last_name, created_at'),
+    supabase.from('profiles').select('id, email, first_name, last_name, is_paid_member, membership_paid_at, created_at'),
     supabase.from('user_roles').select('user_id, role'),
     supabase.from('guardians').select('id, user_id, first_name, last_name, phone, document_id, city'),
     supabase
@@ -281,6 +320,8 @@ async function getAdminCollections() {
         'id, user_id, guardian_id, athlete_id, season_id, payment_type, provider, status, amount_cents, description, paid_at, created_at',
       )
       .order('created_at', { ascending: false }),
+    supabase.from('sponsors').select('id, is_active'),
+    supabase.from('news').select('id'),
   ])
 
   return {
@@ -294,6 +335,8 @@ async function getAdminCollections() {
     consents: consents ?? [],
     consentDocuments: consentDocuments ?? [],
     payments: (payments ?? []) as AdminPaymentRecord[],
+    sponsors: sponsors ?? [],
+    news: news ?? [],
   }
 }
 
@@ -340,7 +383,7 @@ function mapPaymentProviderLabel(
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
-  const { profiles, guardians, athletes, categories, teams, seasons, consents, payments } =
+  const { profiles, roles, guardians, athletes, categories, teams, seasons, consents, payments, sponsors, news } =
     await getAdminCollections()
 
   const guardianById = createGuardianNameLookup(guardians)
@@ -397,10 +440,12 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   const summary: AdminSummary = {
     usuarios: profiles.length,
+    administradores: roles.filter((role) => role.role === 'admin').length,
     tutores: guardians.length,
     sociosActivos: activeMemberIds.size,
     tutoresSocios,
     tutoresOSocios,
+    deportistas: athletes.length,
     deportistasMatriculados: athletes.filter((athlete) => athlete.status === 'matriculado').length,
     deportistasEnRevision: athletes.filter((athlete) => {
       if (athlete.status === 'matriculado') return false
@@ -411,12 +456,11 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       return latestEnrollmentPaymentByAthlete.get(athlete.id)?.status !== 'pending'
     }).length,
     deportistasSinEquipo: athletes.filter((athlete) => !athlete.assigned_team_id).length,
-    ingresosSociosEuros: payments
-      .filter((payment) => payment.payment_type === 'membership' && payment.status === 'paid')
-      .reduce((total, payment) => total + payment.amount_cents, 0) / 100,
-    ingresosEuros: payments
-      .filter((payment) => payment.payment_type === 'enrollment' && payment.status === 'paid')
-      .reduce((total, payment) => total + payment.amount_cents, 0) / 100,
+    equipos: teams.filter((team) => team.is_active).length,
+    categorias: categories.filter((category) => category.is_active).length,
+    patrocinadores: sponsors.filter((sponsor) => sponsor.is_active).length,
+    noticias: news.length,
+    temporadas: seasons.length,
   }
 
   const alerts: AdminAlert[] = []
@@ -506,8 +550,9 @@ export async function getAdminUsers(): Promise<AdminUserRow[]> {
 }
 
 export async function getAdminTutors(): Promise<AdminTutorRow[]> {
-  const { guardians, athletes } = await getAdminCollections()
+  const { profiles, guardians, athletes } = await getAdminCollections()
   const athleteCountByGuardian = new Map<string, number>()
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
 
   for (const athlete of athletes) {
     athleteCountByGuardian.set(
@@ -517,13 +562,36 @@ export async function getAdminTutors(): Promise<AdminTutorRow[]> {
   }
 
   return guardians
-    .map((guardian) => ({
-      id: guardian.id,
-      nombre: `${guardian.first_name} ${guardian.last_name}`.trim(),
-      documento: guardian.document_id,
-      telefono: guardian.phone,
-      ciudad: guardian.city,
-      deportistasAsociados: athleteCountByGuardian.get(guardian.id) ?? 0,
+    .map((guardian) => {
+      const profile = profileById.get(guardian.user_id)
+
+      return {
+        id: guardian.id,
+        userId: guardian.user_id,
+        nombre: `${guardian.first_name} ${guardian.last_name}`.trim(),
+        email: profile?.email ?? '',
+        documento: guardian.document_id,
+        telefono: guardian.phone,
+        ciudad: guardian.city,
+        isSocio: Boolean(profile?.is_paid_member),
+        deportistasAsociados: athleteCountByGuardian.get(guardian.id) ?? 0,
+      }
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+export async function getAdminMembers(): Promise<AdminMemberRow[]> {
+  const { profiles, roles } = await getAdminCollections()
+  const memberRoleIds = new Set(roles.filter((role) => role.role === 'member').map((role) => role.user_id))
+
+  return profiles
+    .filter((profile) => profile.is_paid_member || memberRoleIds.has(profile.id))
+    .map((profile) => ({
+      id: profile.id,
+      nombre: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Socio',
+      email: profile.email,
+      estado: (profile.is_paid_member ? 'Socio pagado' : 'Pendiente') as AdminMemberRow['estado'],
+      fechaAlta: formatSpanishDate(profile.created_at),
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
@@ -747,6 +815,9 @@ export async function getAdminSeasons(): Promise<AdminSeasonRow[]> {
       nombre: season.name,
       fechaInicio: formatSpanishDate(season.starts_at),
       fechaFin: formatSpanishDate(season.ends_at),
+      startsAt: season.starts_at,
+      endsAt: season.ends_at,
+      isActive: season.is_active,
       estado: (
         season.is_active
           ? 'Activa'
@@ -805,6 +876,24 @@ export async function getAdminPayments(): Promise<AdminPaymentRow[]> {
     estado: mapPaymentStatusLabel(payment.status),
     proveedor: mapPaymentProviderLabel(payment.provider),
     fecha: formatSpanishDate(payment.paid_at ?? payment.created_at),
+  }))
+}
+
+export async function getAdminFinanceMovements(): Promise<AdminFinanceMovementRow[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('admin_finance_movements')
+    .select('id, movement_type, concept, detail, amount_cents, recorded_at')
+    .order('recorded_at', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  return ((data ?? []) as AdminFinanceMovementRecord[]).map((movement) => ({
+    id: movement.id,
+    tipo: movement.movement_type === 'income' ? 'ingreso' : 'gasto',
+    concepto: movement.concept,
+    detalle: movement.detail ?? '',
+    importe: movement.amount_cents / 100,
+    fecha: formatSpanishDateTime(movement.recorded_at),
   }))
 }
 

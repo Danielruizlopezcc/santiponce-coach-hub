@@ -72,3 +72,33 @@ export async function rejectEnrollmentAction(athleteId: string): Promise<void> {
   revalidatePath('/admin/deportistas')
   revalidatePath('/admin/pagos')
 }
+
+export async function updateEnrollmentStatusAction(
+  athleteId: string,
+  status: 'pendiente' | 'matriculado' | 'en_revision',
+): Promise<void> {
+  const supabase = await getAdminSupabase()
+  const { error } = await supabase
+    .from('athletes')
+    .update({ status })
+    .eq('id', athleteId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/admin/matriculas')
+  revalidatePath('/admin/deportistas')
+}
+
+export async function deleteEnrollmentAction(athleteId: string): Promise<void> {
+  const supabase = await getAdminSupabase()
+  const { error } = await supabase
+    .from('athletes')
+    .delete()
+    .eq('id', athleteId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/admin/matriculas')
+  revalidatePath('/admin/deportistas')
+  revalidatePath('/admin/pagos')
+}

@@ -139,10 +139,6 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
   const [activeMegaHref, setActiveMegaHref] = useState<string | null>(null)
   const megaItems = activeMegaHref ? getDropdownItems(activeMegaHref, navData) : []
   const megaTitle = activeMegaHref === '/equipos' ? 'Equipos' : 'Noticias'
-  const megaDescription =
-    activeMegaHref === '/equipos'
-      ? 'Selecciona un equipo para ver su plantilla.'
-      : 'Elige una sección para consultar sus noticias.'
   const megaPrimaryHref = activeMegaHref === '/equipos' ? '/equipos' : '/noticias'
   const megaPrimaryLabel = activeMegaHref === '/equipos' ? 'Ver todos los equipos' : 'Ver todas las noticias'
   const megaVisibleItems = activeMegaHref === '/noticias' ? megaItems.slice(1) : megaItems
@@ -176,7 +172,7 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/45" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-black/20" aria-hidden="true" />
 
-      <div className="relative mx-auto flex min-h-20 max-w-7xl items-center justify-between gap-5 px-4 py-3 md:px-8">
+      <div className="relative flex min-h-20 w-full items-center justify-between gap-5 px-4 py-3 md:px-8 lg:px-10">
         <Link
           href="/"
           className="flex min-w-0 items-center gap-5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/80"
@@ -203,10 +199,6 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
         </Link>
 
         <div className="hidden items-center gap-3 md:flex">
-          <div className="mr-2 flex flex-col text-right leading-tight">
-            <span className="text-sm font-bold text-white">Plataforma oficial</span>
-            <span className="text-xs text-white/70">{CLUB.legalName}</span>
-          </div>
           <Link
             href="/registro"
             className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2.5 text-xs font-black uppercase text-white outline-none ring-1 ring-white/20 transition-colors hover:bg-white hover:text-primary focus-visible:ring-2 focus-visible:ring-white/80"
@@ -273,7 +265,7 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
       </div>
 
       <div className="relative border-t border-white/16 bg-[#0b3b7e]/38 backdrop-blur">
-        <div className="mx-auto hidden max-w-7xl px-2 py-1.5 md:block md:px-8">
+        <div className="hidden w-full px-2 py-1.5 md:block md:px-8 lg:px-10">
           <nav aria-label="Navegación principal">
             <NavLinks pathname={pathname} navData={navData} onMegaOpen={setActiveMegaHref} />
           </nav>
@@ -287,11 +279,8 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
         >
           <div className="mx-auto grid w-full max-w-7xl grid-cols-[240px_1fr] gap-12 px-8 py-10">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.32em] text-primary">
+              <p className="text-4xl font-black uppercase tracking-tight text-primary">
                 {megaTitle}
-              </p>
-              <p className="mt-4 max-w-48 text-base font-semibold leading-7 text-muted-foreground">
-                {megaDescription}
               </p>
               <Link
                 href={megaPrimaryHref}

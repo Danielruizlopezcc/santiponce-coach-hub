@@ -29,3 +29,12 @@ export function maskDocument(value: string) {
   if (value.length <= 4) return value
   return `${value.slice(0, 2)}****${value.slice(-2)}`
 }
+
+export function formatSpanishPhone(value: string) {
+  const digits = value.replace(/\D/g, '')
+  const withoutPrefix =
+    digits.length === 11 && digits.startsWith('34') ? digits.slice(2) : digits
+
+  if (withoutPrefix.length !== 9) return value
+  return `${withoutPrefix.slice(0, 3)} ${withoutPrefix.slice(3, 5)} ${withoutPrefix.slice(5, 7)} ${withoutPrefix.slice(7)}`
+}

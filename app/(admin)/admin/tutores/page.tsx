@@ -1,31 +1,20 @@
-import { AdminPageShell } from '@/components/admin/admin-page-shell'
-import { type Column } from '@/components/admin/admin-table'
-import { maskDocument } from '@/lib/format'
-import { getAdminTutors } from '@/lib/admin-app'
-
-const columns: Column[] = [
-  { key: 'nombre', label: 'Nombre' },
-  { key: 'documento', label: 'DNI/NIE' },
-  { key: 'telefono', label: 'Teléfono', responsive: 'md' },
-  { key: 'ciudad', label: 'Ciudad', responsive: 'lg' },
-  { key: 'deportistasAsociados', label: 'Deportistas asociados' },
-]
+import { PageContainer } from '@/components/page-container'
+import { getAdminMembers, getAdminTutors } from '@/lib/admin-app'
+import { TutorsMembersClient } from './tutores-client'
 
 export default async function AdminTutoresPage() {
-  const data = (await getAdminTutors()).map((row) => ({
-    ...row,
-    documento: maskDocument(row.documento),
-  }))
+  const [tutors, members] = await Promise.all([
+    getAdminTutors(),
+    getAdminMembers(),
+  ])
+
   return (
-    <AdminPageShell
-      title="Tutores"
-      description="Resumen visual de tutores y familias registradas."
-      data={data}
-      columns={columns}
-      searchPlaceholder="Buscar por tutor o ciudad"
-      emptyTitle="Sin tutores"
-      emptyDescription="No hay tutores registrados para mostrar."
-      counterLabel="tutores"
-    />
+    <PageContainer
+      title="Tutores / Socios"
+      description="Gestión de tutores, familias y socios del club."
+      className="max-w-7xl"
+    >
+      <TutorsMembersClient tutors={tutors} members={members} />
+    </PageContainer>
   )
 }

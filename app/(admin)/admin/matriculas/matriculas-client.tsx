@@ -1,14 +1,19 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CheckCircle2, Search, X } from 'lucide-react'
+import { CheckCircle2, Pencil, Search, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageContainer } from '@/components/page-container'
 import { cn } from '@/lib/utils'
 import { formatEuro } from '@/lib/format'
 import type { AdminEnrollmentRow } from '@/lib/admin-app'
-import { confirmPaymentAction, rejectEnrollmentAction } from './actions'
+import {
+  confirmPaymentAction,
+  deleteEnrollmentAction,
+  rejectEnrollmentAction,
+  updateEnrollmentStatusAction,
+} from './actions'
 
 const ESTADO_STYLES: Record<AdminEnrollmentRow['estadoMatricula'], string> = {
   Matriculado: 'bg-emerald-100 text-emerald-700',
@@ -21,6 +26,9 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
   const [search, setSearch]                   = useState('')
   const [confirmId, setConfirmId]             = useState<string | null>(null)
   const [rejectId, setRejectId]               = useState<string | null>(null)
+  const [editId, setEditId]                   = useState<string | null>(null)
+  const [deleteId, setDeleteId]               = useState<string | null>(null)
+  const [editStatus, setEditStatus]           = useState<'pendiente' | 'matriculado' | 'en_revision'>('pendiente')
   const [actionError, setActionError]         = useState<string | null>(null)
 
   const filtered = search.trim()
@@ -59,6 +67,44 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
         setActionError(e instanceof Error ? e.message : 'Error al rechazar la matrícula.')
       }
     })
+  }
+
+  function handleUpdateStatus(id: string) {
+    setActionError(null)
+    startTransition(async () => {
+      try {
+        await updateEnrollmentStatusAction(id, editStatus)
+        setEditId(null)
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Error al editar la matrícula.')
+      }
+    })
+  }
+
+  function handleDelete(id: string) {
+    setActionError(null)
+    startTransition(async () => {
+      try {
+        await deleteEnrollmentAction(id)
+        setDeleteId(null)
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Error al eliminar la matrícula.')
+      }
+    })
+  }
+
+  function openEdit(row: AdminEnrollmentRow) {
+    setConfirmId(null)
+    setRejectId(null)
+    setDeleteId(null)
+    setEditId(row.id)
+    setEditStatus(
+      row.estadoMatricula === 'Matriculado'
+        ? 'matriculado'
+        : row.estadoMatricula === 'En revisión'
+          ? 'en_revision'
+          : 'pendiente',
+    )
   }
 
   return (
@@ -144,6 +190,8 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
             {filtered.map((row) => {
               const isConfirming = confirmId === row.id
               const isRejecting  = rejectId  === row.id
+              const isEditing    = editId    === row.id
+              const isDeleting   = deleteId  === row.id
               const canAct       = row.estadoMatricula === 'En revisión'
 
               return (
@@ -193,7 +241,39 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
                     )}
 
                     {/* Acciones normales */}
-                    {!isConfirming && !isRejecting && (
+                    {isEditing && (
+                      <div className="flex items-center justify-end gap-2">
+                        <select
+                          value={editStatus}
+                          onChange={(event) => setEditStatus(event.target.value as typeof editStatus)}
+                          className="h-7 rounded-lg border border-input bg-white px-2 text-xs"
+                        >
+                          <option value="pendiente">Pendiente</option>
+                          <option value="en_revision">En revisión</option>
+                          <option value="matriculado">Matriculado</option>
+                        </select>
+                        <Button size="sm" disabled={isPending} onClick={() => handleUpdateStatus(row.id)}>
+                          Guardar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    )}
+
+                    {isDeleting && (
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.id)}>
+                          Sí, eliminar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setDeleteId(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    )}
+
+                    {!isConfirming && !isRejecting && !isEditing && !isDeleting && (
                       <div className="flex items-center justify-end gap-1">
                         {row.estadoMatricula === 'Matriculado' && (
                           <span className="flex items-center gap-1 text-xs text-emerald-600">
@@ -221,6 +301,17 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
                             </Button>
                           </>
                         )}
+                        <Button size="icon-sm" variant="ghost" aria-label="Editar matrícula" onClick={() => openEdit(row)}>
+                          <Pencil className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="destructive"
+                          aria-label="Eliminar matrícula"
+                          onClick={() => { setConfirmId(null); setRejectId(null); setEditId(null); setDeleteId(row.id) }}
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </Button>
                         {row.estadoMatricula === 'Pendiente' && (
                           <span className="text-xs text-muted-foreground">Sin iniciar checkout</span>
                         )}

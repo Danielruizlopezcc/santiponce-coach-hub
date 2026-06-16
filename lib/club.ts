@@ -30,7 +30,9 @@ export type PrivateNavItem = NavItem & {
 export const PUBLIC_NAV: NavItem[] = [
   { label: 'Inicio', href: '/' },
   { label: 'Noticias', href: '/noticias' },
+  { label: 'Calendario', href: '/calendario' },
   { label: 'Equipos', href: '/equipos' },
+  { label: 'Club', href: '/club' },
   { label: 'Patrocinadores', href: '/patrocinadores' },
   { label: 'Registrarse', href: '/registro' },
   { label: 'Iniciar sesión', href: '/iniciar-sesion' },

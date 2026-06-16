@@ -8,8 +8,10 @@ const FOOTER_COLUMNS = [
     links: [
       { label: 'Inicio', href: '/' },
       { label: 'Noticias', href: '/noticias' },
-      { label: 'Patrocinadores', href: '/patrocinadores' },
+      { label: 'Calendario', href: '/calendario' },
       { label: 'Equipos', href: '/equipos' },
+      { label: 'Club', href: '/club' },
+      { label: 'Patrocinadores', href: '/patrocinadores' },
     ],
   },
   {

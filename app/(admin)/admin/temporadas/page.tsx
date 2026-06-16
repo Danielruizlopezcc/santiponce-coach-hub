@@ -1,26 +1,17 @@
-import { AdminPageShell } from '@/components/admin/admin-page-shell'
-import { type Column } from '@/components/admin/admin-table'
+import { PageContainer } from '@/components/page-container'
 import { getAdminSeasons } from '@/lib/admin-app'
-
-const columns: Column[] = [
-  { key: 'nombre', label: 'Nombre' },
-  { key: 'fechaInicio', label: 'Fecha inicio' },
-  { key: 'fechaFin', label: 'Fecha fin' },
-  { key: 'estado', label: 'Estado' },
-]
+import { TemporadasClient } from './temporadas-client'
 
 export default async function AdminTemporadasPage() {
-  const data = await getAdminSeasons()
+  const seasons = await getAdminSeasons()
+
   return (
-    <AdminPageShell
+    <PageContainer
       title="Temporadas"
       description="Temporadas deportivas disponibles en la plataforma visual."
-      data={data}
-      columns={columns}
-      searchPlaceholder="Buscar temporada"
-      emptyTitle="Sin temporadas"
-      emptyDescription="No hay temporadas registradas."
-      counterLabel="temporadas"
-    />
+      className="max-w-7xl"
+    >
+      <TemporadasClient seasons={seasons} />
+    </PageContainer>
   )
 }
