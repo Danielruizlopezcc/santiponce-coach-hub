@@ -201,6 +201,22 @@ export type AdminFeeTemplateRow = {
   createdAt: string
 }
 
+export type AdminTutorFeeAssignmentRow = {
+  id: string
+  guardianId: string
+  feeTemplateId: string
+  feeName: string
+  feeType: string
+  totalAmount: number
+  chargeDay: number
+  startMonth: string
+  status: 'active' | 'canceled' | 'completed'
+  scheduledCharges: number
+  paidCharges: number
+  nextChargeDate: string
+  createdAt: string
+}
+
 export type AdminConsentRow = {
   id: string
   usuario: string
@@ -301,6 +317,22 @@ type AdminFeeTemplateRecord = {
   charge_frequency: string | null
   charge_count: number | null
   created_at: string
+}
+
+type AdminTutorFeeAssignmentRecord = {
+  id: string
+  guardian_id: string
+  fee_template_id: string
+  charge_day: number
+  start_month: string
+  status: 'active' | 'canceled' | 'completed'
+  created_at: string
+}
+
+type AdminTutorFeeChargeRecord = {
+  assignment_id: string
+  due_date: string
+  status: 'scheduled' | 'paid' | 'failed' | 'canceled'
 }
 
 function mapStatusLabel(
@@ -978,6 +1010,56 @@ export async function getAdminFeeTemplates(): Promise<AdminFeeTemplateRow[]> {
     chargeCount: fee.charge_count,
     createdAt: formatSpanishDateTime(fee.created_at),
   }))
+}
+
+export async function getAdminTutorFeeAssignments(): Promise<AdminTutorFeeAssignmentRow[]> {
+  const supabase = await createClient()
+  const [{ data: assignments }, { data: feeTemplates }, { data: charges }] = await Promise.all([
+    supabase
+      .from('tutor_fee_assignments')
+      .select('id, guardian_id, fee_template_id, charge_day, start_month, status, created_at')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('admin_fee_templates')
+      .select('id, name, fee_type, total_amount_cents, is_public, split_payment, charge_frequency, charge_count, created_at'),
+    supabase
+      .from('tutor_fee_charges')
+      .select('assignment_id, due_date, status')
+      .order('due_date', { ascending: true }),
+  ])
+
+  const feeById = new Map(
+    ((feeTemplates ?? []) as AdminFeeTemplateRecord[]).map((fee) => [fee.id, fee]),
+  )
+  const chargesByAssignment = new Map<string, AdminTutorFeeChargeRecord[]>()
+
+  for (const charge of ((charges ?? []) as AdminTutorFeeChargeRecord[])) {
+    const current = chargesByAssignment.get(charge.assignment_id) ?? []
+    current.push(charge)
+    chargesByAssignment.set(charge.assignment_id, current)
+  }
+
+  return ((assignments ?? []) as AdminTutorFeeAssignmentRecord[]).map((assignment) => {
+    const fee = feeById.get(assignment.fee_template_id)
+    const assignmentCharges = chargesByAssignment.get(assignment.id) ?? []
+    const nextCharge = assignmentCharges.find((charge) => charge.status === 'scheduled')
+
+    return {
+      id: assignment.id,
+      guardianId: assignment.guardian_id,
+      feeTemplateId: assignment.fee_template_id,
+      feeName: fee?.name ?? 'Cuota no disponible',
+      feeType: fee?.fee_type ?? 'Sin tipo',
+      totalAmount: (fee?.total_amount_cents ?? 0) / 100,
+      chargeDay: assignment.charge_day,
+      startMonth: formatSpanishDate(assignment.start_month),
+      status: assignment.status,
+      scheduledCharges: assignmentCharges.filter((charge) => charge.status === 'scheduled').length,
+      paidCharges: assignmentCharges.filter((charge) => charge.status === 'paid').length,
+      nextChargeDate: nextCharge ? formatSpanishDate(nextCharge.due_date) : 'Sin cargos pendientes',
+      createdAt: formatSpanishDateTime(assignment.created_at),
+    }
+  })
 }
 
 export async function getAdminConsents(): Promise<AdminConsentRow[]> {

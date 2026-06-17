@@ -11,6 +11,11 @@ export type TutorSocioActionState = {
   message: string
 }
 
+export type TutorFeeAssignmentActionState = {
+  ok: boolean
+  message: string
+}
+
 const basePersonSchema = z.object({
   nombre: z.string().trim().min(2, 'Introduce un nombre.').max(60),
   apellidos: z.string().trim().min(2, 'Introduce los apellidos.').max(80),
@@ -29,6 +34,31 @@ const tutorSchema = basePersonSchema.extend({
 const memberSchema = basePersonSchema.extend({
   id: z.string().uuid().optional(),
 })
+
+const tutorFeeAssignmentSchema = z.object({
+  guardianId: z.string().uuid('No se ha podido identificar el tutor.'),
+  feeTemplateId: z.string().uuid('Selecciona una cuota.'),
+  chargeDay: z.coerce.number().int().min(1, 'El día debe estar entre 1 y 28.').max(28, 'El día debe estar entre 1 y 28.'),
+  startMonth: z.string().regex(/^\d{4}-\d{2}$/, 'Selecciona el mes de inicio.'),
+})
+
+function getFrequencyMonths(value: string | null) {
+  if (value === 'cada_2_meses') return 2
+  if (value === 'cada_3_meses') return 3
+  if (value === 'cada_6_meses') return 6
+  return 1
+}
+
+function addMonths(year: number, monthIndex: number, monthsToAdd: number) {
+  return new Date(Date.UTC(year, monthIndex + monthsToAdd, 1))
+}
+
+function toDueDate(startMonth: string, chargeDay: number, offsetMonths: number) {
+  const [year, month] = startMonth.split('-').map(Number)
+  const date = addMonths(year, month - 1, offsetMonths)
+  date.setUTCDate(chargeDay)
+  return date.toISOString().slice(0, 10)
+}
 
 async function createAuthProfile(values: z.infer<typeof basePersonSchema>) {
   const supabase = createAdminClient()
@@ -263,6 +293,109 @@ export async function deleteMemberAction(userId: string): Promise<TutorSocioActi
   if (error) return { ok: false, message: error.message }
   revalidatePath('/admin/tutores')
   return { ok: true, message: 'Socio eliminado correctamente.' }
+}
+
+export async function assignTutorFeeAction(
+  _prev: TutorFeeAssignmentActionState,
+  formData: FormData,
+): Promise<TutorFeeAssignmentActionState> {
+  const admin = await requireAdminAction()
+  const parsed = tutorFeeAssignmentSchema.safeParse({
+    guardianId: formData.get('guardianId'),
+    feeTemplateId: formData.get('feeTemplateId'),
+    chargeDay: formData.get('chargeDay'),
+    startMonth: formData.get('startMonth'),
+  })
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Revisa los datos de la cuota.' }
+  }
+
+  const supabase = createAdminClient()
+  const values = parsed.data
+  const { data: fee, error: feeError } = await supabase
+    .from('admin_fee_templates')
+    .select('id, total_amount_cents, split_payment, charge_frequency, charge_count')
+    .eq('id', values.feeTemplateId)
+    .maybeSingle()
+
+  if (feeError || !fee) {
+    return { ok: false, message: feeError?.message ?? 'No se ha encontrado la cuota seleccionada.' }
+  }
+
+  const totalCharges = fee.split_payment ? Number(fee.charge_count ?? 0) : 1
+  if (totalCharges < 1) {
+    return { ok: false, message: 'La cuota no tiene una configuración de cargos válida.' }
+  }
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from('tutor_fee_assignments')
+    .insert({
+      guardian_id: values.guardianId,
+      fee_template_id: values.feeTemplateId,
+      charge_day: values.chargeDay,
+      start_month: `${values.startMonth}-01`,
+      status: 'active',
+      created_by: admin.id,
+    })
+    .select('id')
+    .single()
+
+  if (assignmentError || !assignment) {
+    return { ok: false, message: assignmentError?.message ?? 'No se ha podido asignar la cuota.' }
+  }
+
+  const frequencyMonths = fee.split_payment ? getFrequencyMonths(fee.charge_frequency) : 0
+  const baseAmount = Math.floor(fee.total_amount_cents / totalCharges)
+  const remainder = fee.total_amount_cents % totalCharges
+  const charges = Array.from({ length: totalCharges }, (_, index) => ({
+    assignment_id: assignment.id,
+    guardian_id: values.guardianId,
+    fee_template_id: values.feeTemplateId,
+    charge_number: index + 1,
+    due_date: toDueDate(values.startMonth, values.chargeDay, index * frequencyMonths),
+    amount_cents: baseAmount + (index < remainder ? 1 : 0),
+    currency: 'eur',
+    status: 'scheduled',
+  }))
+
+  const { error: chargesError } = await supabase.from('tutor_fee_charges').insert(charges)
+  if (chargesError) {
+    await supabase.from('tutor_fee_assignments').delete().eq('id', assignment.id)
+    return { ok: false, message: chargesError.message }
+  }
+
+  revalidatePath('/admin/tutores')
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Cuota asignada y cargos programados correctamente.' }
+}
+
+export async function cancelTutorFeeAssignmentAction(assignmentId: string): Promise<TutorSocioActionState> {
+  await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(assignmentId)
+  if (!parsed.success) {
+    return { ok: false, message: 'No se ha podido identificar la cuota asignada.' }
+  }
+
+  const supabase = createAdminClient()
+  const { error: assignmentError } = await supabase
+    .from('tutor_fee_assignments')
+    .update({ status: 'canceled' })
+    .eq('id', parsed.data)
+
+  if (assignmentError) return { ok: false, message: assignmentError.message }
+
+  const { error: chargesError } = await supabase
+    .from('tutor_fee_charges')
+    .update({ status: 'canceled' })
+    .eq('assignment_id', parsed.data)
+    .eq('status', 'scheduled')
+
+  if (chargesError) return { ok: false, message: chargesError.message }
+
+  revalidatePath('/admin/tutores')
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Cuota asignada cancelada correctamente.' }
 }
 
 async function setUserMembership(userId: string, isSocio: boolean) {

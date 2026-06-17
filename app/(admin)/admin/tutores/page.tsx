@@ -1,11 +1,13 @@
 import { PageContainer } from '@/components/page-container'
-import { getAdminMembers, getAdminTutors } from '@/lib/admin-app'
+import { getAdminFeeTemplates, getAdminMembers, getAdminTutorFeeAssignments, getAdminTutors } from '@/lib/admin-app'
 import { TutorsMembersClient } from './tutores-client'
 
 export default async function AdminTutoresPage() {
-  const [tutors, members] = await Promise.all([
+  const [tutors, members, feeTemplates, feeAssignments] = await Promise.all([
     getAdminTutors(),
     getAdminMembers(),
+    getAdminFeeTemplates(),
+    getAdminTutorFeeAssignments(),
   ])
 
   return (
@@ -14,7 +16,12 @@ export default async function AdminTutoresPage() {
       description="Gestión de tutores, familias y socios del club."
       className="max-w-7xl"
     >
-      <TutorsMembersClient tutors={tutors} members={members} />
+      <TutorsMembersClient
+        tutors={tutors}
+        members={members}
+        feeTemplates={feeTemplates}
+        feeAssignments={feeAssignments}
+      />
     </PageContainer>
   )
 }

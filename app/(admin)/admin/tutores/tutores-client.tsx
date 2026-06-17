@@ -1,15 +1,17 @@
 'use client'
 
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
-import { Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X } from 'lucide-react'
+import { CreditCard, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { formatSpanishPhone, maskDocument } from '@/lib/format'
-import type { AdminMemberRow, AdminTutorRow } from '@/lib/admin-app'
+import { formatEuro, formatSpanishPhone, maskDocument } from '@/lib/format'
+import type { AdminFeeTemplateRow, AdminMemberRow, AdminTutorFeeAssignmentRow, AdminTutorRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import {
   approveTutorAction,
+  assignTutorFeeAction,
+  cancelTutorFeeAssignmentAction,
   createMemberAction,
   createTutorAction,
   deleteMemberAction,
@@ -17,14 +19,18 @@ import {
   rejectTutorAction,
   toggleTutorMemberAction,
   type TutorSocioActionState,
+  type TutorFeeAssignmentActionState,
 } from './actions'
 
 type Props = {
   tutors: AdminTutorRow[]
   members: AdminMemberRow[]
+  feeTemplates: AdminFeeTemplateRow[]
+  feeAssignments: AdminTutorFeeAssignmentRow[]
 }
 
 const initialState: TutorSocioActionState = { ok: false, message: '' }
+const initialFeeAssignmentState: TutorFeeAssignmentActionState = { ok: false, message: '' }
 
 function FormMessage({ state }: { state: TutorSocioActionState }) {
   if (!state.message) return null
@@ -40,7 +46,7 @@ function FormMessage({ state }: { state: TutorSocioActionState }) {
   )
 }
 
-export function TutorsMembersClient({ tutors, members }: Props) {
+export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignments }: Props) {
   const [activeTab, setActiveTab] = useState<'tutores' | 'socios' | 'pendientes' | 'rechazados'>('tutores')
   const [tutorSearch, setTutorSearch] = useState('')
   const [memberSearch, setMemberSearch] = useState('')
@@ -49,6 +55,7 @@ export function TutorsMembersClient({ tutors, members }: Props) {
   const [approvePendingId, setApprovePendingId] = useState<string | null>(null)
   const [rejectPendingId, setRejectPendingId] = useState<string | null>(null)
   const [editingTutor, setEditingTutor] = useState<AdminTutorRow | null>(null)
+  const [assigningTutor, setAssigningTutor] = useState<AdminTutorRow | null>(null)
   const [editingMember, setEditingMember] = useState<AdminMemberRow | null>(null)
   const [confirmDeleteTutorId, setConfirmDeleteTutorId] = useState<string | null>(null)
   const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null)
@@ -57,6 +64,7 @@ export function TutorsMembersClient({ tutors, members }: Props) {
   const memberFormRef = useRef<HTMLFormElement>(null)
   const [tutorState, tutorAction, tutorPending] = useActionState(createTutorAction, initialState)
   const [memberState, memberAction, memberPending] = useActionState(createMemberAction, initialState)
+  const [feeAssignmentState, feeAssignmentAction, feeAssignmentPending] = useActionState(assignTutorFeeAction, initialFeeAssignmentState)
 
   const visibleTutors = useMemo(() => {
     const q = tutorSearch.trim().toLowerCase()
@@ -72,6 +80,15 @@ export function TutorsMembersClient({ tutors, members }: Props) {
 
   const pendingTutors = tutors.filter((tutor) => tutor.approvalStatus === 'pending')
   const rejectedTutors = tutors.filter((tutor) => tutor.approvalStatus === 'rejected')
+  const assignmentsByGuardian = useMemo(() => {
+    const map = new Map<string, AdminTutorFeeAssignmentRow[]>()
+    for (const assignment of feeAssignments) {
+      const current = map.get(assignment.guardianId) ?? []
+      current.push(assignment)
+      map.set(assignment.guardianId, current)
+    }
+    return map
+  }, [feeAssignments])
 
   const visibleMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase()
@@ -125,6 +142,14 @@ export function TutorsMembersClient({ tutors, members }: Props) {
     setToggleMessage(null)
     startTransition(async () => {
       const result = await deleteMemberAction(member.id)
+      setToggleMessage(result)
+    })
+  }
+
+  function handleCancelFeeAssignment(assignmentId: string) {
+    setToggleMessage(null)
+    startTransition(async () => {
+      const result = await cancelTutorFeeAssignmentAction(assignmentId)
       setToggleMessage(result)
     })
   }
@@ -211,6 +236,119 @@ export function TutorsMembersClient({ tutors, members }: Props) {
               <Input value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} placeholder="Buscar por tutor, email, teléfono o ciudad" className="pl-9" />
             </div>
             {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
+            {assigningTutor ? (
+              <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">
+                      Asignar cuota
+                    </p>
+                    <h3 className="mt-1 text-lg font-black text-foreground">{assigningTutor.nombre}</h3>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setAssigningTutor(null)}>
+                    <X className="size-4" />
+                    Cerrar
+                  </Button>
+                </div>
+
+                {feeTemplates.length === 0 ? (
+                  <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
+                    Primero crea una cuota en Contabilidad &gt; Cuotas.
+                  </p>
+                ) : (
+                  <form action={feeAssignmentAction} className="grid gap-3 lg:grid-cols-[1.5fr_0.8fr_0.8fr_auto] lg:items-end">
+                    <input type="hidden" name="guardianId" value={assigningTutor.id} />
+                    <div>
+                      <label htmlFor="fee-template" className="text-sm font-black text-foreground">
+                        Tipo de cuota
+                      </label>
+                      <select
+                        id="fee-template"
+                        name="feeTemplateId"
+                        className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        required
+                      >
+                        <option value="">Selecciona cuota</option>
+                        {feeTemplates.map((fee) => (
+                          <option key={fee.id} value={fee.id}>
+                            {fee.nombre} · {formatEuro(fee.importe)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="start-month" className="text-sm font-black text-foreground">
+                        Mes de inicio
+                      </label>
+                      <Input id="start-month" name="startMonth" type="month" className="mt-2 bg-white" required />
+                    </div>
+                    <div>
+                      <label htmlFor="charge-day" className="text-sm font-black text-foreground">
+                        Día de cobro
+                      </label>
+                      <select
+                        id="charge-day"
+                        name="chargeDay"
+                        className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        defaultValue="1"
+                        required
+                      >
+                        {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
+                          <option key={day} value={day}>
+                            Día {day}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Button type="submit" disabled={feeAssignmentPending}>
+                      {feeAssignmentPending ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+                      Programar
+                    </Button>
+                  </form>
+                )}
+
+                {feeAssignmentState.message ? (
+                  <div className="mt-3">
+                    <FormMessage state={feeAssignmentState} />
+                  </div>
+                ) : null}
+
+                {(assignmentsByGuardian.get(assigningTutor.id)?.length ?? 0) > 0 ? (
+                  <div className="mt-4 grid gap-2">
+                    {assignmentsByGuardian.get(assigningTutor.id)?.map((assignment) => (
+                      <div key={assignment.id} className="rounded-lg border border-border bg-white px-3 py-2 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-black text-foreground">{assignment.feeName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              Próximo cargo: {assignment.nextChargeDate}
+                            </span>
+                            {assignment.status === 'active' ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelFeeAssignment(assignment.id)}
+                                disabled={isPending}
+                              >
+                                Cancelar
+                              </Button>
+                            ) : (
+                              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-black text-muted-foreground">
+                                Cancelada
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {assignment.scheduledCharges} pendientes · {assignment.paidCharges} pagados · día {assignment.chargeDay}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
               <table className="w-full text-sm">
@@ -263,6 +401,9 @@ export function TutorsMembersClient({ tutors, members }: Props) {
                           <div className="flex justify-end gap-1">
                             <Button size="icon-sm" variant="ghost" aria-label="Editar tutor" onClick={() => setEditingTutor(tutor)}>
                               <Pencil className="size-4" />
+                            </Button>
+                            <Button size="icon-sm" variant="ghost" aria-label="Asignar cuota" onClick={() => setAssigningTutor(tutor)}>
+                              <CreditCard className="size-4" />
                             </Button>
                             <Button size="icon-sm" variant="destructive" aria-label="Eliminar tutor" onClick={() => setConfirmDeleteTutorId(tutor.id)}>
                               <Trash2 className="size-4" />
