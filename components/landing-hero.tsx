@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Award, CalendarDays, Newspaper, Shield, Users } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { ArrowRight, Award, CalendarDays, CreditCard, Newspaper, Shield, Users } from 'lucide-react'
 import { HomeNewsCarousel } from '@/components/home-news-carousel'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateSponsor, PrivateTeamSummary } from '@/lib/private-app-shared'
@@ -9,9 +10,20 @@ type LandingHeroProps = {
   news: PrivateNewsItem[]
   teams: PrivateTeamSummary[]
   sponsors: PrivateSponsor[]
+  quickLinks?: QuickLink[]
+  newsHref?: string
+  teamsHref?: string
+  sponsorsHref?: string
+  showAuthCta?: boolean
 }
 
-const QUICK_LINKS = [
+export type QuickLink = {
+  label: string
+  href: string
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>
+}
+
+export const PUBLIC_QUICK_LINKS: QuickLink[] = [
   { label: 'Noticias', href: '/noticias', icon: Newspaper },
   { label: 'Equipos', href: '/equipos', icon: Shield },
   { label: 'Patrocinadores', href: '/patrocinadores', icon: Award },
@@ -42,7 +54,33 @@ function SectionTitle({ label, title }: { label: string; title: string }) {
   )
 }
 
-export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
+export const SOCIO_QUICK_LINKS: QuickLink[] = [
+  { label: 'Noticias', href: '/app/noticias', icon: Newspaper },
+  { label: 'Equipos', href: '/app/equipos', icon: Shield },
+  { label: 'Patrocinadores', href: '/app/patrocinadores', icon: Award },
+  { label: 'Registro tutores', href: '/registro', icon: Users },
+  { label: 'Portal Socio', href: '/app/portal-socio', icon: CreditCard },
+]
+
+export const TUTOR_QUICK_LINKS: QuickLink[] = [
+  { label: 'Noticias', href: '/app/noticias', icon: Newspaper },
+  { label: 'Equipos', href: '/app/equipos', icon: Shield },
+  { label: 'Patrocinadores', href: '/app/patrocinadores', icon: Award },
+  { label: 'Registro tutores', href: '/registro', icon: Users },
+  { label: 'Mis deportistas', href: '/app/deportistas', icon: Users },
+  { label: 'Matriculación', href: '/app/matriculacion', icon: CreditCard },
+]
+
+export function LandingHero({
+  news,
+  teams,
+  sponsors,
+  quickLinks = PUBLIC_QUICK_LINKS,
+  newsHref = '/noticias',
+  teamsHref = '/equipos',
+  sponsorsHref = '/patrocinadores',
+  showAuthCta = true,
+}: LandingHeroProps) {
   const featuredNews = news[0]
   const moreNews = news.slice(1, 4)
   const carouselNews = news.slice(0, 3)
@@ -51,11 +89,11 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
 
   return (
     <div className="bg-white">
-      <HomeNewsCarousel news={carouselNews} />
+      <HomeNewsCarousel news={carouselNews} linkHref={newsHref} />
 
       <section className="relative z-10 mx-auto -mt-4 max-w-7xl px-4 sm:px-6">
         <div className="grid overflow-hidden rounded-lg bg-white shadow-xl ring-1 ring-black/5 sm:grid-cols-2 lg:grid-cols-4">
-          {QUICK_LINKS.map((item) => (
+          {quickLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -79,7 +117,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-20">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <SectionTitle label="Actualidad" title="Últimas noticias" />
-          <Link href="/noticias" className="inline-flex items-center gap-2 text-sm font-black uppercase text-primary">
+          <Link href={newsHref} className="inline-flex items-center gap-2 text-sm font-black uppercase text-primary">
             Todas las noticias
             <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
@@ -87,7 +125,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
 
         {featuredNews ? (
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <Link href="/noticias" className="group block overflow-hidden rounded-lg bg-[#071c44] text-white shadow-sm">
+            <Link href={newsHref} className="group block overflow-hidden rounded-lg bg-[#071c44] text-white shadow-sm">
               <div className="relative aspect-[16/9] bg-muted">
                 <Image
                   src={featuredNews.imageUrl}
@@ -113,7 +151,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
                 moreNews.map((item) => (
                   <Link
                     key={item.id}
-                    href="/noticias"
+                    href={newsHref}
                     className="group grid grid-cols-[128px_1fr] overflow-hidden rounded-lg bg-[#f3f6fa] transition-colors hover:bg-blue-50"
                   >
                     <div className="relative min-h-32 bg-muted">
@@ -174,7 +212,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
             <p className="mt-4 max-w-md text-base leading-7 text-white/75">
               Accede a cada plantilla, consulta jugadores y revisa la estructura deportiva de la temporada.
             </p>
-            <Link href="/equipos" className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-black uppercase text-white">
+            <Link href={teamsHref} className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-black uppercase text-white">
               Ver todos
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
@@ -183,7 +221,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
           <div className="relative grid gap-3 sm:grid-cols-2">
             {featuredTeams.length > 0 ? (
               featuredTeams.map((team) => (
-                <Link key={team.id} href={`/equipos/${team.id}`} className="rounded-lg bg-white p-5 shadow-lg ring-1 ring-white/20 transition-transform hover:-translate-y-0.5">
+                <Link key={team.id} href={`${teamsHref}/${team.id}`} className="rounded-lg bg-white p-5 shadow-lg ring-1 ring-white/20 transition-transform hover:-translate-y-0.5">
                   <p className="text-xl font-black text-foreground">{team.nombre}</p>
                   <p className="mt-1 text-sm font-semibold text-muted-foreground">{team.categoria} · {team.temporada}</p>
                   <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-primary">
@@ -204,7 +242,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-20">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <SectionTitle label="Apoyo" title="Patrocinadores" />
-          <Link href="/patrocinadores" className="inline-flex items-center gap-2 text-sm font-black uppercase text-primary">
+          <Link href={sponsorsHref} className="inline-flex items-center gap-2 text-sm font-black uppercase text-primary">
             Ver patrocinadores
             <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
@@ -213,7 +251,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
         {featuredSponsors.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {featuredSponsors.map((sponsor) => (
-              <Link key={sponsor.id} href="/patrocinadores" className="overflow-hidden rounded-lg bg-[#f3f6fa] transition-transform hover:-translate-y-0.5">
+              <Link key={sponsor.id} href={sponsorsHref} className="overflow-hidden rounded-lg bg-[#f3f6fa] transition-transform hover:-translate-y-0.5">
                 <div className="relative h-36 bg-muted">
                   <Image src={sponsor.imageUrl} alt={sponsor.title} fill className="object-cover" sizes="(max-width: 1024px) 50vw, 25vw" />
                 </div>
@@ -228,6 +266,7 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
         )}
       </section>
 
+      {showAuthCta ? (
       <section className="bg-primary text-white">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto] md:items-center">
           <div>
@@ -252,6 +291,9 @@ export function LandingHero({ news, teams, sponsors }: LandingHeroProps) {
           </div>
         </div>
       </section>
+      ) : (
+        <div className="h-16 bg-white md:h-24" aria-hidden="true" />
+      )}
     </div>
   )
 }

@@ -21,6 +21,8 @@ export type PrivateNavIcon =
   | 'award'
   | 'newspaper'
   | 'clipboard-list'
+  | 'calendar'
+  | 'credit-card'
 
 export type PrivateNavItem = NavItem & {
   icon: PrivateNavIcon
@@ -49,9 +51,12 @@ export const LEGAL_NAV: NavItem[] = [
 export const PRIVATE_NAV: PrivateNavItem[] = [
   { label: 'Inicio', href: '/app', icon: 'house' },
   { label: 'Perfil', href: '/app/perfil', icon: 'user' },
+  { label: 'Portal Socio', href: '/app/portal-socio', icon: 'credit-card' },
   { label: 'Noticias', href: '/app/noticias', icon: 'newspaper' },
+  { label: 'Calendario', href: '/calendario', icon: 'calendar' },
   { label: 'Mis deportistas', href: '/app/deportistas', icon: 'users' },
   { label: 'Equipos', href: '/app/equipos', icon: 'shield' },
+  { label: 'Club', href: '/club', icon: 'shield' },
   { label: 'Patrocinadores', href: '/app/patrocinadores', icon: 'award' },
   { label: 'Matriculación', href: '/app/matriculacion', icon: 'clipboard-list' },
 ]
@@ -63,21 +68,26 @@ export function getPrivateNavItems({
   hasGuardian?: boolean
   isPaidSocio?: boolean
 } = {}): PrivateNavItem[] {
-  const baseItems = PRIVATE_NAV.filter((item) =>
-    item.href === '/app' ||
-    item.href === '/app/perfil' ||
-    item.href === '/app/noticias' ||
-    item.href === '/app/equipos' ||
-    item.href === '/app/patrocinadores',
-  )
-
   if (hasGuardian) {
     return [
-      ...baseItems,
+      PRIVATE_NAV.find((item) => item.href === '/app')!,
+      PRIVATE_NAV.find((item) => item.href === '/app/noticias')!,
+      PRIVATE_NAV.find((item) => item.href === '/calendario')!,
+      PRIVATE_NAV.find((item) => item.href === '/app/equipos')!,
+      PRIVATE_NAV.find((item) => item.href === '/club')!,
+      PRIVATE_NAV.find((item) => item.href === '/app/patrocinadores')!,
       PRIVATE_NAV.find((item) => item.href === '/app/deportistas')!,
       PRIVATE_NAV.find((item) => item.href === '/app/matriculacion')!,
     ]
   }
 
-  return baseItems
+  return [
+    PRIVATE_NAV.find((item) => item.href === '/app')!,
+    PRIVATE_NAV.find((item) => item.href === '/app/noticias')!,
+    PRIVATE_NAV.find((item) => item.href === '/calendario')!,
+    PRIVATE_NAV.find((item) => item.href === '/app/equipos')!,
+    PRIVATE_NAV.find((item) => item.href === '/club')!,
+    PRIVATE_NAV.find((item) => item.href === '/app/patrocinadores')!,
+    PRIVATE_NAV.find((item) => item.href === '/app/portal-socio')!,
+  ]
 }

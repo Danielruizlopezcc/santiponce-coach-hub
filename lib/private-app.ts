@@ -23,6 +23,8 @@ import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
 type PrivateCollections = {
   guardianId: string | null
+  isGuardianApproved: boolean
+  guardianApprovalStatus: 'pending' | 'approved' | 'rejected' | null
   activeSeasonLabel: string
   categoriesById: Map<string, string>
   teamsById: Map<string, string>
@@ -101,7 +103,7 @@ async function getPrivateCollections(userId: string): Promise<PrivateCollections
   const [{ data: activeSeason }, { data: guardian }, { data: categories }, { data: teams }, { data: seasons }] =
     await Promise.all([
       supabase.from('seasons').select('id, name').eq('is_active', true).maybeSingle(),
-      supabase.from('guardians').select('id').eq('user_id', userId).maybeSingle(),
+      supabase.from('guardians').select('id, is_approved, approval_status').eq('user_id', userId).maybeSingle(),
       supabase.from('categories').select('id, name'),
       supabase.from('teams').select('id, name'),
       supabase.from('seasons').select('id, name'),
@@ -109,6 +111,8 @@ async function getPrivateCollections(userId: string): Promise<PrivateCollections
 
   return {
     guardianId: guardian?.id ?? null,
+    isGuardianApproved: Boolean(guardian?.is_approved),
+    guardianApprovalStatus: (guardian?.approval_status ?? null) as PrivateCollections['guardianApprovalStatus'],
     activeSeasonLabel: activeSeason?.name ?? CLUB.season,
     categoriesById: new Map((categories ?? []).map((category) => [category.id, category.name])),
     teamsById: new Map((teams ?? []).map((team) => [team.id, team.name])),
@@ -122,7 +126,7 @@ export async function getPrivateUserStatus(userId: string): Promise<PrivateUserS
   const supabase = createAdminClient()
 
   const [{ data: guardian }, { data: profile }] = await Promise.all([
-    supabase.from('guardians').select('id').eq('user_id', userId).maybeSingle(),
+    supabase.from('guardians').select('id, is_approved, approval_status').eq('user_id', userId).maybeSingle(),
     supabase
       .from('profiles')
       .select('is_paid_member, email')
@@ -136,6 +140,8 @@ export async function getPrivateUserStatus(userId: string): Promise<PrivateUserS
 
   return {
     hasGuardian,
+    isGuardianApproved: Boolean(guardian?.is_approved),
+    guardianApprovalStatus: (guardian?.approval_status ?? null) as PrivateUserStatus['guardianApprovalStatus'],
     isSocio,
     isPaidSocio: Boolean(profile?.is_paid_member),
     hasSavedPaymentMethod: Boolean(savedStripeCard),
@@ -160,6 +166,8 @@ export async function getPrivateDashboardData(
       matriculaImporte: MATRICULA_IMPORTE,
       deportistas: [],
       hasGuardian: false,
+      isGuardianApproved: false,
+      guardianApprovalStatus: null,
       isPaidSocio: status.isPaidSocio,
     }
   }
@@ -190,6 +198,8 @@ export async function getPrivateDashboardData(
       estado: getAthleteDisplayStatus(athlete.status, paymentByAthlete.get(athlete.id)),
     })),
     hasGuardian: true,
+    isGuardianApproved: collections.isGuardianApproved,
+    guardianApprovalStatus: collections.guardianApprovalStatus,
     isPaidSocio: status.isPaidSocio,
   }
 }

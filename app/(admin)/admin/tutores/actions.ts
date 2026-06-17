@@ -18,10 +18,16 @@ const basePersonSchema = z.object({
 })
 
 const tutorSchema = basePersonSchema.extend({
+  id: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
   telefono: z.string().trim().min(6, 'Introduce un teléfono.').max(30),
   documento: z.string().trim().min(3, 'Introduce DNI/NIE.').max(40),
   ciudad: z.string().trim().min(2, 'Introduce ciudad.').max(60),
   isSocio: z.coerce.boolean().optional(),
+})
+
+const memberSchema = basePersonSchema.extend({
+  id: z.string().uuid().optional(),
 })
 
 async function createAuthProfile(values: z.infer<typeof basePersonSchema>) {
@@ -61,6 +67,8 @@ export async function createTutorAction(
 ): Promise<TutorSocioActionState> {
   await requireAdminAction()
   const parsed = tutorSchema.safeParse({
+    id: formData.get('id') || undefined,
+    userId: formData.get('userId') || undefined,
     nombre: formData.get('nombre'),
     apellidos: formData.get('apellidos'),
     email: formData.get('email'),
@@ -75,6 +83,45 @@ export async function createTutorAction(
   try {
     const supabase = createAdminClient()
     const values = parsed.data
+    if (values.id && values.userId) {
+      const email = normalizeEmail(values.email)
+      const { error: authError } = await supabase.auth.admin.updateUserById(values.userId, {
+        email,
+        email_confirm: true,
+        user_metadata: {
+          first_name: values.nombre,
+          last_name: values.apellidos,
+        },
+      })
+      if (authError) throw new Error(authError.message)
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          email,
+          first_name: values.nombre,
+          last_name: values.apellidos,
+        })
+        .eq('id', values.userId)
+      if (profileError) throw new Error(profileError.message)
+
+      const { error: guardianError } = await supabase
+        .from('guardians')
+        .update({
+          first_name: values.nombre,
+          last_name: values.apellidos,
+          phone: normalizePhone(values.telefono),
+          document_id: normalizeDocument(values.documento),
+          city: values.ciudad,
+        })
+        .eq('id', values.id)
+      if (guardianError) throw new Error(guardianError.message)
+
+      await setUserMembership(values.userId, Boolean(values.isSocio))
+      revalidatePath('/admin/tutores')
+      return { ok: true, message: 'Tutor actualizado correctamente.' }
+    }
+
     const userId = await createAuthProfile(values)
     const { error } = await supabase.from('guardians').insert({
       user_id: userId,
@@ -88,6 +135,8 @@ export async function createTutorAction(
       city: values.ciudad,
       country: 'España',
       payment_preference: 'cuotas',
+      is_approved: true,
+      approval_status: 'approved',
     })
     if (error) throw new Error(error.message)
 
@@ -107,7 +156,8 @@ export async function createMemberAction(
   formData: FormData,
 ): Promise<TutorSocioActionState> {
   await requireAdminAction()
-  const parsed = basePersonSchema.safeParse({
+  const parsed = memberSchema.safeParse({
+    id: formData.get('id') || undefined,
     nombre: formData.get('nombre'),
     apellidos: formData.get('apellidos'),
     email: formData.get('email'),
@@ -116,6 +166,35 @@ export async function createMemberAction(
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Revisa los datos.' }
 
   try {
+    if (parsed.data.id) {
+      const supabase = createAdminClient()
+      const email = normalizeEmail(parsed.data.email)
+      const { error: authError } = await supabase.auth.admin.updateUserById(parsed.data.id, {
+        email,
+        email_confirm: true,
+        user_metadata: {
+          first_name: parsed.data.nombre,
+          last_name: parsed.data.apellidos,
+        },
+      })
+      if (authError) throw new Error(authError.message)
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          email,
+          first_name: parsed.data.nombre,
+          last_name: parsed.data.apellidos,
+          is_paid_member: true,
+          membership_paid_at: new Date().toISOString(),
+        })
+        .eq('id', parsed.data.id)
+      if (error) throw new Error(error.message)
+      await setUserMembership(parsed.data.id, true)
+      revalidatePath('/admin/tutores')
+      return { ok: true, message: 'Socio actualizado correctamente.' }
+    }
+
     const userId = await createAuthProfile(parsed.data)
     await setUserMembership(userId, true)
     revalidatePath('/admin/tutores')
@@ -135,6 +214,55 @@ export async function toggleTutorMemberAction(userId: string, isSocio: boolean):
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'No se ha podido actualizar el tutor.' }
   }
+}
+
+export async function approveTutorAction(guardianId: string): Promise<TutorSocioActionState> {
+  await requireAdminAction()
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('guardians')
+    .update({ is_approved: true, approval_status: 'approved' })
+    .eq('id', guardianId)
+
+  if (error) {
+    return { ok: false, message: error.message }
+  }
+
+  revalidatePath('/admin/tutores')
+  return { ok: true, message: 'Tutor aprobado correctamente.' }
+}
+
+export async function rejectTutorAction(guardianId: string): Promise<TutorSocioActionState> {
+  await requireAdminAction()
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('guardians')
+    .update({ is_approved: false, approval_status: 'rejected' })
+    .eq('id', guardianId)
+
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/admin/tutores')
+  return { ok: true, message: 'Tutor rechazado correctamente.' }
+}
+
+export async function deleteTutorAction(guardianId: string, userId: string): Promise<TutorSocioActionState> {
+  await requireAdminAction()
+  const supabase = createAdminClient()
+  const { error } = await supabase.auth.admin.deleteUser(userId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/admin/tutores')
+  return { ok: true, message: 'Tutor eliminado correctamente.' }
+}
+
+export async function deleteMemberAction(userId: string): Promise<TutorSocioActionState> {
+  await requireAdminAction()
+  const supabase = createAdminClient()
+  const { error } = await supabase.auth.admin.deleteUser(userId)
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/admin/tutores')
+  return { ok: true, message: 'Socio eliminado correctamente.' }
 }
 
 async function setUserMembership(userId: string, isSocio: boolean) {

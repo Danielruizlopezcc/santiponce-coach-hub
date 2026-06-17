@@ -3,7 +3,7 @@
 import type { ComponentType } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Award, ClipboardList, House, Newspaper, Shield, User, Users } from 'lucide-react'
+import { Award, Calendar, ClipboardList, CreditCard, House, Newspaper, Shield, User, Users } from 'lucide-react'
 import { SignOutButton } from '@/components/sign-out-button'
 import { cn } from '@/lib/utils'
 import type { PrivateNavItem } from '@/lib/club'
@@ -25,6 +25,8 @@ const ICONS: Record<PrivateNavItem['icon'], ComponentType<{ className?: string; 
   award: Award,
   newspaper: Newspaper,
   'clipboard-list': ClipboardList,
+  calendar: Calendar,
+  'credit-card': CreditCard,
 }
 
 export function PrivateNav({

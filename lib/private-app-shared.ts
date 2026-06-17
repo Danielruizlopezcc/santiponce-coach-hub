@@ -99,11 +99,15 @@ export type PrivateDashboardData = {
   matriculaImporte: number
   deportistas: PrivateAthleteSummary[]
   hasGuardian: boolean
+  isGuardianApproved: boolean
+  guardianApprovalStatus: 'pending' | 'approved' | 'rejected' | null
   isPaidSocio: boolean
 }
 
 export type PrivateUserStatus = {
   hasGuardian: boolean
+  isGuardianApproved: boolean
+  guardianApprovalStatus: 'pending' | 'approved' | 'rejected' | null
   isSocio: boolean
   isPaidSocio: boolean
   hasSavedPaymentMethod: boolean

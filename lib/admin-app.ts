@@ -77,7 +77,14 @@ export type AdminTutorRow = {
   telefono: string
   ciudad: string
   isSocio: boolean
+  isApproved: boolean
+  approvalStatus: 'pending' | 'approved' | 'rejected'
   deportistasAsociados: number
+}
+
+export type AdminTutorOption = {
+  id: string
+  nombre: string
 }
 
 export type AdminMemberRow = {
@@ -94,8 +101,11 @@ export type AdminAthleteRow = {
   tutor: string
   categoriaSolicitadaId: string
   categoriaSolicitada: string
+  assignedTeamId: string | null
   equipoAsignado: string
+  seasonId: string
   temporada: string
+  rawStatus: 'pendiente' | 'matriculado' | 'en_revision'
   estadoMatricula: 'Pendiente' | 'Matriculado' | 'En revisión'
 }
 
@@ -177,6 +187,18 @@ export type AdminFinanceMovementRow = {
   detalle: string
   importe: number
   fecha: string
+}
+
+export type AdminFeeTemplateRow = {
+  id: string
+  nombre: string
+  tipo: string
+  importe: number
+  isPublic: boolean
+  splitPayment: boolean
+  chargeFrequency: string
+  chargeCount: number | null
+  createdAt: string
 }
 
 export type AdminConsentRow = {
@@ -269,6 +291,18 @@ type AdminFinanceMovementRecord = {
   recorded_at: string
 }
 
+type AdminFeeTemplateRecord = {
+  id: string
+  name: string
+  fee_type: string
+  total_amount_cents: number
+  is_public: boolean
+  split_payment: boolean
+  charge_frequency: string | null
+  charge_count: number | null
+  created_at: string
+}
+
 function mapStatusLabel(
   status: 'pendiente' | 'matriculado' | 'en_revision',
 ): AdminAthleteRow['estadoMatricula'] {
@@ -288,7 +322,6 @@ async function getAdminCollections() {
   const [
     { data: profiles },
     { data: roles },
-    { data: guardians },
     { data: athletes },
     { data: categories },
     { data: teams },
@@ -301,7 +334,6 @@ async function getAdminCollections() {
   ] = await Promise.all([
     supabase.from('profiles').select('id, email, first_name, last_name, is_paid_member, membership_paid_at, created_at'),
     supabase.from('user_roles').select('user_id, role'),
-    supabase.from('guardians').select('id, user_id, first_name, last_name, phone, document_id, city'),
     supabase
       .from('athletes')
       .select(
@@ -324,10 +356,24 @@ async function getAdminCollections() {
     supabase.from('news').select('id'),
   ])
 
+  const guardiansWithApproval = await supabase
+    .from('guardians')
+    .select('id, user_id, first_name, last_name, phone, document_id, city, is_approved, approval_status')
+
+  const guardiansFallback = guardiansWithApproval.error
+    ? await supabase
+        .from('guardians')
+        .select('id, user_id, first_name, last_name, phone, document_id, city')
+    : null
+
   return {
     profiles: profiles ?? [],
     roles: roles ?? [],
-    guardians: guardians ?? [],
+    guardians: (guardiansWithApproval.data ?? guardiansFallback?.data ?? []).map((guardian) => ({
+      ...guardian,
+      is_approved: 'is_approved' in guardian ? guardian.is_approved : true,
+      approval_status: 'approval_status' in guardian ? guardian.approval_status : 'approved',
+    })),
     athletes: athletes ?? [],
     categories: categories ?? [],
     teams: teams ?? [],
@@ -555,6 +601,7 @@ export async function getAdminTutors(): Promise<AdminTutorRow[]> {
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
 
   for (const athlete of athletes) {
+    if (!athlete.guardian_id) continue
     athleteCountByGuardian.set(
       athlete.guardian_id,
       (athleteCountByGuardian.get(athlete.guardian_id) ?? 0) + 1,
@@ -574,6 +621,8 @@ export async function getAdminTutors(): Promise<AdminTutorRow[]> {
         telefono: guardian.phone,
         ciudad: guardian.city,
         isSocio: Boolean(profile?.is_paid_member),
+        isApproved: Boolean(guardian.is_approved),
+        approvalStatus: (guardian.approval_status ?? (guardian.is_approved ? 'approved' : 'pending')) as AdminTutorRow['approvalStatus'],
         deportistasAsociados: athleteCountByGuardian.get(guardian.id) ?? 0,
       }
     })
@@ -596,6 +645,17 @@ export async function getAdminMembers(): Promise<AdminMemberRow[]> {
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 
+export async function getAdminTutorOptions(): Promise<AdminTutorOption[]> {
+  const { guardians } = await getAdminCollections()
+
+  return guardians
+    .map((guardian) => ({
+      id: guardian.id,
+      nombre: `${guardian.first_name} ${guardian.last_name}`.trim(),
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
 export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
   const { guardians, athletes, categories, teams, seasons, payments } = await getAdminCollections()
   const guardianById = createGuardianNameLookup(guardians)
@@ -608,14 +668,17 @@ export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
     .map((athlete) => ({
       id: athlete.id,
       nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
-      tutor: guardianById.get(athlete.guardian_id)?.name ?? 'Tutor no disponible',
+      tutor: athlete.guardian_id ? guardianById.get(athlete.guardian_id)?.name ?? 'Tutor no disponible' : 'Sin tutor',
       categoriaSolicitadaId: athlete.requested_category_id,
       categoriaSolicitada:
         categoryById.get(athlete.requested_category_id) ?? 'Categoría pendiente',
+      assignedTeamId: athlete.assigned_team_id ?? null,
       equipoAsignado: athlete.assigned_team_id
         ? teamById.get(athlete.assigned_team_id) ?? 'Equipo pendiente'
         : 'Sin equipo asignado',
+      seasonId: athlete.season_id,
       temporada: seasonById.get(athlete.season_id) ?? CLUB.season,
+      rawStatus: athlete.status,
       estadoMatricula:
         athlete.status === 'matriculado'
           ? 'Matriculado'
@@ -894,6 +957,26 @@ export async function getAdminFinanceMovements(): Promise<AdminFinanceMovementRo
     detalle: movement.detail ?? '',
     importe: movement.amount_cents / 100,
     fecha: formatSpanishDateTime(movement.recorded_at),
+  }))
+}
+
+export async function getAdminFeeTemplates(): Promise<AdminFeeTemplateRow[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('admin_fee_templates')
+    .select('id, name, fee_type, total_amount_cents, is_public, split_payment, charge_frequency, charge_count, created_at')
+    .order('created_at', { ascending: false })
+
+  return ((data ?? []) as AdminFeeTemplateRecord[]).map((fee) => ({
+    id: fee.id,
+    nombre: fee.name,
+    tipo: fee.fee_type,
+    importe: fee.total_amount_cents / 100,
+    isPublic: fee.is_public,
+    splitPayment: fee.split_payment,
+    chargeFrequency: fee.charge_frequency ?? '',
+    chargeCount: fee.charge_count,
+    createdAt: formatSpanishDateTime(fee.created_at),
   }))
 }
 

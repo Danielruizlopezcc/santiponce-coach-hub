@@ -2,19 +2,24 @@ import type { ReactNode } from 'react'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ClubLogo } from '@/components/club-logo'
+import { AnimatedBackground } from '@/components/animated-background'
 import { PrivateHeader } from '@/components/private-header'
 import { SiteFooter } from '@/components/site-footer'
 import { requireUser } from '@/lib/auth'
 import { getPrivateUserStatus, getPrivateViewer } from '@/lib/private-app'
 import { getPrivateNavItems } from '@/lib/club'
+import { getPublicNavData } from '@/lib/public-app'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PrivateLayout({ children }: { children: ReactNode }) {
   const user = await requireUser()
   const pathname = (await headers()).get('x-pathname') ?? ''
-  const viewer = await getPrivateViewer(user.id)
-  const status = await getPrivateUserStatus(user.id)
+  const [viewer, status, navData] = await Promise.all([
+    getPrivateViewer(user.id),
+    getPrivateUserStatus(user.id),
+    getPublicNavData(),
+  ])
   const isPaymentSetupRoute = pathname.startsWith('/app/configurar-pago')
 
   if (status.hasGuardian && !status.hasSavedPaymentMethod && !isPaymentSetupRoute) {
@@ -40,19 +45,21 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
   }
 
   const navItems = getPrivateNavItems({
-    hasGuardian: status.isSocio === false,
+    hasGuardian: status.hasGuardian,
     isPaidSocio: status.isPaidSocio,
   })
 
   return (
-    <div className="flex min-h-svh flex-col bg-muted/30">
+    <div className="flex min-h-dvh flex-col">
+      <AnimatedBackground />
       <PrivateHeader
         viewer={viewer}
         navItems={navItems}
+        navData={navData}
         isSocio={status.isSocio}
         isPaidSocio={status.isPaidSocio}
       />
-      <main className="min-h-[calc(100svh-12rem)] flex-1 pb-56">{children}</main>
+      <main className="flex-1 pb-32 md:pb-44">{children}</main>
       <SiteFooter />
     </div>
   )

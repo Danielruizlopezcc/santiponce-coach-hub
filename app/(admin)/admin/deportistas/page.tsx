@@ -1,11 +1,14 @@
-import { getAdminAthletes, getAdminCategories } from '@/lib/admin-app'
+import { getAdminAthletes, getAdminCategories, getAdminSeasons, getAdminTeams, getAdminTutorOptions } from '@/lib/admin-app'
 import { DeportistasClient } from './deportistas-client'
 
 export default async function AdminDeportistasPage() {
-  const [athletes, categories] = await Promise.all([
+  const [athletes, categories, teams, seasons, tutors] = await Promise.all([
     getAdminAthletes(),
     getAdminCategories(),
+    getAdminTeams(),
+    getAdminSeasons(),
+    getAdminTutorOptions(),
   ])
 
-  return <DeportistasClient athletes={athletes} categories={categories} />
+  return <DeportistasClient athletes={athletes} categories={categories} teams={teams} seasons={seasons} tutors={tutors} />
 }

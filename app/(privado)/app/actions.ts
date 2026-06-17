@@ -14,6 +14,7 @@ import {
   tutorProfileSchema,
   type DeportistaFormValues,
 } from '@/lib/registro-schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type ActionResult = {
@@ -196,4 +197,22 @@ export async function startEnrollmentAction(athleteId: string): Promise<ActionRe
   revalidatePath('/app/deportistas')
 
   return { success: true }
+}
+
+export async function requestTutorApprovalAgainAction(): Promise<void> {
+  const user = await requireUser()
+  const supabase = createAdminClient()
+
+  const { error } = await supabase
+    .from('guardians')
+    .update({ is_approved: false, approval_status: 'pending' })
+    .eq('user_id', user.id)
+    .eq('approval_status', 'rejected')
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/app')
+  revalidatePath('/admin/tutores')
 }

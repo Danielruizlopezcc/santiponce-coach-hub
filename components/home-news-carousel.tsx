@@ -10,11 +10,12 @@ import { cn } from '@/lib/utils'
 
 type HomeNewsCarouselProps = {
   news: PrivateNewsItem[]
+  linkHref?: string
 }
 
 const AUTOPLAY_MS = 4500
 
-export function HomeNewsCarousel({ news }: HomeNewsCarouselProps) {
+export function HomeNewsCarousel({ news, linkHref = '/noticias' }: HomeNewsCarouselProps) {
   const slides = useMemo(() => news.slice(0, 3), [news])
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -64,7 +65,7 @@ export function HomeNewsCarousel({ news }: HomeNewsCarouselProps) {
       {slides.map((item, index) => (
         <Link
           key={item.id}
-          href="/noticias"
+          href={linkHref}
           aria-hidden={index !== activeIndex}
           tabIndex={index === activeIndex ? 0 : -1}
           className={cn(

@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
-import { CreditCard, Download, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
+import { CreditCard, Download, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
 import {
   AdminTable,
   type AdminTableRow,
@@ -12,17 +12,22 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatEuro } from '@/lib/format'
-import type { AdminFinanceMovementRow, AdminPaymentRow } from '@/lib/admin-app'
+import type { AdminEnrollmentRow, AdminFeeTemplateRow, AdminFinanceMovementRow, AdminPaymentRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
+import { MatriculasClient } from '../matriculas/matriculas-client'
 import {
   createFinanceMovementAction,
+  createFeeTemplateAction,
   deleteFinanceMovementAction,
+  type FeeTemplateActionState,
   type FinanceMovementActionState,
 } from './actions'
 
 type AdminPaymentsClientProps = {
   payments: AdminPaymentRow[]
   financeMovements: AdminFinanceMovementRow[]
+  enrollments: AdminEnrollmentRow[]
+  feeTemplates: AdminFeeTemplateRow[]
 }
 
 const columns: Column[] = [
@@ -172,10 +177,16 @@ const initialMovementState: FinanceMovementActionState = {
   message: '',
 }
 
-export function AdminPaymentsClient({ payments, financeMovements }: AdminPaymentsClientProps) {
+const initialFeeState: FeeTemplateActionState = {
+  ok: false,
+  message: '',
+}
+
+export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates }: AdminPaymentsClientProps) {
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'resumen' | 'cobros' | 'movimientos'>('resumen')
+  const [activeTab, setActiveTab] = useState<'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'movimientos'>('resumen')
   const [editingMovement, setEditingMovement] = useState<AdminFinanceMovementRow | null>(null)
+  const [splitFee, setSplitFee] = useState(false)
   const [movementSearch, setMovementSearch] = useState('')
   const [movementTypeFilter, setMovementTypeFilter] = useState<'todos' | 'ingreso' | 'gasto'>('todos')
   const [confirmDeleteMovementId, setConfirmDeleteMovementId] = useState<string | null>(null)
@@ -185,15 +196,23 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
     createFinanceMovementAction,
     initialMovementState,
   )
+  const [feeState, feeAction, feePending] = useActionState(createFeeTemplateAction, initialFeeState)
   const movementFormRef = useRef<HTMLFormElement>(null)
+  const feeFormRef = useRef<HTMLFormElement>(null)
 
   const summary = useMemo(() => {
     const paid = payments.filter((payment) => payment.estado === 'pagado')
     const pending = payments.filter((payment) => payment.estado === 'pendiente')
     const failed = payments.filter((payment) => payment.estado === 'fallido')
     const refunded = payments.filter((payment) => payment.estado === 'reembolsado')
+    const manualIncomes = financeMovements.filter((movement) => movement.tipo === 'ingreso')
+    const manualExpenses = financeMovements.filter((movement) => movement.tipo === 'gasto')
     const paidTotal = paid.reduce((sum, payment) => sum + payment.importe, 0)
     const pendingTotal = pending.reduce((sum, payment) => sum + payment.importe, 0)
+    const manualIncomeTotal = manualIncomes.reduce((sum, movement) => sum + movement.importe, 0)
+    const manualExpenseTotal = manualExpenses.reduce((sum, movement) => sum + movement.importe, 0)
+    const confirmedIncomeTotal = paidTotal + manualIncomeTotal
+    const balance = confirmedIncomeTotal - manualExpenseTotal
     const membershipTotal = paid
       .filter((payment) => payment.operacion === 'Cuota de socio')
       .reduce((sum, payment) => sum + payment.importe, 0)
@@ -210,13 +229,19 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
       refunded,
       paidTotal,
       pendingTotal,
+      manualIncomes,
+      manualExpenses,
+      manualIncomeTotal,
+      manualExpenseTotal,
+      confirmedIncomeTotal,
+      balance,
       membershipTotal,
       enrollmentTotal,
       stripeCount,
       manualCount,
-      averagePaid: paid.length > 0 ? paidTotal / paid.length : 0,
+      averagePaid: paid.length + manualIncomes.length > 0 ? confirmedIncomeTotal / (paid.length + manualIncomes.length) : 0,
     }
-  }, [payments])
+  }, [payments, financeMovements])
 
   const tableData = useMemo<AdminTableRow[]>(
     () =>
@@ -268,6 +293,13 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
     }
   }, [movementState.ok, movementState.message])
 
+  useEffect(() => {
+    if (feeState.ok) {
+      feeFormRef.current?.reset()
+      setSplitFee(false)
+    }
+  }, [feeState.ok, feeState.message])
+
   async function handleDeleteMovement(movement: AdminFinanceMovementRow) {
     setDeletePendingId(movement.id)
     setDeleteMessage(null)
@@ -291,6 +323,8 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
         {[
           { id: 'resumen', label: 'Resumen' },
           { id: 'cobros', label: 'Cobros realizados' },
+          { id: 'matriculas', label: 'Matrículas' },
+          { id: 'cuotas', label: 'Cuotas' },
           { id: 'movimientos', label: 'Ingresos y gastos' },
         ].map((tab) => (
           <button
@@ -322,13 +356,27 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
           </h2>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-4">
           <SummaryCard
-            title="Ingresos confirmados"
-            value={formatEuro(summary.paidTotal)}
-            detail={`${summary.paid.length} cobro${summary.paid.length !== 1 ? 's' : ''} pagado${summary.paid.length !== 1 ? 's' : ''}`}
+            title="Ingresos totales"
+            value={formatEuro(summary.confirmedIncomeTotal)}
+            detail={`${formatEuro(summary.paidTotal)} en cobros y ${formatEuro(summary.manualIncomeTotal)} manuales`}
             icon={Wallet}
             tone="green"
+          />
+          <SummaryCard
+            title="Gastos"
+            value={formatEuro(summary.manualExpenseTotal)}
+            detail={`${summary.manualExpenses.length} registro${summary.manualExpenses.length !== 1 ? 's' : ''} de salida`}
+            icon={TrendingDown}
+            tone="amber"
+          />
+          <SummaryCard
+            title="Balance"
+            value={formatEuro(summary.balance)}
+            detail="Ingresos confirmados menos gastos"
+            icon={TrendingUp}
+            tone={summary.balance >= 0 ? 'blue' : 'amber'}
           />
           <SummaryCard
             title="Pendiente de cobro"
@@ -336,12 +384,6 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
             detail={`${summary.pending.length} operación${summary.pending.length !== 1 ? 'es' : ''} pendiente${summary.pending.length !== 1 ? 's' : ''}`}
             icon={CreditCard}
             tone="amber"
-          />
-          <SummaryCard
-            title="Ticket medio"
-            value={formatEuro(summary.averagePaid)}
-            detail="Media de las operaciones pagadas"
-            icon={TrendingUp}
           />
         </div>
 
@@ -375,6 +417,18 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
                 <p className="text-sm font-black text-muted-foreground">Matrículas</p>
                 <p className="mt-2 text-2xl font-black text-foreground">
                   {formatEuro(summary.enrollmentTotal)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-white p-4">
+                <p className="text-sm font-black text-muted-foreground">Ingresos manuales</p>
+                <p className="mt-2 text-2xl font-black text-foreground">
+                  {formatEuro(summary.manualIncomeTotal)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-white p-4">
+                <p className="text-sm font-black text-muted-foreground">Gastos manuales</p>
+                <p className="mt-2 text-2xl font-black text-foreground">
+                  {formatEuro(summary.manualExpenseTotal)}
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-white p-4">
@@ -440,6 +494,168 @@ export function AdminPaymentsClient({ payments, financeMovements }: AdminPayment
           />
         </div>
       </section>
+      ) : null}
+
+      {activeTab === 'matriculas' ? (
+        <section aria-label="Matrículas" role="tabpanel">
+          <MatriculasClient enrollments={enrollments} embedded />
+        </section>
+      ) : null}
+
+      {activeTab === 'cuotas' ? (
+        <section aria-labelledby="pagos-cuotas" className="space-y-5" role="tabpanel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+              Configuración de cobros
+            </p>
+            <h2 id="pagos-cuotas" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+              Cuotas
+            </h2>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
+            <Card className="bg-white/88 shadow-sm backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-lg font-black">Nueva cuota</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form ref={feeFormRef} action={feeAction} className="space-y-4">
+                  <div>
+                    <label htmlFor="fee-name" className="text-sm font-black text-foreground">
+                      Nombre
+                    </label>
+                    <Input id="fee-name" name="nombre" className="mt-2" placeholder="Ej. Cuota mensual, campus, equipación..." required />
+                  </div>
+
+                  <div>
+                    <label htmlFor="fee-type" className="text-sm font-black text-foreground">
+                      Tipo
+                    </label>
+                    <Input id="fee-type" name="tipo" className="mt-2" placeholder="Ej. Socio, deportista, campaña..." required />
+                  </div>
+
+                  <div>
+                    <label htmlFor="fee-amount" className="text-sm font-black text-foreground">
+                      Precio total
+                    </label>
+                    <Input id="fee-amount" name="importe" type="number" min="0.01" step="0.01" className="mt-2" placeholder="0,00" required />
+                  </div>
+
+                  <label className="flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+                    <input type="checkbox" name="isPublic" className="size-4 accent-primary" defaultChecked />
+                    Esta cuota es pública
+                  </label>
+
+                  <label className="flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      name="splitPayment"
+                      className="size-4 accent-primary"
+                      checked={splitFee}
+                      onChange={(event) => setSplitFee(event.target.checked)}
+                    />
+                    Repartir pago en varios cargos
+                  </label>
+
+                  {splitFee ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="fee-frequency" className="text-sm font-black text-foreground">
+                          Frecuencia de cargos
+                        </label>
+                        <select
+                          id="fee-frequency"
+                          name="chargeFrequency"
+                          className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                          defaultValue="cada_mes"
+                          required
+                        >
+                          <option value="cada_mes">Cada mes</option>
+                          <option value="cada_2_meses">Cada 2 meses</option>
+                          <option value="cada_3_meses">Cada 3 meses</option>
+                          <option value="cada_6_meses">Cada 6 meses</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="fee-count" className="text-sm font-black text-foreground">
+                          Número total de cargos
+                        </label>
+                        <Input id="fee-count" name="chargeCount" type="number" min="2" step="1" className="mt-2" placeholder="12" required />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {feeState.message ? (
+                    <p
+                      className={cn(
+                        'rounded-lg px-3 py-2 text-sm font-semibold',
+                        feeState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+                      )}
+                    >
+                      {feeState.message}
+                    </p>
+                  ) : null}
+
+                  <Button type="submit" className="w-full" disabled={feePending}>
+                    {feePending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
+                    Guardar cuota
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {feeTemplates.length} cuotas
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <Tags className="size-3.5" aria-hidden="true" />
+                  Configuradas
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                      <th className="px-4 py-2.5">Nombre</th>
+                      <th className="px-4 py-2.5">Tipo</th>
+                      <th className="px-4 py-2.5">Importe</th>
+                      <th className="hidden px-4 py-2.5 md:table-cell">Reparto</th>
+                      <th className="hidden px-4 py-2.5 lg:table-cell">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-card">
+                    {feeTemplates.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                          Aún no hay cuotas configuradas.
+                        </td>
+                      </tr>
+                    ) : (
+                      feeTemplates.map((fee) => (
+                        <tr key={fee.id} className="transition-colors hover:bg-muted/30">
+                          <td className="px-4 py-3 font-semibold text-foreground">{fee.nombre}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{fee.tipo}</td>
+                          <td className="px-4 py-3 font-semibold text-foreground">{formatEuro(fee.importe)}</td>
+                          <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
+                            {fee.splitPayment ? `${fee.chargeCount} cargos · ${fee.chargeFrequency}` : 'Pago único'}
+                          </td>
+                          <td className="hidden px-4 py-3 lg:table-cell">
+                            <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', fee.isPublic ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
+                              {fee.isPublic ? 'Pública' : 'Privada'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
       ) : null}
 
       {activeTab === 'movimientos' ? (

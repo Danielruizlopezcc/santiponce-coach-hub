@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
-import { Loader2, Plus, Search, UserCheck, Users } from 'lucide-react'
+import { Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -9,8 +9,12 @@ import { formatSpanishPhone, maskDocument } from '@/lib/format'
 import type { AdminMemberRow, AdminTutorRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import {
+  approveTutorAction,
   createMemberAction,
   createTutorAction,
+  deleteMemberAction,
+  deleteTutorAction,
+  rejectTutorAction,
   toggleTutorMemberAction,
   type TutorSocioActionState,
 } from './actions'
@@ -37,11 +41,17 @@ function FormMessage({ state }: { state: TutorSocioActionState }) {
 }
 
 export function TutorsMembersClient({ tutors, members }: Props) {
-  const [activeTab, setActiveTab] = useState<'tutores' | 'socios'>('tutores')
+  const [activeTab, setActiveTab] = useState<'tutores' | 'socios' | 'pendientes' | 'rechazados'>('tutores')
   const [tutorSearch, setTutorSearch] = useState('')
   const [memberSearch, setMemberSearch] = useState('')
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null)
   const [toggleMessage, setToggleMessage] = useState<TutorSocioActionState | null>(null)
+  const [approvePendingId, setApprovePendingId] = useState<string | null>(null)
+  const [rejectPendingId, setRejectPendingId] = useState<string | null>(null)
+  const [editingTutor, setEditingTutor] = useState<AdminTutorRow | null>(null)
+  const [editingMember, setEditingMember] = useState<AdminMemberRow | null>(null)
+  const [confirmDeleteTutorId, setConfirmDeleteTutorId] = useState<string | null>(null)
+  const [confirmDeleteMemberId, setConfirmDeleteMemberId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const tutorFormRef = useRef<HTMLFormElement>(null)
   const memberFormRef = useRef<HTMLFormElement>(null)
@@ -50,14 +60,18 @@ export function TutorsMembersClient({ tutors, members }: Props) {
 
   const visibleTutors = useMemo(() => {
     const q = tutorSearch.trim().toLowerCase()
-    if (!q) return tutors
-    return tutors.filter((tutor) =>
+    const approvedTutors = tutors.filter((tutor) => tutor.approvalStatus === 'approved')
+    if (!q) return approvedTutors
+    return approvedTutors.filter((tutor) =>
       [tutor.nombre, tutor.email, tutor.documento, tutor.telefono, tutor.ciudad, tutor.isSocio ? 'socio' : 'no socio']
         .join(' ')
         .toLowerCase()
         .includes(q),
     )
   }, [tutors, tutorSearch])
+
+  const pendingTutors = tutors.filter((tutor) => tutor.approvalStatus === 'pending')
+  const rejectedTutors = tutors.filter((tutor) => tutor.approvalStatus === 'rejected')
 
   const visibleMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase()
@@ -77,12 +91,52 @@ export function TutorsMembersClient({ tutors, members }: Props) {
     })
   }
 
+  function handleApproveTutor(tutor: AdminTutorRow) {
+    setApprovePendingId(tutor.id)
+    setToggleMessage(null)
+    startTransition(async () => {
+      const result = await approveTutorAction(tutor.id)
+      setToggleMessage(result)
+      setApprovePendingId(null)
+    })
+  }
+
+  function handleRejectTutor(tutor: AdminTutorRow) {
+    setRejectPendingId(tutor.id)
+    setToggleMessage(null)
+    startTransition(async () => {
+      const result = await rejectTutorAction(tutor.id)
+      setToggleMessage(result)
+      setRejectPendingId(null)
+    })
+  }
+
+  function handleDeleteTutor(tutor: AdminTutorRow) {
+    setConfirmDeleteTutorId(null)
+    setToggleMessage(null)
+    startTransition(async () => {
+      const result = await deleteTutorAction(tutor.id, tutor.userId)
+      setToggleMessage(result)
+    })
+  }
+
+  function handleDeleteMember(member: AdminMemberRow) {
+    setConfirmDeleteMemberId(null)
+    setToggleMessage(null)
+    startTransition(async () => {
+      const result = await deleteMemberAction(member.id)
+      setToggleMessage(result)
+    })
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones de tutores y socios">
         {[
           { id: 'tutores', label: 'Tutores' },
           { id: 'socios', label: 'Socios' },
+          { id: 'pendientes', label: `Tutores pendientes${pendingTutors.length ? ` (${pendingTutors.length})` : ''}` },
+          { id: 'rechazados', label: `Tutores rechazados${rejectedTutors.length ? ` (${rejectedTutors.length})` : ''}` },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -106,27 +160,39 @@ export function TutorsMembersClient({ tutors, members }: Props) {
         <section className="grid gap-5 xl:grid-cols-[380px_1fr]">
           <Card className="bg-white/88 shadow-sm backdrop-blur">
             <CardHeader>
-              <CardTitle className="text-lg font-black">Añadir tutor</CardTitle>
+              <CardTitle className="text-lg font-black">
+                {editingTutor ? 'Editar tutor' : 'Añadir tutor'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <form ref={tutorFormRef} action={tutorAction} className="space-y-3">
+              <form key={editingTutor?.id ?? 'new-tutor'} ref={tutorFormRef} action={tutorAction} className="space-y-3">
+                <input type="hidden" name="id" value={editingTutor?.id ?? ''} />
+                <input type="hidden" name="userId" value={editingTutor?.userId ?? ''} />
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <Input name="nombre" placeholder="Nombre" required />
-                  <Input name="apellidos" placeholder="Apellidos" required />
+                  <Input name="nombre" placeholder="Nombre" defaultValue={editingTutor?.nombre.split(' ')[0] ?? ''} required />
+                  <Input name="apellidos" placeholder="Apellidos" defaultValue={editingTutor ? editingTutor.nombre.split(' ').slice(1).join(' ') : ''} required />
                 </div>
-                <Input name="email" type="email" placeholder="Email" required />
-                <Input name="telefono" placeholder="Teléfono" required />
-                <Input name="documento" placeholder="DNI/NIE" required />
-                <Input name="ciudad" placeholder="Ciudad" required />
+                <Input name="email" type="email" placeholder="Email" defaultValue={editingTutor?.email ?? ''} required />
+                <Input name="telefono" placeholder="Teléfono" defaultValue={editingTutor?.telefono ?? ''} required />
+                <Input name="documento" placeholder="DNI/NIE" defaultValue={editingTutor?.documento ?? ''} required />
+                <Input name="ciudad" placeholder="Ciudad" defaultValue={editingTutor?.ciudad ?? ''} required />
                 <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                  <input type="checkbox" name="isSocio" className="size-4" />
+                  <input type="checkbox" name="isSocio" className="size-4" defaultChecked={editingTutor?.isSocio ?? false} />
                   También es socio
                 </label>
                 <FormMessage state={tutorState} />
-                <Button type="submit" className="w-full" disabled={tutorPending}>
-                  {tutorPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                  Crear tutor
-                </Button>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                  {editingTutor ? (
+                    <Button type="button" variant="outline" onClick={() => setEditingTutor(null)} disabled={tutorPending}>
+                      <X className="size-4" />
+                      Cancelar
+                    </Button>
+                  ) : null}
+                  <Button type="submit" className="w-full" disabled={tutorPending}>
+                    {tutorPending ? <Loader2 className="size-4 animate-spin" /> : editingTutor ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+                    {editingTutor ? 'Guardar cambios' : 'Crear tutor'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -134,7 +200,7 @@ export function TutorsMembersClient({ tutors, members }: Props) {
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {tutors.length} tutores
+                {tutors.filter((tutor) => tutor.isApproved).length} tutores
               </span>
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                 {tutors.filter((tutor) => tutor.isSocio).length} socios
@@ -156,6 +222,7 @@ export function TutorsMembersClient({ tutors, members }: Props) {
                     <th className="hidden px-4 py-2.5 lg:table-cell">Ciudad</th>
                     <th className="px-4 py-2.5">Socio</th>
                     <th className="px-4 py-2.5">Deportistas</th>
+                    <th className="px-4 py-2.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-card">
@@ -181,6 +248,28 @@ export function TutorsMembersClient({ tutors, members }: Props) {
                         </Button>
                       </td>
                       <td className="px-4 py-3 font-semibold">{tutor.deportistasAsociados}</td>
+                      <td className="px-4 py-3 text-right">
+                        {confirmDeleteTutorId === tutor.id ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteTutor(tutor)} disabled={isPending}>
+                              Sí, eliminar
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setConfirmDeleteTutorId(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon-sm" variant="ghost" aria-label="Editar tutor" onClick={() => setEditingTutor(tutor)}>
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button size="icon-sm" variant="destructive" aria-label="Eliminar tutor" onClick={() => setConfirmDeleteTutorId(tutor.id)}>
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -190,24 +279,150 @@ export function TutorsMembersClient({ tutors, members }: Props) {
         </section>
       ) : null}
 
+      {activeTab === 'pendientes' ? (
+        <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+              {pendingTutors.length} pendientes
+            </span>
+          </div>
+          {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
+          <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                  <th className="px-4 py-2.5">Nombre</th>
+                  <th className="px-4 py-2.5">DNI/NIE</th>
+                  <th className="px-4 py-2.5">Teléfono</th>
+                  <th className="px-4 py-2.5">Ciudad</th>
+                  <th className="px-4 py-2.5 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {pendingTutors.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                      No hay tutores pendientes de aprobación.
+                    </td>
+                  </tr>
+                ) : (
+                  pendingTutors.map((tutor) => (
+                    <tr key={tutor.id} className="transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-foreground">{tutor.nombre}</p>
+                        <p className="text-xs text-muted-foreground">{tutor.email}</p>
+                      </td>
+                      <td className="px-4 py-3">{maskDocument(tutor.documento)}</td>
+                      <td className="px-4 py-3">{formatSpanishPhone(tutor.telefono)}</td>
+                      <td className="px-4 py-3">{tutor.ciudad}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            disabled={approvePendingId === tutor.id}
+                            onClick={() => handleApproveTutor(tutor)}
+                          >
+                            {approvePendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
+                            Aprobar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={rejectPendingId === tutor.id}
+                            onClick={() => handleRejectTutor(tutor)}
+                          >
+                            {rejectPendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                            Rechazar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === 'rechazados' ? (
+        <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+              {rejectedTutors.length} rechazados
+            </span>
+          </div>
+          {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
+          <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                  <th className="px-4 py-2.5">Nombre</th>
+                  <th className="px-4 py-2.5">DNI/NIE</th>
+                  <th className="px-4 py-2.5">Teléfono</th>
+                  <th className="px-4 py-2.5">Ciudad</th>
+                  <th className="px-4 py-2.5 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {rejectedTutors.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                      No hay tutores rechazados.
+                    </td>
+                  </tr>
+                ) : (
+                  rejectedTutors.map((tutor) => (
+                    <tr key={tutor.id} className="transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-foreground">{tutor.nombre}</p>
+                        <p className="text-xs text-muted-foreground">{tutor.email}</p>
+                      </td>
+                      <td className="px-4 py-3">{maskDocument(tutor.documento)}</td>
+                      <td className="px-4 py-3">{formatSpanishPhone(tutor.telefono)}</td>
+                      <td className="px-4 py-3">{tutor.ciudad}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" onClick={() => handleApproveTutor(tutor)} disabled={approvePendingId === tutor.id}>
+                          {approvePendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
+                          Aprobar
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
       {activeTab === 'socios' ? (
         <section className="grid gap-5 xl:grid-cols-[380px_1fr]">
           <Card className="bg-white/88 shadow-sm backdrop-blur">
             <CardHeader>
-              <CardTitle className="text-lg font-black">Añadir socio</CardTitle>
+              <CardTitle className="text-lg font-black">{editingMember ? 'Editar socio' : 'Añadir socio'}</CardTitle>
             </CardHeader>
             <CardContent>
-              <form ref={memberFormRef} action={memberAction} className="space-y-3">
+              <form key={editingMember?.id ?? 'new-member'} ref={memberFormRef} action={memberAction} className="space-y-3">
+                <input type="hidden" name="id" value={editingMember?.id ?? ''} />
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <Input name="nombre" placeholder="Nombre" required />
-                  <Input name="apellidos" placeholder="Apellidos" required />
+                  <Input name="nombre" placeholder="Nombre" defaultValue={editingMember?.nombre.split(' ')[0] ?? ''} required />
+                  <Input name="apellidos" placeholder="Apellidos" defaultValue={editingMember ? editingMember.nombre.split(' ').slice(1).join(' ') : ''} required />
                 </div>
-                <Input name="email" type="email" placeholder="Email" required />
+                <Input name="email" type="email" placeholder="Email" defaultValue={editingMember?.email ?? ''} required />
                 <FormMessage state={memberState} />
-                <Button type="submit" className="w-full" disabled={memberPending}>
-                  {memberPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                  Crear socio
-                </Button>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                  {editingMember ? (
+                    <Button type="button" variant="outline" onClick={() => setEditingMember(null)} disabled={memberPending}>
+                      <X className="size-4" />
+                      Cancelar
+                    </Button>
+                  ) : null}
+                  <Button type="submit" className="w-full" disabled={memberPending}>
+                    {memberPending ? <Loader2 className="size-4 animate-spin" /> : editingMember ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+                    {editingMember ? 'Guardar cambios' : 'Crear socio'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -234,6 +449,7 @@ export function TutorsMembersClient({ tutors, members }: Props) {
                     <th className="px-4 py-2.5">Email</th>
                     <th className="px-4 py-2.5">Estado</th>
                     <th className="hidden px-4 py-2.5 lg:table-cell">Alta</th>
+                    <th className="px-4 py-2.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-card">
@@ -247,6 +463,28 @@ export function TutorsMembersClient({ tutors, members }: Props) {
                         </span>
                       </td>
                       <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{member.fechaAlta}</td>
+                      <td className="px-4 py-3 text-right">
+                        {confirmDeleteMemberId === member.id ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteMember(member)} disabled={isPending}>
+                              Sí, eliminar
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setConfirmDeleteMemberId(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon-sm" variant="ghost" aria-label="Editar socio" onClick={() => setEditingMember(member)}>
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button size="icon-sm" variant="destructive" aria-label="Eliminar socio" onClick={() => setConfirmDeleteMemberId(member.id)}>
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

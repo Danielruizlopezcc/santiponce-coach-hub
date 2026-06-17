@@ -21,7 +21,12 @@ import { createCategory, deleteCategory, updateCategory } from './actions'
 
 type SheetMode = 'create' | 'edit'
 
-export function CategoriasClient({ categories }: { categories: AdminCategoryRow[] }) {
+type CategoriasClientProps = {
+  categories: AdminCategoryRow[]
+  embedded?: boolean
+}
+
+export function CategoriasClient({ categories, embedded = false }: CategoriasClientProps) {
   const [isPending, startTransition] = useTransition()
   const [sheetOpen, setSheetOpen]       = useState(false)
   const [mode, setMode]                 = useState<SheetMode>('create')
@@ -86,12 +91,8 @@ export function CategoriasClient({ categories }: { categories: AdminCategoryRow[
     })
   }
 
-  return (
-    <PageContainer
-      title="Categorías"
-      description="Gestión de categorías deportivas para la temporada."
-      className="max-w-7xl"
-    >
+  const content = (
+    <>
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="mb-6 flex items-center justify-between gap-3">
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -269,6 +270,20 @@ export function CategoriasClient({ categories }: { categories: AdminCategoryRow[
           </SheetFooter>
         </SheetContent>
       </Sheet>
+    </>
+  )
+
+  if (embedded) {
+    return content
+  }
+
+  return (
+    <PageContainer
+      title="Categorías"
+      description="Gestión de categorías deportivas para la temporada."
+      className="max-w-7xl"
+    >
+      {content}
     </PageContainer>
   )
 }

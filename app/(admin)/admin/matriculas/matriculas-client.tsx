@@ -21,7 +21,12 @@ const ESTADO_STYLES: Record<AdminEnrollmentRow['estadoMatricula'], string> = {
   Pendiente: 'bg-amber-100 text-amber-700',
 }
 
-export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollmentRow[] }) {
+type MatriculasClientProps = {
+  enrollments: AdminEnrollmentRow[]
+  embedded?: boolean
+}
+
+export function MatriculasClient({ enrollments, embedded = false }: MatriculasClientProps) {
   const [isPending, startTransition] = useTransition()
   const [search, setSearch]                   = useState('')
   const [confirmId, setConfirmId]             = useState<string | null>(null)
@@ -107,12 +112,8 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
     )
   }
 
-  return (
-    <PageContainer
-      title="Matrículas"
-      description="Supervisa el estado de cada matrícula y usa acciones manuales solo en incidencias."
-      className="max-w-7xl"
-    >
+  const content = (
+    <>
       {/* ── Resumen rápido ───────────────────────────────────────── */}
       <div className="mb-6 flex flex-wrap gap-2">
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -324,6 +325,20 @@ export function MatriculasClient({ enrollments }: { enrollments: AdminEnrollment
           </tbody>
         </table>
       </div>
+    </>
+  )
+
+  if (embedded) {
+    return content
+  }
+
+  return (
+    <PageContainer
+      title="Matrículas"
+      description="Supervisa el estado de cada matrícula y usa acciones manuales solo en incidencias."
+      className="max-w-7xl"
+    >
+      {content}
     </PageContainer>
   )
 }
