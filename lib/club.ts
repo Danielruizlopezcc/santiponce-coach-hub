@@ -71,6 +71,7 @@ export function getPrivateNavItems({
   if (hasGuardian) {
     return [
       PRIVATE_NAV.find((item) => item.href === '/app')!,
+      PRIVATE_NAV.find((item) => item.href === '/app/perfil')!,
       PRIVATE_NAV.find((item) => item.href === '/app/noticias')!,
       PRIVATE_NAV.find((item) => item.href === '/calendario')!,
       PRIVATE_NAV.find((item) => item.href === '/app/equipos')!,
@@ -83,6 +84,7 @@ export function getPrivateNavItems({
 
   return [
     PRIVATE_NAV.find((item) => item.href === '/app')!,
+    PRIVATE_NAV.find((item) => item.href === '/app/perfil')!,
     PRIVATE_NAV.find((item) => item.href === '/app/noticias')!,
     PRIVATE_NAV.find((item) => item.href === '/calendario')!,
     PRIVATE_NAV.find((item) => item.href === '/app/equipos')!,

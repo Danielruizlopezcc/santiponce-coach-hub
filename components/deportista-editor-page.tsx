@@ -21,7 +21,6 @@ type DeportistaEditorPageProps = {
 
 export function DeportistaEditorPage({
   title,
-  description,
   submitLabel,
   deportista,
 }: DeportistaEditorPageProps) {
@@ -43,8 +42,7 @@ export function DeportistaEditorPage({
 
       <section className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm">
         <div className="mb-5">
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <h2 className="text-2xl font-black tracking-tight text-foreground">{title}</h2>
         </div>
 
         {saved && (

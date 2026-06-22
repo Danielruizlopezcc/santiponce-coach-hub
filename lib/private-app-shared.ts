@@ -42,6 +42,13 @@ export type PrivateTutorProfile = TutorProfileFormValues & {
   }
 }
 
+export type PrivateMemberProfile = {
+  nombre: string
+  apellidos: string
+  email: string
+  estadoSocio: 'Socio pagado' | 'Pendiente'
+}
+
 export type PrivateSponsor = {
   id: string
   title: string

@@ -9,21 +9,16 @@ type PageContainerProps = {
 
 export function PageContainer({
   title,
-  description,
   children,
   className,
 }: PageContainerProps) {
   return (
     <div className={cn('mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8', className)}>
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground text-balance md:text-3xl">
+      <header className="mb-8">
+        <div className="mb-3 h-1 w-14 rounded-full bg-primary" aria-hidden="true" />
+        <h1 className="text-4xl font-black tracking-tight text-foreground text-balance md:text-5xl">
           {title}
         </h1>
-        {description && (
-          <p className="mt-1 text-sm text-muted-foreground text-pretty">
-            {description}
-          </p>
-        )}
       </header>
       {children}
     </div>

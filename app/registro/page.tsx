@@ -6,7 +6,6 @@ import { RegistroForm } from '@/components/registro-form'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -33,11 +32,7 @@ export default function RegistroPage() {
         />
         <Card className="w-full border-border/70 bg-card/90 backdrop-blur">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-balance">Registro</CardTitle>
-            <CardDescription className="text-pretty">
-              Elige entre crear una cuenta de tutor o de socio para acceder a tu
-              área privada del {CLUB.legalName}.
-            </CardDescription>
+            <CardTitle className="text-3xl font-black tracking-tight text-balance">Registro</CardTitle>
           </CardHeader>
           <CardContent>
             <RegistroForm />

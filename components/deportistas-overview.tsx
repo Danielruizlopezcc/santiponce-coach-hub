@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Edit3, Plus, ShieldCheck } from 'lucide-react'
+import { Edit3, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatSpanishDate } from '@/lib/format'
 import { type PrivateAthleteDetail } from '@/lib/private-app-shared'
@@ -123,12 +123,6 @@ export function DeportistasOverview({ deportistas }: DeportistasOverviewProps) {
                   <Edit3 className="size-4" aria-hidden="true" />
                   Editar
                 </Button>
-                {deportista.estado !== 'matriculado' && (
-                  <Button nativeButton={false} render={<Link href="/app/matriculacion" />}>
-                    <ShieldCheck className="size-4" aria-hidden="true" />
-                    Matricular
-                  </Button>
-                )}
               </div>
             </div>
           </article>

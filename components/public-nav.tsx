@@ -77,6 +77,7 @@ function NavLinks({
         if (orientation === 'horizontal' && AUTH_HREFS.has(item.href)) return null
 
         const dropdownItems = getDropdownItems(item.href, navData)
+        const href = item.href === '/equipos' && dropdownItems[0] ? dropdownItems[0].href : item.href
         const active =
           item.href === '/'
             ? pathname === '/'
@@ -85,7 +86,7 @@ function NavLinks({
         return (
           <li key={item.href}>
             <Link
-              href={item.href}
+              href={href}
               onClick={onNavigate}
               onMouseEnter={() => {
                 if (orientation !== 'horizontal') return
@@ -141,6 +142,7 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
   const megaTitle = activeMegaHref === '/equipos' ? 'Equipos' : 'Noticias'
   const megaPrimaryHref = activeMegaHref === '/equipos' ? '/equipos' : '/noticias'
   const megaPrimaryLabel = activeMegaHref === '/equipos' ? 'Ver todos los equipos' : 'Ver todas las noticias'
+  const showMegaPrimary = activeMegaHref !== '/equipos'
   const megaVisibleItems = activeMegaHref === '/noticias' ? megaItems.slice(1) : megaItems
   const megaGroups =
     activeMegaHref === '/equipos'
@@ -282,14 +284,16 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
               <p className="text-4xl font-black uppercase tracking-tight text-primary">
                 {megaTitle}
               </p>
-              <Link
-                href={megaPrimaryHref}
-                onClick={() => setActiveMegaHref(null)}
-                className="mt-7 inline-flex items-center gap-2 text-sm font-black uppercase text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {megaPrimaryLabel}
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
+              {showMegaPrimary ? (
+                <Link
+                  href={megaPrimaryHref}
+                  onClick={() => setActiveMegaHref(null)}
+                  className="mt-7 inline-flex items-center gap-2 text-sm font-black uppercase text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {megaPrimaryLabel}
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              ) : null}
             </div>
 
             {megaVisibleItems.length === 0 ? (
@@ -315,11 +319,6 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
                             <span className="block text-base font-black leading-tight">
                               {item.label}
                             </span>
-                            {activeMegaHref === '/noticias' ? (
-                              <span className="mt-1 block text-sm font-semibold text-muted-foreground">
-                                {item.description}
-                              </span>
-                            ) : null}
                           </span>
                           <ArrowRight className="size-4 shrink-0 text-primary/70 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                         </Link>

@@ -56,6 +56,7 @@ export function PrivateHeader({ viewer, navItems, navData }: PrivateHeaderProps)
   const megaTitle = activeMegaHref === '/app/equipos' ? 'Equipos' : 'Noticias'
   const megaPrimaryHref = activeMegaHref === '/app/equipos' ? '/app/equipos' : '/app/noticias'
   const megaPrimaryLabel = activeMegaHref === '/app/equipos' ? 'Ver todos los equipos' : 'Ver todas las noticias'
+  const showMegaPrimary = activeMegaHref !== '/app/equipos'
   const megaVisibleItems = activeMegaHref === '/app/noticias' ? megaItems.slice(1) : megaItems
   const megaGroups =
     activeMegaHref === '/app/equipos'
@@ -114,16 +115,22 @@ export function PrivateHeader({ viewer, navItems, navData }: PrivateHeaderProps)
         </Link>
 
         <div className="flex min-w-0 items-center gap-3">
-          <div className="hidden flex-col text-right leading-tight sm:flex">
-            <span className="text-base font-bold text-white">{viewer.fullName}</span>
-            <span className="text-sm text-white/70">{viewer.email}</span>
-          </div>
-          <span
-            aria-hidden="true"
-            className="flex size-11 items-center justify-center rounded-full border border-white/30 bg-white text-base font-black text-primary"
+          <Link
+            href="/app/perfil"
+            className="flex min-w-0 items-center gap-3 rounded-lg outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/80"
+            aria-label="Ir al perfil"
           >
-            {viewer.initials}
-          </span>
+            <span className="hidden flex-col text-right leading-tight sm:flex">
+              <span className="text-base font-bold text-white">{viewer.fullName}</span>
+              <span className="text-sm text-white/70">{viewer.email}</span>
+            </span>
+            <span
+              aria-hidden="true"
+              className="flex size-11 items-center justify-center rounded-full border border-white/30 bg-white text-base font-black text-primary"
+            >
+              {viewer.initials}
+            </span>
+          </Link>
           <SignOutButton
             variant="ghost"
             label="Salir"
@@ -138,6 +145,7 @@ export function PrivateHeader({ viewer, navItems, navData }: PrivateHeaderProps)
             <ul className="flex flex-row items-center gap-1 overflow-x-auto">
               {navItems.map((item) => {
                 const dropdownItems = getDropdownItems(item.href, navData)
+                const href = item.href === '/app/equipos' && dropdownItems[0] ? dropdownItems[0].href : item.href
                 const active =
                   item.href === '/app'
                     ? pathname === '/app'
@@ -146,7 +154,7 @@ export function PrivateHeader({ viewer, navItems, navData }: PrivateHeaderProps)
                 return (
                   <li key={item.href}>
                     <Link
-                      href={item.href}
+                      href={href}
                       onMouseEnter={() => setActiveMegaHref(dropdownItems.length > 0 ? item.href : null)}
                       onFocus={() => setActiveMegaHref(dropdownItems.length > 0 ? item.href : null)}
                       aria-current={active ? 'page' : undefined}
@@ -179,14 +187,16 @@ export function PrivateHeader({ viewer, navItems, navData }: PrivateHeaderProps)
               <p className="text-4xl font-black uppercase tracking-tight text-primary">
                 {megaTitle}
               </p>
-              <Link
-                href={megaPrimaryHref}
-                onClick={() => setActiveMegaHref(null)}
-                className="mt-7 inline-flex items-center gap-2 text-sm font-black uppercase text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {megaPrimaryLabel}
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
+              {showMegaPrimary ? (
+                <Link
+                  href={megaPrimaryHref}
+                  onClick={() => setActiveMegaHref(null)}
+                  className="mt-7 inline-flex items-center gap-2 text-sm font-black uppercase text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {megaPrimaryLabel}
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              ) : null}
             </div>
 
             {megaVisibleItems.length === 0 ? (
@@ -212,11 +222,6 @@ export function PrivateHeader({ viewer, navItems, navData }: PrivateHeaderProps)
                             <span className="block text-base font-black leading-tight">
                               {item.label}
                             </span>
-                            {activeMegaHref === '/app/noticias' ? (
-                              <span className="mt-1 block text-sm font-semibold text-muted-foreground">
-                                {item.description}
-                              </span>
-                            ) : null}
                           </span>
                           <ArrowRight className="size-4 shrink-0 text-primary/70 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                         </Link>

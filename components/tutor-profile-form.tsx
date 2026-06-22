@@ -69,12 +69,9 @@ export function TutorProfileForm({ profile }: TutorProfileFormProps) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.8fr_1fr]">
-      <section className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-sm">
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-foreground">Datos del tutor</h2>
-          <p className="text-sm text-muted-foreground">
-            Revisa y actualiza la información de tu cuenta.
-          </p>
+          <h2 className="text-2xl font-black tracking-tight text-foreground">Datos del tutor</h2>
         </div>
 
         <form noValidate onSubmit={onSubmit} className="grid gap-4">
@@ -155,7 +152,7 @@ export function TutorProfileForm({ profile }: TutorProfileFormProps) {
             <Label htmlFor={`${errId}-preferencia-pago`}>Preferencia de pago</Label>
             <select
               id={`${errId}-preferencia-pago`}
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-8 rounded-lg border border-input bg-white px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               {...register('preferenciaPago')}
             >
               <option value="cuotas">Cuotas</option>
@@ -193,16 +190,13 @@ export function TutorProfileForm({ profile }: TutorProfileFormProps) {
       </section>
 
       <aside className="grid gap-4">
-        <section className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+        <section className="rounded-2xl border border-border bg-white p-5 shadow-sm">
           <div className="flex items-start gap-3">
             <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <CreditCard className="size-5" aria-hidden="true" />
             </span>
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Método de pago guardado</h2>
-              <p className="text-sm text-muted-foreground">
-                Información disponible para tu cuenta.
-              </p>
+              <h2 className="text-2xl font-black tracking-tight text-foreground">Método de pago guardado</h2>
             </div>
           </div>
 

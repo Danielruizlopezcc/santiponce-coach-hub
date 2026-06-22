@@ -5,6 +5,7 @@ import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
 import type {
   PrivateAthleteDetail,
   PrivateDashboardData,
+  PrivateMemberProfile,
   PrivateNewsData,
   PrivateSponsor,
   PrivateTeamDetail,
@@ -314,6 +315,24 @@ export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
   }))
 }
 
+export async function getPrivateMemberProfile(userId: string): Promise<PrivateMemberProfile | null> {
+  const supabase = await createClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email, first_name, last_name, is_paid_member')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (!profile) return null
+
+  return {
+    nombre: profile.first_name ?? '',
+    apellidos: profile.last_name ?? '',
+    email: profile.email,
+    estadoSocio: profile.is_paid_member ? 'Socio pagado' : 'Pendiente',
+  }
+}
+
 export async function getPrivateNewsData(): Promise<PrivateNewsData> {
   noStore()
 
@@ -435,6 +454,8 @@ export async function getPrivateTeamDetail(teamId: string): Promise<PrivateTeamD
 
   const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const categoryName = categoryById.get(team.category_id) ?? 'Sin categoría'
+  const sortInfo = getTeamCategorySortInfo(team.name, categoryName)
   const players: PrivateTeamPlayer[] = (athletes ?? []).map((athlete) => ({
     id: athlete.id,
     nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
@@ -447,7 +468,7 @@ export async function getPrivateTeamDetail(teamId: string): Promise<PrivateTeamD
   return {
     id: team.id,
     nombre: team.name,
-    categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+    categoria: sortInfo.label,
     temporada: seasonById.get(team.season_id) ?? CLUB.season,
     jugadores: players.length,
     estado: !team.is_active ? 'Pendiente' : players.length >= 15 ? 'Completo' : 'Abierto',

@@ -105,9 +105,9 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
           <div className="absolute inset-0" style={HERO_PATTERN} aria-hidden="true" />
           <div className="relative mx-auto flex min-h-56 w-full max-w-7xl flex-col justify-center px-4 py-10 md:px-8 md:py-16">
             <Button variant="ghost" size="sm" asChild className="mb-8 w-fit gap-1.5 text-white/80 hover:bg-white/10 hover:text-white">
-              <Link href="/app/equipos">
+              <Link href="/app">
                 <ArrowLeft className="size-4" aria-hidden="true" />
-                Equipos
+                Inicio
               </Link>
             </Button>
             <p className="text-sm font-black uppercase tracking-[0.28em] text-white/70">
@@ -127,9 +127,6 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
             <span className="py-5 text-sm font-semibold text-muted-foreground">
               {team.jugadores} jugador{team.jugadores !== 1 ? 'es' : ''}
             </span>
-            <span className="py-5 text-sm font-semibold text-muted-foreground">
-              {team.estado}
-            </span>
           </div>
       </div>
 
@@ -139,37 +136,60 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
               <p className="text-base font-semibold text-foreground">Este equipo aún no tiene jugadores asignados.</p>
             </div>
           ) : (
-            visibleSections.map((section) => (
-              <section key={section.key}>
-                <div className="mb-8 flex items-center justify-between gap-4">
-                  <h2 className="font-serif text-4xl font-black uppercase text-foreground md:text-5xl">
-                    {section.title}
-                  </h2>
-                  <span className="text-sm font-semibold text-muted-foreground">
-                    {section.players.length}
-                  </span>
-                </div>
-
-                {section.players.length === 0 ? (
-                  <p className="rounded-xl border border-border bg-muted/40 px-4 py-8 text-sm text-muted-foreground">
-                    No hay jugadores en esta posición.
+            <>
+              <section>
+                <div className="mb-6">
+                  <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+                    Plantilla
                   </p>
-                ) : (
-                  <div className="-mx-4 overflow-x-auto px-4 pb-3">
-                    <div className="flex gap-6">
-                      {section.players.map((player, index) => (
-                        <PlayerCard
-                          key={player.id}
-                          player={player}
-                          positionLabel={section.singular}
-                          index={index}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  <h2 className="mt-2 text-3xl font-black tracking-tight text-foreground">
+                    Jugadores del equipo
+                  </h2>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {team.players.map((player) => (
+                    <article key={player.id} className="rounded-lg border border-border bg-white px-4 py-3 shadow-sm">
+                      <p className="font-black text-foreground">{player.nombre}</p>
+                      <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                        {player.categoriaSolicitada} · {player.estadoMatricula}
+                      </p>
+                    </article>
+                  ))}
+                </div>
               </section>
-            ))
+
+              {visibleSections.map((section) => (
+                <section key={section.key}>
+                  <div className="mb-8 flex items-center justify-between gap-4">
+                    <h2 className="font-serif text-4xl font-black uppercase text-foreground md:text-5xl">
+                      {section.title}
+                    </h2>
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      {section.players.length}
+                    </span>
+                  </div>
+
+                  {section.players.length === 0 ? (
+                    <p className="rounded-xl border border-border bg-muted/40 px-4 py-8 text-sm text-muted-foreground">
+                      No hay jugadores en esta posición.
+                    </p>
+                  ) : (
+                    <div className="-mx-4 overflow-x-auto px-4 pb-3">
+                      <div className="flex gap-6">
+                        {section.players.map((player, index) => (
+                          <PlayerCard
+                            key={player.id}
+                            player={player}
+                            positionLabel={section.singular}
+                            index={index}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              ))}
+            </>
           )}
       </div>
       </div>

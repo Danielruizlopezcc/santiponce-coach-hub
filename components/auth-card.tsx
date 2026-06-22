@@ -3,7 +3,6 @@ import Image from 'next/image'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -18,7 +17,6 @@ type AuthCardProps = {
 
 export function AuthCard({
   title,
-  description,
   children,
   footer,
 }: AuthCardProps) {
@@ -35,12 +33,7 @@ export function AuthCard({
       />
       <Card className="w-full border-border/70 bg-card/90 backdrop-blur">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-balance">{title}</CardTitle>
-          {description && (
-            <CardDescription className="text-pretty">
-              {description}
-            </CardDescription>
-          )}
+          <CardTitle className="text-3xl font-black tracking-tight text-balance">{title}</CardTitle>
         </CardHeader>
         <CardContent>{children}</CardContent>
       </Card>

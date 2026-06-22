@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { requireUser } from '@/lib/auth'
 import {
   normalizeDocument,
@@ -21,6 +22,12 @@ type ActionResult = {
   success: boolean
   message?: string
 }
+
+const memberProfileSchema = z.object({
+  nombre: z.string().trim().min(2, 'Introduce un nombre válido').max(60),
+  apellidos: z.string().trim().min(2, 'Introduce los apellidos').max(80),
+  email: z.string().trim().email('Correo electrónico no válido').max(120),
+})
 
 function mapDeportistaToAthleteRow(values: DeportistaFormValues, seasonId: string) {
   return {
@@ -109,6 +116,45 @@ export async function updateTutorProfileAction(rawValues: unknown): Promise<Acti
   revalidatePath('/app')
   revalidatePath('/app/perfil')
   revalidatePath('/app/deportistas')
+
+  return { success: true }
+}
+
+export async function updateMemberProfileAction(rawValues: unknown): Promise<ActionResult> {
+  const user = await requireUser()
+  const parsed = memberProfileSchema.safeParse(rawValues)
+
+  if (!parsed.success) {
+    return { success: false, message: parsed.error.issues[0]?.message }
+  }
+
+  const values = parsed.data
+  const email = normalizeEmail(values.email)
+  const supabase = await createClient()
+  const { data: conflictingProfiles } = await supabase
+    .from('profiles')
+    .select('id, email')
+    .eq('email', email)
+
+  if (conflictingProfiles?.some((profile) => profile.id !== user.id)) {
+    return { success: false, message: 'Ya existe otro usuario con ese correo electrónico.' }
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      email,
+      first_name: values.nombre,
+      last_name: values.apellidos,
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    return { success: false, message: error.message }
+  }
+
+  revalidatePath('/app')
+  revalidatePath('/app/perfil')
 
   return { success: true }
 }

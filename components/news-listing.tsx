@@ -157,20 +157,6 @@ export function NewsListing({
               Toda la informacion del {CLUB.shortName}, organizada por secciones y siempre al dia.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:flex">
-            <div className="rounded-lg bg-white/8 px-5 py-4 ring-1 ring-white/14">
-              <p className="text-3xl font-black">{visibleNews.length}</p>
-              <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-white/60">
-                Noticias
-              </p>
-            </div>
-            <div className="rounded-lg bg-white/8 px-5 py-4 ring-1 ring-white/14">
-              <p className="text-3xl font-black">{sections.length}</p>
-              <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-white/60">
-                Secciones
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 

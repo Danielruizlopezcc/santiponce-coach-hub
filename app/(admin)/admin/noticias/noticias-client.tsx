@@ -44,7 +44,7 @@ export function NoticiasClient({ news, sections }: Props) {
   const [body, setBody] = useState('')
   const [sectionId, setSectionId] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [inputKey, setInputKey] = useState(String(Date.now()))
+  const [inputKey, setInputKey] = useState('initial')
   const [sectionName, setSectionName] = useState('')
   const [sectionError, setSectionError] = useState<string | null>(null)
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null)

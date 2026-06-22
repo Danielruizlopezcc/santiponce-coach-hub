@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CreditCard, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CreditCard, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -47,6 +47,73 @@ function FormMessage({ state }: { state: TutorSocioActionState }) {
   )
 }
 
+function IconStatus({
+  title,
+  tone,
+  icon: Icon,
+  badge,
+}: {
+  title: string
+  tone: 'green' | 'amber' | 'red' | 'slate'
+  icon: typeof CheckCircle2
+  badge?: 'check' | 'x'
+}) {
+  return (
+    <span
+      title={title}
+      className={cn(
+        'relative inline-flex size-8 items-center justify-center rounded-full',
+        tone === 'green' && 'bg-emerald-100 text-emerald-700',
+        tone === 'amber' && 'bg-amber-100 text-amber-800',
+        tone === 'red' && 'bg-rose-100 text-rose-700',
+        tone === 'slate' && 'bg-slate-100 text-slate-600',
+      )}
+    >
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      {badge === 'check' ? (
+        <CheckCircle2 className="absolute -right-1 -top-1 size-3.5 rounded-full bg-white text-emerald-700" aria-hidden="true" />
+      ) : null}
+      {badge === 'x' ? (
+        <XCircle className="absolute -right-1 -top-1 size-3.5 rounded-full bg-white text-rose-700" aria-hidden="true" />
+      ) : null}
+    </span>
+  )
+}
+
+function getNextCharge(assignments?: AdminTutorFeeAssignmentRow[]) {
+  const assignment = assignments?.find((item) => item.status === 'active' && item.scheduledCharges > 0)
+  if (!assignment) return null
+
+  return {
+    label: assignment.feeName,
+    detail: `${formatEuro(assignment.totalAmount)} · ${assignment.nextChargeDate}`,
+  }
+}
+
+function getConsentStatus(tutor: AdminTutorRow) {
+  const title = `Obligatorios: ${tutor.consentStatus}. Imágenes: ${tutor.imageConsent}.`
+
+  if (tutor.consentStatus === 'Completo' && tutor.imageConsent === 'Aceptado') {
+    return { title, tone: 'green' as const, icon: CheckCircle2 }
+  }
+
+  if (tutor.consentStatus === 'Completo' && tutor.imageConsent !== 'Aceptado') {
+    return { title, tone: 'amber' as const, icon: AlertTriangle }
+  }
+
+  return { title, tone: 'red' as const, icon: XCircle }
+}
+
+function getCardStatus(tutor: AdminTutorRow) {
+  const title = tutor.cardStatus
+
+  if (tutor.cardStatus === 'Tarjeta activa') {
+    return { title, tone: 'green' as const, icon: CreditCard, badge: 'check' as const }
+  }
+
+  return { title, tone: 'red' as const, icon: CreditCard, badge: 'x' as const }
+}
+
 export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignments }: Props) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'tutores' | 'socios' | 'pendientes' | 'rechazados'>('tutores')
@@ -56,6 +123,7 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
   const [toggleMessage, setToggleMessage] = useState<TutorSocioActionState | null>(null)
   const [approvePendingId, setApprovePendingId] = useState<string | null>(null)
   const [rejectPendingId, setRejectPendingId] = useState<string | null>(null)
+  const [showTutorForm, setShowTutorForm] = useState(false)
   const [editingTutor, setEditingTutor] = useState<AdminTutorRow | null>(null)
   const [assigningTutor, setAssigningTutor] = useState<AdminTutorRow | null>(null)
   const [editingMember, setEditingMember] = useState<AdminMemberRow | null>(null)
@@ -185,7 +253,26 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
       </div>
 
       {activeTab === 'tutores' ? (
-        <section className="grid gap-5 xl:grid-cols-[380px_1fr]">
+        <section className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-muted-foreground">
+                Alta, revisión y seguimiento administrativo de tutores.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => {
+                setEditingTutor(null)
+                setShowTutorForm((current) => !current)
+              }}
+            >
+              {showTutorForm && !editingTutor ? <X className="size-4" /> : <Plus className="size-4" />}
+              {showTutorForm && !editingTutor ? 'Cerrar formulario' : 'Crear tutor'}
+            </Button>
+          </div>
+
+          {showTutorForm || editingTutor ? (
           <Card className="bg-white/88 shadow-sm backdrop-blur">
             <CardHeader>
               <CardTitle className="text-lg font-black">
@@ -201,6 +288,9 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                   <Input name="apellidos" placeholder="Apellidos" defaultValue={editingTutor ? editingTutor.nombre.split(' ').slice(1).join(' ') : ''} required />
                 </div>
                 <Input name="email" type="email" placeholder="Email" defaultValue={editingTutor?.email ?? ''} required />
+                {!editingTutor ? (
+                  <Input name="password" type="password" placeholder="Contraseña" minLength={8} required />
+                ) : null}
                 <Input name="telefono" placeholder="Teléfono" defaultValue={editingTutor?.telefono ?? ''} required />
                 <Input name="documento" placeholder="DNI/NIE" defaultValue={editingTutor?.documento ?? ''} required />
                 <Input name="ciudad" placeholder="Ciudad" defaultValue={editingTutor?.ciudad ?? ''} required />
@@ -208,10 +298,24 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                   <input type="checkbox" name="isSocio" className="size-4" defaultChecked={editingTutor?.isSocio ?? false} />
                   También es socio
                 </label>
+                {!editingTutor ? (
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+                    <input type="checkbox" name="imageConsent" className="size-4" />
+                    Acepta consentimiento de imagen
+                  </label>
+                ) : null}
                 <FormMessage state={tutorState} />
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                   {editingTutor ? (
-                    <Button type="button" variant="outline" onClick={() => setEditingTutor(null)} disabled={tutorPending}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingTutor(null)
+                        setShowTutorForm(false)
+                      }}
+                      disabled={tutorPending}
+                    >
                       <X className="size-4" />
                       Cancelar
                     </Button>
@@ -224,14 +328,12 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
               </form>
             </CardContent>
           </Card>
+          ) : null}
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 {tutors.filter((tutor) => tutor.isApproved).length} tutores
-              </span>
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                {tutors.filter((tutor) => tutor.isSocio).length} socios
               </span>
             </div>
             <div className="relative mb-4">
@@ -347,43 +449,80 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
               </div>
             ) : null}
 
-            <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-              <table className="w-full text-sm">
+            <div className="mt-4 overflow-hidden rounded-xl ring-1 ring-foreground/10">
+              <table className="w-full table-fixed text-sm">
+                <colgroup>
+                  <col className="w-[15%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[14%]" />
+                </colgroup>
                 <thead>
-                  <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                    <th className="px-4 py-2.5">Nombre</th>
-                    <th className="px-4 py-2.5">DNI/NIE</th>
-                    <th className="px-4 py-2.5">Teléfono</th>
-                    <th className="hidden px-4 py-2.5 lg:table-cell">Ciudad</th>
-                    <th className="px-4 py-2.5">Socio</th>
-                    <th className="px-4 py-2.5">Deportistas</th>
-                    <th className="px-4 py-2.5 text-right">Acciones</th>
+                  <tr className="border-b border-border bg-muted/40 text-center text-xs font-medium text-muted-foreground">
+                    <th className="px-3 py-2.5 text-center">Nombre</th>
+                    <th className="px-2 py-2.5 text-center">DNI/NIE</th>
+                    <th className="px-2 py-2.5 text-center">Teléfono</th>
+                    <th className="px-2 py-2.5 text-center">Ciudad</th>
+                    <th className="px-2 py-2.5 text-center">Socio</th>
+                    <th className="px-2 py-2.5 text-center">Deportistas</th>
+                    <th className="px-2 py-2.5 text-center">Consentimientos</th>
+                    <th className="px-2 py-2.5 text-center">Tarjeta</th>
+                    <th className="px-2 py-2.5 text-center">Próximo cargo</th>
+                    <th className="px-3 py-2.5 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-card">
-                  {visibleTutors.map((tutor) => (
+                  {visibleTutors.map((tutor) => {
+                    const nextCharge = getNextCharge(assignmentsByGuardian.get(tutor.id))
+                    const consentStatus = getConsentStatus(tutor)
+                    const cardStatus = getCardStatus(tutor)
+
+                    return (
                     <tr key={tutor.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-foreground">{tutor.nombre}</p>
-                        <p className="text-xs text-muted-foreground">{tutor.email}</p>
+                      <td className="min-w-0 px-3 py-3 text-center">
+                        <p className="truncate font-semibold text-foreground" title={tutor.nombre}>{tutor.nombre}</p>
+                        <p className="truncate text-xs text-muted-foreground" title={tutor.email}>{tutor.email}</p>
                       </td>
-                      <td className="px-4 py-3">{maskDocument(tutor.documento)}</td>
-                      <td className="px-4 py-3">{formatSpanishPhone(tutor.telefono)}</td>
-                      <td className="hidden px-4 py-3 lg:table-cell">{tutor.ciudad}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3 text-center">{maskDocument(tutor.documento)}</td>
+                      <td className="whitespace-nowrap px-2 py-3 text-center">{formatSpanishPhone(tutor.telefono)}</td>
+                      <td className="truncate px-2 py-3 text-center" title={tutor.ciudad}>{tutor.ciudad}</td>
+                      <td className="px-2 py-3 text-center">
                         <Button
                           type="button"
                           size="sm"
                           variant={tutor.isSocio ? 'default' : 'outline'}
                           disabled={isPending && pendingToggleId === tutor.userId}
                           onClick={() => handleToggleTutor(tutor)}
+                          className="h-8 px-2 text-xs"
                         >
                           {pendingToggleId === tutor.userId ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
                           {tutor.isSocio ? 'Sí' : 'No'}
                         </Button>
                       </td>
-                      <td className="px-4 py-3 font-semibold">{tutor.deportistasAsociados}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-2 py-3 text-center font-semibold">{tutor.deportistasAsociados}</td>
+                      <td className="px-2 py-3 text-center">
+                        <IconStatus {...consentStatus} />
+                      </td>
+                      <td className="px-2 py-3 text-center">
+                        <IconStatus {...cardStatus} />
+                      </td>
+                      <td className="min-w-0 px-2 py-3 text-center">
+                        {nextCharge ? (
+                          <div title={`${nextCharge.label}. ${nextCharge.detail}.`} className="min-w-0">
+                            <p className="truncate text-xs font-black text-primary">{nextCharge.label}</p>
+                            <p className="truncate text-xs font-semibold text-muted-foreground">{nextCharge.detail}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-semibold text-muted-foreground">Sin cargo</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center">
                         {confirmDeleteTutorId === tutor.id ? (
                           <div className="flex items-center justify-end gap-2">
                             <span className="text-xs text-muted-foreground">¿Eliminar?</span>
@@ -395,8 +534,16 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                             </Button>
                           </div>
                         ) : (
-                          <div className="flex justify-end gap-1">
-                            <Button size="icon-sm" variant="ghost" aria-label="Editar tutor" onClick={() => setEditingTutor(tutor)}>
+                          <div className="flex justify-center gap-1">
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label="Editar tutor"
+                              onClick={() => {
+                                setEditingTutor(tutor)
+                                setShowTutorForm(true)
+                              }}
+                            >
                               <Pencil className="size-4" />
                             </Button>
                             <Button size="icon-sm" variant="ghost" aria-label="Asignar cuota" onClick={() => setAssigningTutor(tutor)}>
@@ -409,7 +556,8 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                         )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

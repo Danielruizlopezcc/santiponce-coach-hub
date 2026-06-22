@@ -295,9 +295,9 @@ export function AdminTable({
 
             {/* Data rows */}
             {!isLoading &&
-              paged.map((row) => (
+              paged.map((row, index) => (
                 <tr
-                  key={String(row[keyField] ?? `${current}-${Math.random()}`)}
+                  key={String(row[keyField] ?? `${current}-${index}`)}
                   className="transition-colors hover:bg-muted/30"
                 >
                   {columns.map((col) => (

@@ -80,6 +80,9 @@ export type AdminTutorRow = {
   isApproved: boolean
   approvalStatus: 'pending' | 'approved' | 'rejected'
   deportistasAsociados: number
+  consentStatus: 'Completo' | 'Parcial' | 'Sin consentimientos'
+  imageConsent: 'Aceptado' | 'No aceptado' | 'Sin registrar'
+  cardStatus: 'Tarjeta activa' | 'Tarjeta caducada' | 'No válida' | 'Sin tarjeta'
 }
 
 export type AdminTutorOption = {
@@ -376,7 +379,11 @@ async function getAdminCollections() {
     { data: sponsors },
     { data: news },
   ] = await Promise.all([
-    supabase.from('profiles').select('id, email, first_name, last_name, is_paid_member, membership_paid_at, created_at'),
+    supabase
+      .from('profiles')
+      .select(
+        'id, email, first_name, last_name, is_paid_member, membership_paid_at, stripe_payment_method_id, payment_method_exp_month, payment_method_exp_year, payment_method_saved_at, created_at',
+      ),
     supabase.from('user_roles').select('user_id, role'),
     supabase
       .from('athletes')
@@ -389,7 +396,7 @@ async function getAdminCollections() {
     supabase
       .from('consents')
       .select('id, guardian_id, athlete_id, document_id, accepted, signer_full_name, accepted_at, revoked_at'),
-    supabase.from('consent_documents').select('id, title, version'),
+    supabase.from('consent_documents').select('id, code, title, version, is_required'),
     supabase
       .from('payments')
       .select(
@@ -470,6 +477,32 @@ function mapPaymentProviderLabel(
   provider: AdminPaymentRecord['provider'],
 ): AdminPaymentRow['proveedor'] {
   return provider === 'manual' ? 'Manual' : 'Stripe'
+}
+
+function getCardStatus(profile?: {
+  stripe_payment_method_id?: string | null
+  payment_method_exp_month?: number | null
+  payment_method_exp_year?: number | null
+}): AdminTutorRow['cardStatus'] {
+  if (!profile?.stripe_payment_method_id) {
+    return 'Sin tarjeta'
+  }
+
+  const expMonth = profile.payment_method_exp_month
+  const expYear = profile.payment_method_exp_year
+
+  if (!expMonth || !expYear) {
+    return 'No válida'
+  }
+
+  const now = new Date()
+  const expiresAt = new Date(Date.UTC(expYear, expMonth, 1))
+
+  if (expiresAt <= now) {
+    return 'Tarjeta caducada'
+  }
+
+  return 'Tarjeta activa'
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
@@ -640,9 +673,16 @@ export async function getAdminUsers(): Promise<AdminUserRow[]> {
 }
 
 export async function getAdminTutors(): Promise<AdminTutorRow[]> {
-  const { profiles, guardians, athletes } = await getAdminCollections()
+  const { profiles, guardians, athletes, consents, consentDocuments } = await getAdminCollections()
   const athleteCountByGuardian = new Map<string, number>()
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
+  const requiredDocumentIds = new Set(
+    consentDocuments
+      .filter((document) => document.is_required)
+      .map((document) => document.id),
+  )
+  const imageRightsDocument = consentDocuments.find((document) => document.code === 'image_rights')
+  const consentsByGuardian = new Map<string, typeof consents>()
 
   for (const athlete of athletes) {
     if (!athlete.guardian_id) continue
@@ -652,9 +692,41 @@ export async function getAdminTutors(): Promise<AdminTutorRow[]> {
     )
   }
 
+  for (const consent of consents) {
+    const current = consentsByGuardian.get(consent.guardian_id) ?? []
+    current.push(consent)
+    consentsByGuardian.set(consent.guardian_id, current)
+  }
+
   return guardians
     .map((guardian) => {
       const profile = profileById.get(guardian.user_id)
+      const guardianConsents = consentsByGuardian.get(guardian.id) ?? []
+      const activeConsentIds = new Set(
+        guardianConsents
+          .filter((consent) => consent.accepted && !consent.revoked_at)
+          .map((consent) => consent.document_id),
+      )
+      const hasAnyConsent = guardianConsents.length > 0
+      const requiredAccepted = Array.from(requiredDocumentIds).filter((documentId) =>
+        activeConsentIds.has(documentId),
+      ).length
+      const consentStatus =
+        requiredDocumentIds.size > 0 && requiredAccepted === requiredDocumentIds.size
+          ? 'Completo'
+          : hasAnyConsent
+            ? 'Parcial'
+            : 'Sin consentimientos'
+      const imageConsentRecord = imageRightsDocument
+        ? guardianConsents.find((consent) => consent.document_id === imageRightsDocument.id)
+        : null
+      const imageConsent =
+        imageConsentRecord?.accepted && !imageConsentRecord.revoked_at
+          ? 'Aceptado'
+          : imageConsentRecord
+            ? 'No aceptado'
+            : 'Sin registrar'
+      const cardStatus = getCardStatus(profile)
 
       return {
         id: guardian.id,
@@ -668,6 +740,9 @@ export async function getAdminTutors(): Promise<AdminTutorRow[]> {
         isApproved: Boolean(guardian.is_approved),
         approvalStatus: (guardian.approval_status ?? (guardian.is_approved ? 'approved' : 'pending')) as AdminTutorRow['approvalStatus'],
         deportistasAsociados: athleteCountByGuardian.get(guardian.id) ?? 0,
+        consentStatus: consentStatus as AdminTutorRow['consentStatus'],
+        imageConsent: imageConsent as AdminTutorRow['imageConsent'],
+        cardStatus,
       }
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))

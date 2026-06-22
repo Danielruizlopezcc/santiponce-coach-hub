@@ -32,7 +32,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
   const [sortOrder, setSortOrder] = useState('1')
   const [isActive, setIsActive] = useState(true)
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [inputKey, setInputKey] = useState(String(Date.now()))
+  const [inputKey, setInputKey] = useState('initial')
 
   function openCreate() {
     setMode('create')

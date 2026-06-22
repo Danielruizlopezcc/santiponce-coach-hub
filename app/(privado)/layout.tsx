@@ -21,8 +21,9 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
     getPublicNavData(),
   ])
   const isPaymentSetupRoute = pathname.startsWith('/app/configurar-pago')
+  const isProfileRoute = pathname.startsWith('/app/perfil')
 
-  if (status.hasGuardian && !status.hasSavedPaymentMethod && !isPaymentSetupRoute) {
+  if (status.hasGuardian && !status.hasSavedPaymentMethod && !isPaymentSetupRoute && !isProfileRoute) {
     redirect('/app/configurar-pago')
   }
 

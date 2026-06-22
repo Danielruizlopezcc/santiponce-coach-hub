@@ -31,10 +31,12 @@ const basePersonSchema = z.object({
 const tutorSchema = basePersonSchema.extend({
   id: z.string().uuid().optional(),
   userId: z.string().uuid().optional(),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').optional(),
   telefono: z.string().trim().min(6, 'Introduce un teléfono.').max(30),
   documento: z.string().trim().min(3, 'Introduce DNI/NIE.').max(40),
   ciudad: z.string().trim().min(2, 'Introduce ciudad.').max(60),
   isSocio: z.coerce.boolean().optional(),
+  imageConsent: z.coerce.boolean().optional(),
 })
 
 const memberSchema = basePersonSchema.extend({
@@ -66,7 +68,7 @@ function toDueDate(startMonth: string, chargeDay: number, offsetMonths: number) 
   return date.toISOString().slice(0, 10)
 }
 
-async function createAuthProfile(values: z.infer<typeof basePersonSchema>) {
+async function createAuthProfile(values: z.infer<typeof basePersonSchema>, password?: string) {
   const supabase = createAdminClient()
   const email = normalizeEmail(values.email)
   const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle()
@@ -74,7 +76,7 @@ async function createAuthProfile(values: z.infer<typeof basePersonSchema>) {
 
   const { data, error } = await supabase.auth.admin.createUser({
     email,
-    password: crypto.randomUUID(),
+    password: password ?? crypto.randomUUID(),
     email_confirm: true,
     user_metadata: {
       first_name: values.nombre,
@@ -112,6 +114,8 @@ export async function createTutorAction(
     documento: formData.get('documento'),
     ciudad: formData.get('ciudad'),
     isSocio: formData.get('isSocio') === 'on',
+    password: formData.get('password') || undefined,
+    imageConsent: formData.get('imageConsent') === 'on',
   })
 
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Revisa los datos.' }
@@ -158,23 +162,53 @@ export async function createTutorAction(
       return { ok: true, message: 'Tutor actualizado correctamente.' }
     }
 
-    const userId = await createAuthProfile(values)
-    const { error } = await supabase.from('guardians').insert({
-      user_id: userId,
-      first_name: values.nombre,
-      last_name: values.apellidos,
-      phone: normalizePhone(values.telefono),
-      document_id: normalizeDocument(values.documento),
-      address_line: 'Pendiente',
-      postal_code: '41970',
-      province: 'Sevilla',
-      city: values.ciudad,
-      country: 'España',
-      payment_preference: 'cuotas',
-      is_approved: true,
-      approval_status: 'approved',
-    })
-    if (error) throw new Error(error.message)
+    if (!values.password) {
+      return { ok: false, message: 'Introduce una contraseña para la cuenta del tutor.' }
+    }
+
+    const userId = await createAuthProfile(values, values.password)
+    const { data: guardian, error } = await supabase
+      .from('guardians')
+      .insert({
+        user_id: userId,
+        first_name: values.nombre,
+        last_name: values.apellidos,
+        phone: normalizePhone(values.telefono),
+        document_id: normalizeDocument(values.documento),
+        address_line: 'Pendiente',
+        postal_code: '41970',
+        province: 'Sevilla',
+        city: values.ciudad,
+        country: 'España',
+        payment_preference: 'cuotas',
+        is_approved: true,
+        approval_status: 'approved',
+      })
+      .select('id')
+      .single()
+    if (error || !guardian) throw new Error(error?.message ?? 'No se ha podido crear el tutor.')
+
+    const { data: consentDocuments, error: consentDocumentsError } = await supabase
+      .from('consent_documents')
+      .select('id, code, is_required')
+      .or('is_required.eq.true,code.eq.image_rights')
+    if (consentDocumentsError) throw new Error(consentDocumentsError.message)
+
+    const signerName = `${values.nombre} ${values.apellidos}`.trim()
+    const signerDocument = normalizeDocument(values.documento)
+    const consentRows = (consentDocuments ?? []).map((document) => ({
+      guardian_id: guardian.id,
+      athlete_id: null,
+      document_id: document.id,
+      accepted: document.code === 'image_rights' ? Boolean(values.imageConsent) : true,
+      signer_full_name: signerName,
+      signer_document_id: signerDocument,
+    }))
+
+    if (consentRows.length > 0) {
+      const { error: consentsError } = await supabase.from('consents').insert(consentRows)
+      if (consentsError) throw new Error(consentsError.message)
+    }
 
     if (values.isSocio) {
       await setUserMembership(userId, true)
