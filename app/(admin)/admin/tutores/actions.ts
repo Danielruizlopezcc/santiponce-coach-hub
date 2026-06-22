@@ -5,6 +5,12 @@ import { z } from 'zod'
 import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeDocument, normalizeEmail, normalizePhone } from '@/lib/private-app-shared'
+import {
+  cancelTutorFeeStripeSchedule,
+  createTutorFeeStripeSchedule,
+  validateFirstDueDate,
+  type TutorFeeChargeDraft,
+} from '@/lib/tutor-fee-billing'
 
 export type TutorSocioActionState = {
   ok: boolean
@@ -315,7 +321,7 @@ export async function assignTutorFeeAction(
   const values = parsed.data
   const { data: fee, error: feeError } = await supabase
     .from('admin_fee_templates')
-    .select('id, total_amount_cents, split_payment, charge_frequency, charge_count')
+    .select('id, name, fee_type, total_amount_cents, currency, split_payment, charge_frequency, charge_count, stripe_product_id')
     .eq('id', values.feeTemplateId)
     .maybeSingle()
 
@@ -326,6 +332,26 @@ export async function assignTutorFeeAction(
   const totalCharges = fee.split_payment ? Number(fee.charge_count ?? 0) : 1
   if (totalCharges < 1) {
     return { ok: false, message: 'La cuota no tiene una configuración de cargos válida.' }
+  }
+
+  const frequencyMonths = fee.split_payment ? getFrequencyMonths(fee.charge_frequency) : 1
+  const baseAmount = Math.floor(fee.total_amount_cents / totalCharges)
+  const remainder = fee.total_amount_cents % totalCharges
+  const charges = Array.from({ length: totalCharges }, (_, index) => ({
+    assignment_id: '',
+    guardian_id: values.guardianId,
+    fee_template_id: values.feeTemplateId,
+    charge_number: index + 1,
+    due_date: toDueDate(values.startMonth, values.chargeDay, index * frequencyMonths),
+    amount_cents: baseAmount + (index < remainder ? 1 : 0),
+    currency: 'eur',
+    status: 'scheduled',
+  }))
+
+  try {
+    validateFirstDueDate(charges[0].due_date)
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Revisa la fecha del primer cobro.' }
   }
 
   const { data: assignment, error: assignmentError } = await supabase
@@ -345,29 +371,47 @@ export async function assignTutorFeeAction(
     return { ok: false, message: assignmentError?.message ?? 'No se ha podido asignar la cuota.' }
   }
 
-  const frequencyMonths = fee.split_payment ? getFrequencyMonths(fee.charge_frequency) : 0
-  const baseAmount = Math.floor(fee.total_amount_cents / totalCharges)
-  const remainder = fee.total_amount_cents % totalCharges
-  const charges = Array.from({ length: totalCharges }, (_, index) => ({
+  const chargePayload = charges.map((charge) => ({
+    ...charge,
     assignment_id: assignment.id,
-    guardian_id: values.guardianId,
-    fee_template_id: values.feeTemplateId,
-    charge_number: index + 1,
-    due_date: toDueDate(values.startMonth, values.chargeDay, index * frequencyMonths),
-    amount_cents: baseAmount + (index < remainder ? 1 : 0),
-    currency: 'eur',
-    status: 'scheduled',
   }))
 
-  const { error: chargesError } = await supabase.from('tutor_fee_charges').insert(charges)
-  if (chargesError) {
+  const { data: createdCharges, error: chargesError } = await supabase
+    .from('tutor_fee_charges')
+    .insert(chargePayload)
+    .select('id, amount_cents, due_date, charge_number')
+
+  if (chargesError || !createdCharges) {
     await supabase.from('tutor_fee_assignments').delete().eq('id', assignment.id)
-    return { ok: false, message: chargesError.message }
+    return { ok: false, message: chargesError?.message ?? 'No se han podido crear los cargos.' }
+  }
+
+  try {
+    const schedule = await createTutorFeeStripeSchedule({
+      assignmentId: assignment.id,
+      guardianId: values.guardianId,
+      fee,
+      charges: createdCharges as TutorFeeChargeDraft[],
+      frequencyMonths,
+    })
+
+    const { error: scheduleError } = await supabase
+      .from('tutor_fee_assignments')
+      .update({ stripe_subscription_schedule_id: schedule.id })
+      .eq('id', assignment.id)
+
+    if (scheduleError) throw new Error(scheduleError.message)
+  } catch (error) {
+    await supabase.from('tutor_fee_assignments').delete().eq('id', assignment.id)
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'No se ha podido programar la cuota en Stripe.',
+    }
   }
 
   revalidatePath('/admin/tutores')
   revalidatePath('/admin/pagos')
-  return { ok: true, message: 'Cuota asignada y cargos programados correctamente.' }
+  return { ok: true, message: 'Cuota asignada y cobros programados en Stripe correctamente.' }
 }
 
 export async function cancelTutorFeeAssignmentAction(assignmentId: string): Promise<TutorSocioActionState> {
@@ -378,24 +422,36 @@ export async function cancelTutorFeeAssignmentAction(assignmentId: string): Prom
   }
 
   const supabase = createAdminClient()
-  const { error: assignmentError } = await supabase
+  const { data: assignment, error: findError } = await supabase
     .from('tutor_fee_assignments')
-    .update({ status: 'canceled' })
+    .select('stripe_subscription_schedule_id, stripe_subscription_id')
+    .eq('id', parsed.data)
+    .maybeSingle()
+
+  if (findError) return { ok: false, message: findError.message }
+
+  try {
+    await cancelTutorFeeStripeSchedule({
+      scheduleId: assignment?.stripe_subscription_schedule_id ?? null,
+      subscriptionId: assignment?.stripe_subscription_id ?? null,
+    })
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'No se ha podido cancelar la programación en Stripe.',
+    }
+  }
+
+  const { error } = await supabase
+    .from('tutor_fee_assignments')
+    .delete()
     .eq('id', parsed.data)
 
-  if (assignmentError) return { ok: false, message: assignmentError.message }
-
-  const { error: chargesError } = await supabase
-    .from('tutor_fee_charges')
-    .update({ status: 'canceled' })
-    .eq('assignment_id', parsed.data)
-    .eq('status', 'scheduled')
-
-  if (chargesError) return { ok: false, message: chargesError.message }
+  if (error) return { ok: false, message: error.message }
 
   revalidatePath('/admin/tutores')
   revalidatePath('/admin/pagos')
-  return { ok: true, message: 'Cuota asignada cancelada correctamente.' }
+  return { ok: true, message: 'Cuota asignada eliminada correctamente.' }
 }
 
 async function setUserMembership(userId: string, isSocio: boolean) {

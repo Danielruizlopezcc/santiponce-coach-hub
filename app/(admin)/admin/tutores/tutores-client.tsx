@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { CreditCard, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +48,7 @@ function FormMessage({ state }: { state: TutorSocioActionState }) {
 }
 
 export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignments }: Props) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'tutores' | 'socios' | 'pendientes' | 'rechazados'>('tutores')
   const [tutorSearch, setTutorSearch] = useState('')
   const [memberSearch, setMemberSearch] = useState('')
@@ -151,6 +153,7 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
     startTransition(async () => {
       const result = await cancelTutorFeeAssignmentAction(assignmentId)
       setToggleMessage(result)
+      if (result.ok) router.refresh()
     })
   }
 
@@ -161,7 +164,7 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
           { id: 'tutores', label: 'Tutores' },
           { id: 'socios', label: 'Socios' },
           { id: 'pendientes', label: `Tutores pendientes${pendingTutors.length ? ` (${pendingTutors.length})` : ''}` },
-          { id: 'rechazados', label: `Tutores rechazados${rejectedTutors.length ? ` (${rejectedTutors.length})` : ''}` },
+          { id: 'rechazados', label: 'Tutores rechazados' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -323,21 +326,15 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                             <span className="text-xs font-semibold text-muted-foreground">
                               Próximo cargo: {assignment.nextChargeDate}
                             </span>
-                            {assignment.status === 'active' ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleCancelFeeAssignment(assignment.id)}
-                                disabled={isPending}
-                              >
-                                Cancelar
-                              </Button>
-                            ) : (
-                              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-black text-muted-foreground">
-                                Cancelada
-                              </span>
-                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCancelFeeAssignment(assignment.id)}
+                              disabled={isPending}
+                            >
+                              Cancelar
+                            </Button>
                           </div>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">

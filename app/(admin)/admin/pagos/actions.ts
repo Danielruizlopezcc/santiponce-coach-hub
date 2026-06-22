@@ -22,6 +22,18 @@ const financeMovementSchema = z.object({
   }),
   concepto: z.string().trim().min(2, 'Escribe un concepto.').max(120, 'El concepto es demasiado largo.'),
   detalle: z.string().trim().max(500, 'El detalle es demasiado largo.').optional(),
+  categoria: z.string().trim().min(2, 'Selecciona una categoría.').max(80),
+  metodoPago: z.enum(['cash', 'transfer', 'bizum', 'card', 'stripe', 'other'], {
+    message: 'Selecciona un método de pago.',
+  }),
+  estado: z.enum(['confirmed', 'pending', 'void'], {
+    message: 'Selecciona un estado.',
+  }),
+  seasonId: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().uuid().optional(),
+  ),
+  justificanteUrl: z.string().trim().url('El justificante debe ser una URL válida.').optional().or(z.literal('')),
   importe: z.coerce
     .number({ message: 'Introduce un importe válido.' })
     .positive('El importe debe ser mayor que cero.')
@@ -59,6 +71,11 @@ export async function createFinanceMovementAction(
     tipo: formData.get('tipo'),
     concepto: formData.get('concepto'),
     detalle: formData.get('detalle'),
+    categoria: formData.get('categoria'),
+    metodoPago: formData.get('metodoPago'),
+    estado: formData.get('estado'),
+    seasonId: formData.get('seasonId'),
+    justificanteUrl: formData.get('justificanteUrl'),
     importe: formData.get('importe'),
   })
 
@@ -70,11 +87,16 @@ export async function createFinanceMovementAction(
   }
 
   const supabase = createAdminClient()
-  const { id, tipo, concepto, detalle, importe } = parsed.data
+  const { id, tipo, concepto, detalle, categoria, metodoPago, estado, seasonId, justificanteUrl, importe } = parsed.data
   const payload = {
     movement_type: tipo === 'ingreso' ? 'income' : 'expense',
     concept: concepto,
     detail: detalle || null,
+    category: categoria,
+    payment_method: metodoPago,
+    status: estado,
+    season_id: seasonId ?? null,
+    receipt_url: justificanteUrl || null,
     amount_cents: Math.round(importe * 100),
     currency: 'eur',
   }

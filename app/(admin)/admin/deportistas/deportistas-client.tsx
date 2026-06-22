@@ -24,6 +24,7 @@ type Props = {
 }
 
 type Draft = {
+  guardianId: string
   categoryId: string
   assignedTeamId: string
   seasonId: string
@@ -92,6 +93,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
     setDeleteId(null)
     setEditId(athlete.id)
     setDraft({
+      guardianId: athlete.guardianId ?? '',
       categoryId: athlete.categoriaSolicitadaId,
       assignedTeamId: athlete.assignedTeamId ?? '',
       seasonId: athlete.seasonId,
@@ -106,6 +108,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
       try {
         await updateAthleteAdminAction({
           athleteId: athlete.id,
+          guardianId: draft.guardianId || null,
           categoryId: draft.categoryId,
           assignedTeamId: draft.assignedTeamId || null,
           seasonId: draft.seasonId,
@@ -272,7 +275,22 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
               return (
                 <tr key={athlete.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
                   <td className="px-4 py-3 font-medium">{athlete.nombre}</td>
-                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{athlete.tutor}</td>
+                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
+                    {isEditing && draft ? (
+                      <select
+                        value={draft.guardianId}
+                        onChange={(event) => setDraft((prev) => prev && { ...prev, guardianId: event.target.value })}
+                        className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-foreground"
+                      >
+                        <option value="">Sin tutor</option>
+                        {tutors.map((tutor) => (
+                          <option key={tutor.id} value={tutor.id}>
+                            {tutor.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    ) : athlete.tutor}
+                  </td>
                   <td className="px-4 py-3">
                     {isEditing && draft ? (
                       <select value={draft.categoryId} onChange={(event) => setDraft((prev) => prev && { ...prev, categoryId: event.target.value })} className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm">

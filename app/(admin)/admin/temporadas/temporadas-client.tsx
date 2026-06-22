@@ -1,18 +1,25 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Pencil, Search, Trash2, X } from 'lucide-react'
+import { Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { AdminSeasonRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
-import { deleteSeasonAction, updateSeasonAction } from './actions'
+import { createSeasonAction, deleteSeasonAction, updateSeasonAction } from './actions'
 
 export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
   const [search, setSearch] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState({
+    nombre: '',
+    startsAt: '',
+    endsAt: '',
+    isActive: false,
+  })
+  const [createForm, setCreateForm] = useState({
     nombre: '',
     startsAt: '',
     endsAt: '',
@@ -29,6 +36,7 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
     : seasons
 
   function openEdit(season: AdminSeasonRow) {
+    setShowCreate(false)
     setDeleteId(null)
     setEditId(season.id)
     setForm({
@@ -36,6 +44,24 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
       startsAt: season.startsAt,
       endsAt: season.endsAt,
       isActive: season.isActive,
+    })
+  }
+
+  function handleCreate() {
+    setError(null)
+    startTransition(async () => {
+      try {
+        await createSeasonAction(createForm)
+        setCreateForm({
+          nombre: '',
+          startsAt: '',
+          endsAt: '',
+          isActive: false,
+        })
+        setShowCreate(false)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se ha podido crear la temporada.')
+      }
     })
   }
 
@@ -65,11 +91,84 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {seasons.length} temporadas
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            {seasons.length} temporadas
+          </span>
+        </div>
+        <Button
+          type="button"
+          onClick={() => {
+            setEditId(null)
+            setDeleteId(null)
+            setShowCreate((current) => !current)
+          }}
+        >
+          {showCreate ? <X className="size-4" /> : <Plus className="size-4" />}
+          {showCreate ? 'Cerrar' : 'Añadir temporada'}
+        </Button>
       </div>
+
+      {showCreate ? (
+        <div className="rounded-xl bg-white/82 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+          <div className="mb-3">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Nueva temporada</p>
+            <h3 className="mt-1 text-lg font-black text-foreground">Crear temporada</h3>
+          </div>
+          <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end">
+            <div>
+              <label className="text-sm font-black text-foreground" htmlFor="new-season-name">
+                Nombre
+              </label>
+              <Input
+                id="new-season-name"
+                value={createForm.nombre}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, nombre: event.target.value }))}
+                placeholder="Temporada 2027/2028"
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-black text-foreground" htmlFor="new-season-start">
+                Fecha inicio
+              </label>
+              <Input
+                id="new-season-start"
+                type="date"
+                value={createForm.startsAt}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, startsAt: event.target.value }))}
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-black text-foreground" htmlFor="new-season-end">
+                Fecha fin
+              </label>
+              <Input
+                id="new-season-end"
+                type="date"
+                value={createForm.endsAt}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, endsAt: event.target.value }))}
+                className="mt-2"
+              />
+            </div>
+            <Button type="button" onClick={handleCreate} disabled={isPending}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              Crear
+            </Button>
+          </div>
+          <label className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              checked={createForm.isActive}
+              onChange={(event) => setCreateForm((prev) => ({ ...prev, isActive: event.target.checked }))}
+              className="size-4"
+            />
+            Marcar como temporada activa
+          </label>
+        </div>
+      ) : null}
 
       <div className="flex gap-2">
         <div className="relative flex-1">

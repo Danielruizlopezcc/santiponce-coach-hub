@@ -98,6 +98,7 @@ export type AdminMemberRow = {
 export type AdminAthleteRow = {
   id: string
   nombre: string
+  guardianId: string | null
   tutor: string
   categoriaSolicitadaId: string
   categoriaSolicitada: string
@@ -185,6 +186,12 @@ export type AdminFinanceMovementRow = {
   tipo: 'ingreso' | 'gasto'
   concepto: string
   detalle: string
+  categoria: string
+  metodoPago: 'cash' | 'transfer' | 'bizum' | 'card' | 'stripe' | 'other'
+  estado: 'confirmed' | 'pending' | 'void'
+  seasonId: string | null
+  temporada: string
+  justificanteUrl: string
   importe: number
   fecha: string
 }
@@ -303,6 +310,11 @@ type AdminFinanceMovementRecord = {
   movement_type: 'income' | 'expense'
   concept: string
   detail: string | null
+  category: string | null
+  payment_method: 'cash' | 'transfer' | 'bizum' | 'card' | 'stripe' | 'other'
+  status: 'confirmed' | 'pending' | 'void'
+  season_id: string | null
+  receipt_url: string | null
   amount_cents: number
   recorded_at: string
 }
@@ -681,6 +693,7 @@ export async function getAdminTutorOptions(): Promise<AdminTutorOption[]> {
   const { guardians } = await getAdminCollections()
 
   return guardians
+    .filter((guardian) => (guardian.approval_status ?? (guardian.is_approved ? 'approved' : 'pending')) === 'approved')
     .map((guardian) => ({
       id: guardian.id,
       nombre: `${guardian.first_name} ${guardian.last_name}`.trim(),
@@ -700,6 +713,7 @@ export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
     .map((athlete) => ({
       id: athlete.id,
       nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
+      guardianId: athlete.guardian_id ?? null,
       tutor: athlete.guardian_id ? guardianById.get(athlete.guardian_id)?.name ?? 'Tutor no disponible' : 'Sin tutor',
       categoriaSolicitadaId: athlete.requested_category_id,
       categoriaSolicitada:
@@ -976,17 +990,28 @@ export async function getAdminPayments(): Promise<AdminPaymentRow[]> {
 
 export async function getAdminFinanceMovements(): Promise<AdminFinanceMovementRow[]> {
   const supabase = await createClient()
-  const { data } = await supabase
+  const [{ data }, { data: seasons }] = await Promise.all([
+    supabase
     .from('admin_finance_movements')
-    .select('id, movement_type, concept, detail, amount_cents, recorded_at')
+      .select('id, movement_type, concept, detail, category, payment_method, status, season_id, receipt_url, amount_cents, recorded_at')
     .order('recorded_at', { ascending: false })
-    .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }),
+    supabase.from('seasons').select('id, name'),
+  ])
+
+  const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
 
   return ((data ?? []) as AdminFinanceMovementRecord[]).map((movement) => ({
     id: movement.id,
     tipo: movement.movement_type === 'income' ? 'ingreso' : 'gasto',
     concepto: movement.concept,
     detalle: movement.detail ?? '',
+    categoria: movement.category ?? 'Sin categoría',
+    metodoPago: movement.payment_method ?? 'cash',
+    estado: movement.status ?? 'confirmed',
+    seasonId: movement.season_id,
+    temporada: movement.season_id ? seasonById.get(movement.season_id) ?? 'Temporada no disponible' : 'Sin temporada',
+    justificanteUrl: movement.receipt_url ?? '',
     importe: movement.amount_cents / 100,
     fecha: formatSpanishDateTime(movement.recorded_at),
   }))
@@ -1018,6 +1043,7 @@ export async function getAdminTutorFeeAssignments(): Promise<AdminTutorFeeAssign
     supabase
       .from('tutor_fee_assignments')
       .select('id, guardian_id, fee_template_id, charge_day, start_month, status, created_at')
+      .neq('status', 'canceled')
       .order('created_at', { ascending: false }),
     supabase
       .from('admin_fee_templates')

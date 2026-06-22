@@ -1,13 +1,22 @@
 import { PageContainer } from '@/components/page-container'
-import { getAdminEnrollments, getAdminFeeTemplates, getAdminFinanceMovements, getAdminPayments } from '@/lib/admin-app'
+import {
+  getAdminEnrollments,
+  getAdminFeeTemplates,
+  getAdminFinanceMovements,
+  getAdminPayments,
+  getAdminSeasons,
+  getAdminTutorFeeAssignments,
+} from '@/lib/admin-app'
 import { AdminPaymentsClient } from './payments-client'
 
 export default async function AdminPagosPage() {
-  const [payments, financeMovements, enrollments, feeTemplates] = await Promise.all([
+  const [payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments] = await Promise.all([
     getAdminPayments(),
     getAdminFinanceMovements(),
     getAdminEnrollments(),
     getAdminFeeTemplates(),
+    getAdminSeasons(),
+    getAdminTutorFeeAssignments(),
   ])
 
   return (
@@ -21,6 +30,8 @@ export default async function AdminPagosPage() {
         financeMovements={financeMovements}
         enrollments={enrollments}
         feeTemplates={feeTemplates}
+        seasons={seasons}
+        feeAssignments={feeAssignments}
       />
     </PageContainer>
   )

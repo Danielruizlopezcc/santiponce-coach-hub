@@ -80,6 +80,7 @@ export async function updateAthleteRequestedCategoryAction(
 
 export async function updateAthleteAdminAction(input: {
   athleteId: string
+  guardianId: string | null
   categoryId: string
   assignedTeamId: string | null
   seasonId: string
@@ -90,6 +91,7 @@ export async function updateAthleteAdminAction(input: {
   const { error } = await supabase
     .from('athletes')
     .update({
+      guardian_id: input.guardianId,
       requested_category_id: input.categoryId,
       assigned_team_id: input.assignedTeamId,
       season_id: input.seasonId,

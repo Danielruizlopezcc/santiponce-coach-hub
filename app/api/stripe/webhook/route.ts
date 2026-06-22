@@ -4,6 +4,11 @@ import { confirmStripeSetupSessionPaymentMethod } from '@/lib/payment-method-con
 import { confirmStripeCheckoutSessionPayment } from '@/lib/payment-confirmation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripeClient, getStripeWebhookSecret } from '@/lib/stripe'
+import {
+  confirmTutorFeeInvoiceFailed,
+  confirmTutorFeeInvoicePaid,
+  syncTutorFeeSubscription,
+} from '@/lib/tutor-fee-billing'
 
 export async function POST(request: Request) {
   const signature = request.headers.get('stripe-signature')
@@ -69,6 +74,24 @@ export async function POST(request: Request) {
     revalidatePath('/app/perfil')
     revalidatePath('/admin')
     revalidatePath('/admin/matriculas')
+    revalidatePath('/admin/pagos')
+  }
+
+  if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
+    await syncTutorFeeSubscription(event.data.object)
+    revalidatePath('/admin/tutores')
+    revalidatePath('/admin/pagos')
+  }
+
+  if (event.type === 'invoice.paid') {
+    await confirmTutorFeeInvoicePaid(event.data.object)
+    revalidatePath('/admin/tutores')
+    revalidatePath('/admin/pagos')
+  }
+
+  if (event.type === 'invoice.payment_failed') {
+    await confirmTutorFeeInvoiceFailed(event.data.object)
+    revalidatePath('/admin/tutores')
     revalidatePath('/admin/pagos')
   }
 

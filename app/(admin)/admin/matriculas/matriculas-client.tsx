@@ -29,6 +29,9 @@ type MatriculasClientProps = {
 export function MatriculasClient({ enrollments, embedded = false }: MatriculasClientProps) {
   const [isPending, startTransition] = useTransition()
   const [search, setSearch]                   = useState('')
+  const [statusFilter, setStatusFilter]       = useState<'todos' | AdminEnrollmentRow['estadoMatricula']>('todos')
+  const [paymentFilter, setPaymentFilter]     = useState<'todos' | AdminEnrollmentRow['estadoPago']>('todos')
+  const [seasonFilter, setSeasonFilter]       = useState('todos')
   const [confirmId, setConfirmId]             = useState<string | null>(null)
   const [rejectId, setRejectId]               = useState<string | null>(null)
   const [editId, setEditId]                   = useState<string | null>(null)
@@ -36,16 +39,21 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
   const [editStatus, setEditStatus]           = useState<'pendiente' | 'matriculado' | 'en_revision'>('pendiente')
   const [actionError, setActionError]         = useState<string | null>(null)
 
-  const filtered = search.trim()
-    ? enrollments.filter((e) => {
-        const q = search.toLowerCase()
-        return (
-          e.deportista.toLowerCase().includes(q) ||
-          e.tutor.toLowerCase().includes(q) ||
-          e.temporada.toLowerCase().includes(q)
-        )
-      })
-    : enrollments
+  const seasons = Array.from(new Set(enrollments.map((enrollment) => enrollment.temporada))).sort((a, b) => a.localeCompare(b, 'es'))
+  const hasFilters = Boolean(search.trim()) || statusFilter !== 'todos' || paymentFilter !== 'todos' || seasonFilter !== 'todos'
+  const filtered = enrollments.filter((e) => {
+    if (statusFilter !== 'todos' && e.estadoMatricula !== statusFilter) return false
+    if (paymentFilter !== 'todos' && e.estadoPago !== paymentFilter) return false
+    if (seasonFilter !== 'todos' && e.temporada !== seasonFilter) return false
+
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+
+    return [e.deportista, e.tutor, e.temporada, e.estadoMatricula, e.estadoPago, formatEuro(e.importe)]
+      .join(' ')
+      .toLowerCase()
+      .includes(q)
+  })
 
   const enRevision = enrollments.filter((e) => e.estadoMatricula === 'En revisión').length
   const matriculados = enrollments.filter((e) => e.estadoMatricula === 'Matriculado').length
@@ -131,27 +139,73 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
         )}
       </div>
 
-      {/* ── Buscador ────────────────────────────────────────────── */}
-      <div className="mb-4 flex gap-2">
-        <div className="relative flex-1">
-          <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            type="search"
-            placeholder="Buscar por deportista, tutor o temporada…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      {/* ── Buscador y filtros ──────────────────────────────────── */}
+      <div className="mb-4 space-y-3 rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              type="search"
+              placeholder="Buscar por deportista, tutor, temporada, estado o importe..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {hasFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearch('')
+                setStatusFilter('todos')
+                setPaymentFilter('todos')
+                setSeasonFilter('todos')
+              }}
+              className="gap-1.5 text-muted-foreground"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              Limpiar
+            </Button>
+          )}
         </div>
-        {search && (
-          <Button variant="outline" size="sm" onClick={() => setSearch('')} className="gap-1.5 text-muted-foreground">
-            <X className="size-3.5" aria-hidden="true" />
-            Limpiar
-          </Button>
-        )}
+
+        <div className="grid gap-2 md:grid-cols-3">
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+            className="h-9 rounded-lg border border-input bg-white px-3 text-sm"
+          >
+            <option value="todos">Todos los estados</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="En revisión">En revisión</option>
+            <option value="Matriculado">Matriculado</option>
+          </select>
+          <select
+            value={paymentFilter}
+            onChange={(event) => setPaymentFilter(event.target.value as typeof paymentFilter)}
+            className="h-9 rounded-lg border border-input bg-white px-3 text-sm"
+          >
+            <option value="todos">Todos los pagos</option>
+            <option value="Pendiente">Pago pendiente</option>
+            <option value="Pagado">Pago pagado</option>
+          </select>
+          <select
+            value={seasonFilter}
+            onChange={(event) => setSeasonFilter(event.target.value)}
+            className="h-9 rounded-lg border border-input bg-white px-3 text-sm"
+          >
+            <option value="todos">Todas las temporadas</option>
+            {seasons.map((season) => (
+              <option key={season} value={season}>
+                {season}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {actionError && (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
-import { CreditCard, Download, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
+import { BarChart3, CreditCard, Download, FileText, Landmark, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
 import {
   AdminTable,
   type AdminTableRow,
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatEuro } from '@/lib/format'
-import type { AdminEnrollmentRow, AdminFeeTemplateRow, AdminFinanceMovementRow, AdminPaymentRow } from '@/lib/admin-app'
+import type { AdminEnrollmentRow, AdminFeeTemplateRow, AdminFinanceMovementRow, AdminPaymentRow, AdminSeasonRow, AdminTutorFeeAssignmentRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import { MatriculasClient } from '../matriculas/matriculas-client'
 import {
@@ -28,6 +28,8 @@ type AdminPaymentsClientProps = {
   financeMovements: AdminFinanceMovementRow[]
   enrollments: AdminEnrollmentRow[]
   feeTemplates: AdminFeeTemplateRow[]
+  seasons: AdminSeasonRow[]
+  feeAssignments: AdminTutorFeeAssignmentRow[]
 }
 
 const columns: Column[] = [
@@ -182,13 +184,56 @@ const initialFeeState: FeeTemplateActionState = {
   message: '',
 }
 
-export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates }: AdminPaymentsClientProps) {
+const INCOME_CATEGORIES = ['Socios', 'Matrículas', 'Cuotas deportivas', 'Patrocinadores', 'Lotería / eventos', 'Subvenciones', 'Otros']
+const EXPENSE_CATEGORIES = ['Material deportivo', 'Árbitros', 'Federación', 'Equipaciones', 'Instalaciones', 'Transporte', 'Administración', 'Otros']
+const METHOD_LABELS: Record<AdminFinanceMovementRow['metodoPago'], string> = {
+  cash: 'Efectivo',
+  transfer: 'Transferencia',
+  bizum: 'Bizum',
+  card: 'Tarjeta',
+  stripe: 'Stripe',
+  other: 'Otro',
+}
+const MOVEMENT_STATUS_LABELS: Record<AdminFinanceMovementRow['estado'], string> = {
+  confirmed: 'Confirmado',
+  pending: 'Pendiente',
+  void: 'Anulado',
+}
+const MOVEMENT_STATUS_STYLES: Record<AdminFinanceMovementRow['estado'], string> = {
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  pending: 'bg-amber-100 text-amber-700',
+  void: 'bg-slate-100 text-slate-600',
+}
+
+function getMovementCategories(type: 'ingreso' | 'gasto') {
+  return type === 'ingreso' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+}
+
+function sumMovements(movements: AdminFinanceMovementRow[]) {
+  return movements
+    .filter((movement) => movement.estado === 'confirmed')
+    .reduce((sum, movement) => sum + movement.importe, 0)
+}
+
+export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments }: AdminPaymentsClientProps) {
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'movimientos'>('resumen')
+  const [activeTab, setActiveTab] = useState<'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'pendientes' | 'ingresos' | 'gastos' | 'informes'>('resumen')
   const [editingMovement, setEditingMovement] = useState<AdminFinanceMovementRow | null>(null)
+  const [movementFormType, setMovementFormType] = useState<'ingreso' | 'gasto'>('ingreso')
   const [splitFee, setSplitFee] = useState(false)
   const [movementSearch, setMovementSearch] = useState('')
-  const [movementTypeFilter, setMovementTypeFilter] = useState<'todos' | 'ingreso' | 'gasto'>('todos')
+  const [movementCategoryFilter, setMovementCategoryFilter] = useState('todos')
+  const [movementMethodFilter, setMovementMethodFilter] = useState<'todos' | AdminFinanceMovementRow['metodoPago']>('todos')
+  const [movementStatusFilter, setMovementStatusFilter] = useState<'todos' | AdminFinanceMovementRow['estado']>('todos')
+  const [movementSeasonFilter, setMovementSeasonFilter] = useState('todos')
+  const [feeSearch, setFeeSearch] = useState('')
+  const [feeTypeFilter, setFeeTypeFilter] = useState('todos')
+  const [feeVisibilityFilter, setFeeVisibilityFilter] = useState<'todos' | 'publica' | 'privada'>('todos')
+  const [feeSplitFilter, setFeeSplitFilter] = useState<'todos' | 'unico' | 'repartido'>('todos')
+  const [pendingSearch, setPendingSearch] = useState('')
+  const [pendingStatusFilter, setPendingStatusFilter] = useState<'todos' | 'pendiente' | 'fallido' | 'programada'>('todos')
+  const [reportSearch, setReportSearch] = useState('')
+  const [reportSeasonFilter, setReportSeasonFilter] = useState('todos')
   const [confirmDeleteMovementId, setConfirmDeleteMovementId] = useState<string | null>(null)
   const [deletePendingId, setDeletePendingId] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<FinanceMovementActionState | null>(null)
@@ -205,12 +250,12 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
     const pending = payments.filter((payment) => payment.estado === 'pendiente')
     const failed = payments.filter((payment) => payment.estado === 'fallido')
     const refunded = payments.filter((payment) => payment.estado === 'reembolsado')
-    const manualIncomes = financeMovements.filter((movement) => movement.tipo === 'ingreso')
-    const manualExpenses = financeMovements.filter((movement) => movement.tipo === 'gasto')
+    const manualIncomes = financeMovements.filter((movement) => movement.tipo === 'ingreso' && movement.estado === 'confirmed')
+    const manualExpenses = financeMovements.filter((movement) => movement.tipo === 'gasto' && movement.estado === 'confirmed')
     const paidTotal = paid.reduce((sum, payment) => sum + payment.importe, 0)
     const pendingTotal = pending.reduce((sum, payment) => sum + payment.importe, 0)
-    const manualIncomeTotal = manualIncomes.reduce((sum, movement) => sum + movement.importe, 0)
-    const manualExpenseTotal = manualExpenses.reduce((sum, movement) => sum + movement.importe, 0)
+    const manualIncomeTotal = sumMovements(manualIncomes)
+    const manualExpenseTotal = sumMovements(manualExpenses)
     const confirmedIncomeTotal = paidTotal + manualIncomeTotal
     const balance = confirmedIncomeTotal - manualExpenseTotal
     const membershipTotal = paid
@@ -221,6 +266,9 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
       .reduce((sum, payment) => sum + payment.importe, 0)
     const stripeCount = payments.filter((payment) => payment.proveedor === 'Stripe').length
     const manualCount = payments.filter((payment) => payment.proveedor === 'Manual').length
+    const cashTotal = sumMovements(financeMovements.filter((movement) => movement.metodoPago === 'cash'))
+    const bankTotal = sumMovements(financeMovements.filter((movement) => ['transfer', 'bizum', 'card'].includes(movement.metodoPago)))
+    const stripeTotal = paid.filter((payment) => payment.proveedor === 'Stripe').reduce((sum, payment) => sum + payment.importe, 0)
 
     return {
       paid,
@@ -239,6 +287,9 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
       enrollmentTotal,
       stripeCount,
       manualCount,
+      cashTotal,
+      bankTotal,
+      stripeTotal,
       averagePaid: paid.length + manualIncomes.length > 0 ? confirmedIncomeTotal / (paid.length + manualIncomes.length) : 0,
     }
   }, [payments, financeMovements])
@@ -255,8 +306,8 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   const movementSummary = useMemo(() => {
     const incomes = financeMovements.filter((movement) => movement.tipo === 'ingreso')
     const expenses = financeMovements.filter((movement) => movement.tipo === 'gasto')
-    const incomeTotal = incomes.reduce((sum, movement) => sum + movement.importe, 0)
-    const expenseTotal = expenses.reduce((sum, movement) => sum + movement.importe, 0)
+    const incomeTotal = sumMovements(incomes)
+    const expenseTotal = sumMovements(expenses)
 
     return {
       incomes,
@@ -269,14 +320,23 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
   const visibleMovements = useMemo(() => {
     const q = movementSearch.trim().toLowerCase()
+    const expectedType = activeTab === 'gastos' ? 'gasto' : 'ingreso'
     return financeMovements.filter((movement) => {
-      if (movementTypeFilter !== 'todos' && movement.tipo !== movementTypeFilter) return false
+      if (movement.tipo !== expectedType) return false
+      if (movementCategoryFilter !== 'todos' && movement.categoria !== movementCategoryFilter) return false
+      if (movementMethodFilter !== 'todos' && movement.metodoPago !== movementMethodFilter) return false
+      if (movementStatusFilter !== 'todos' && movement.estado !== movementStatusFilter) return false
+      if (movementSeasonFilter !== 'todos' && (movement.seasonId ?? 'sin-temporada') !== movementSeasonFilter) return false
       if (!q) return true
 
       return [
         movement.tipo,
         movement.concepto,
         movement.detalle,
+        movement.categoria,
+        METHOD_LABELS[movement.metodoPago],
+        MOVEMENT_STATUS_LABELS[movement.estado],
+        movement.temporada,
         formatEuro(movement.importe),
         movement.fecha,
       ]
@@ -284,7 +344,78 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
         .toLowerCase()
         .includes(q)
     })
-  }, [financeMovements, movementSearch, movementTypeFilter])
+  }, [activeTab, financeMovements, movementCategoryFilter, movementMethodFilter, movementSearch, movementSeasonFilter, movementStatusFilter])
+
+  const feeTypes = useMemo(
+    () => Array.from(new Set(feeTemplates.map((fee) => fee.tipo))).sort((a, b) => a.localeCompare(b, 'es')),
+    [feeTemplates],
+  )
+
+  const visibleFeeTemplates = useMemo(() => {
+    const q = feeSearch.trim().toLowerCase()
+    return feeTemplates.filter((fee) => {
+      if (feeTypeFilter !== 'todos' && fee.tipo !== feeTypeFilter) return false
+      if (feeVisibilityFilter === 'publica' && !fee.isPublic) return false
+      if (feeVisibilityFilter === 'privada' && fee.isPublic) return false
+      if (feeSplitFilter === 'unico' && fee.splitPayment) return false
+      if (feeSplitFilter === 'repartido' && !fee.splitPayment) return false
+      if (!q) return true
+
+      return [
+        fee.nombre,
+        fee.tipo,
+        formatEuro(fee.importe),
+        fee.splitPayment ? 'repartido varios cargos' : 'pago unico',
+        fee.isPublic ? 'publica' : 'privada',
+        fee.chargeFrequency,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+  }, [feeSearch, feeSplitFilter, feeTemplates, feeTypeFilter, feeVisibilityFilter])
+
+  const pendingPayments = useMemo(() => [...summary.pending, ...summary.failed], [summary.failed, summary.pending])
+
+  const visiblePendingPayments = useMemo(() => {
+    const q = pendingSearch.trim().toLowerCase()
+    return pendingPayments.filter((payment) => {
+      if (pendingStatusFilter === 'programada') return false
+      if (pendingStatusFilter !== 'todos' && payment.estado !== pendingStatusFilter) return false
+      if (!q) return true
+
+      return [payment.operacion, payment.deportista, payment.tutor, payment.estado, payment.proveedor, payment.fecha, formatEuro(payment.importe)]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+  }, [pendingPayments, pendingSearch, pendingStatusFilter])
+
+  const visibleFeeAssignments = useMemo(() => {
+    const q = pendingSearch.trim().toLowerCase()
+    if (pendingStatusFilter === 'pendiente' || pendingStatusFilter === 'fallido') return []
+    return feeAssignments.filter((assignment) => {
+      if (!q) return true
+      return [assignment.feeName, assignment.feeType, assignment.nextChargeDate, String(assignment.chargeDay), String(assignment.scheduledCharges)]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+  }, [feeAssignments, pendingSearch, pendingStatusFilter])
+
+  const reportMovements = useMemo(
+    () =>
+      financeMovements.filter((movement) => {
+        if (reportSeasonFilter !== 'todos' && (movement.seasonId ?? 'sin-temporada') !== reportSeasonFilter) return false
+        const q = reportSearch.trim().toLowerCase()
+        if (!q) return true
+        return [movement.concepto, movement.detalle, movement.categoria, movement.temporada, METHOD_LABELS[movement.metodoPago], MOVEMENT_STATUS_LABELS[movement.estado]]
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+      }),
+    [financeMovements, reportSearch, reportSeasonFilter],
+  )
 
   useEffect(() => {
     if (movementState.ok) {
@@ -317,6 +448,17 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
     setTimeout(() => setLoading(false), 900)
   }
 
+  const currentMovementType: 'ingreso' | 'gasto' = activeTab === 'gastos' ? 'gasto' : 'ingreso'
+  const currentMovementCategories = getMovementCategories(editingMovement?.tipo ?? movementFormType)
+  const tabMovements = financeMovements.filter((movement) => movement.tipo === currentMovementType)
+  const tabMovementTotal = sumMovements(tabMovements)
+  const confirmedTabMovements = tabMovements.filter((movement) => movement.estado === 'confirmed')
+  const pendingTabMovements = tabMovements.filter((movement) => movement.estado === 'pending')
+  const reportIncomeTotal = sumMovements(reportMovements.filter((movement) => movement.tipo === 'ingreso'))
+  const reportExpenseTotal = sumMovements(reportMovements.filter((movement) => movement.tipo === 'gasto'))
+  const reportCashTotal = sumMovements(reportMovements.filter((movement) => movement.metodoPago === 'cash'))
+  const reportBankTotal = sumMovements(reportMovements.filter((movement) => ['transfer', 'bizum', 'card'].includes(movement.metodoPago)))
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones de pagos">
@@ -325,14 +467,24 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           { id: 'cobros', label: 'Cobros realizados' },
           { id: 'matriculas', label: 'Matrículas' },
           { id: 'cuotas', label: 'Cuotas' },
-          { id: 'movimientos', label: 'Ingresos y gastos' },
+          { id: 'pendientes', label: 'Pendientes' },
+          { id: 'ingresos', label: 'Ingresos' },
+          { id: 'gastos', label: 'Gastos' },
+          { id: 'informes', label: 'Informes' },
         ].map((tab) => (
           <button
             key={tab.id}
             type="button"
             role="tab"
             aria-selected={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id as typeof activeTab)}
+            onClick={() => {
+              setActiveTab(tab.id as typeof activeTab)
+              if (tab.id === 'ingresos' || tab.id === 'gastos') {
+                setMovementFormType(tab.id === 'gastos' ? 'gasto' : 'ingreso')
+                setEditingMovement(null)
+                setConfirmDeleteMovementId(null)
+              }
+            }}
             className={cn(
               'rounded-full px-4 py-2 text-sm font-black uppercase transition-colors',
               activeTab === tab.id
@@ -607,12 +759,43 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  {feeTemplates.length} cuotas
+                  {visibleFeeTemplates.length} de {feeTemplates.length} cuotas
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                   <Tags className="size-3.5" aria-hidden="true" />
                   Configuradas
                 </span>
+              </div>
+
+              <div className="mb-4 space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                  <Input
+                    type="search"
+                    value={feeSearch}
+                    onChange={(event) => setFeeSearch(event.target.value)}
+                    placeholder="Buscar por nombre, tipo, importe o frecuencia"
+                    className="pl-9"
+                  />
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <select value={feeTypeFilter} onChange={(event) => setFeeTypeFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                    <option value="todos">Todos los tipos</option>
+                    {feeTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  <select value={feeVisibilityFilter} onChange={(event) => setFeeVisibilityFilter(event.target.value as typeof feeVisibilityFilter)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                    <option value="todos">Públicas y privadas</option>
+                    <option value="publica">Solo públicas</option>
+                    <option value="privada">Solo privadas</option>
+                  </select>
+                  <select value={feeSplitFilter} onChange={(event) => setFeeSplitFilter(event.target.value as typeof feeSplitFilter)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                    <option value="todos">Todos los pagos</option>
+                    <option value="unico">Pago único</option>
+                    <option value="repartido">Pago repartido</option>
+                  </select>
+                </div>
               </div>
 
               <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
@@ -627,14 +810,14 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-card">
-                    {feeTemplates.length === 0 ? (
+                    {visibleFeeTemplates.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                          Aún no hay cuotas configuradas.
+                          No hay cuotas que coincidan con los filtros.
                         </td>
                       </tr>
                     ) : (
-                      feeTemplates.map((fee) => (
+                      visibleFeeTemplates.map((fee) => (
                         <tr key={fee.id} className="transition-colors hover:bg-muted/30">
                           <td className="px-4 py-3 font-semibold text-foreground">{fee.nombre}</td>
                           <td className="px-4 py-3 text-muted-foreground">{fee.tipo}</td>
@@ -658,38 +841,262 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
         </section>
       ) : null}
 
-      {activeTab === 'movimientos' ? (
+      {activeTab === 'pendientes' ? (
+        <section aria-labelledby="pagos-pendientes" className="space-y-5" role="tabpanel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+              Seguimiento de cobros
+            </p>
+            <h2 id="pagos-pendientes" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+              Pendientes de cobro
+            </h2>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <SummaryCard
+              title="Pagos pendientes"
+              value={formatEuro(summary.pendingTotal)}
+              detail={`${summary.pending.length} operación${summary.pending.length !== 1 ? 'es' : ''} pendiente${summary.pending.length !== 1 ? 's' : ''}`}
+              icon={CreditCard}
+              tone="amber"
+            />
+            <SummaryCard
+              title="Cuotas programadas"
+              value={String(feeAssignments.reduce((sum, assignment) => sum + assignment.scheduledCharges, 0))}
+              detail={`${feeAssignments.length} asignación${feeAssignments.length !== 1 ? 'es' : ''} activa${feeAssignments.length !== 1 ? 's' : ''}`}
+              icon={Tags}
+              tone="blue"
+            />
+            <SummaryCard
+              title="Fallidos"
+              value={String(summary.failed.length)}
+              detail="Operaciones que requieren revisión"
+              icon={ShieldAlert}
+              tone="amber"
+            />
+          </div>
+
+          <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+            <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  type="search"
+                  value={pendingSearch}
+                  onChange={(event) => setPendingSearch(event.target.value)}
+                  placeholder="Buscar por operación, tutor, cuota, fecha o importe"
+                  className="pl-9"
+                />
+              </div>
+              <select value={pendingStatusFilter} onChange={(event) => setPendingStatusFilter(event.target.value as typeof pendingStatusFilter)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                <option value="todos">Todos los pendientes</option>
+                <option value="pendiente">Pagos pendientes</option>
+                <option value="fallido">Pagos fallidos</option>
+                <option value="programada">Cuotas programadas</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <Card className="bg-white/88 shadow-sm backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-lg font-black">Pagos pendientes o fallidos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                        <th className="px-4 py-2.5">Operación</th>
+                        <th className="px-4 py-2.5">Tutor</th>
+                        <th className="px-4 py-2.5">Importe</th>
+                        <th className="px-4 py-2.5">Estado</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-card">
+                      {visiblePendingPayments.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                            No hay pagos que coincidan con los filtros.
+                          </td>
+                        </tr>
+                      ) : (
+                        visiblePendingPayments.map((payment) => (
+                          <tr key={payment.id}>
+                            <td className="px-4 py-3 font-semibold">{payment.operacion}</td>
+                            <td className="px-4 py-3 text-muted-foreground">{payment.tutor}</td>
+                            <td className="px-4 py-3 font-semibold">{formatEuro(payment.importe)}</td>
+                            <td className="px-4 py-3">
+                              <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', payment.estado === 'pendiente' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700')}>
+                                {payment.estado}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/88 shadow-sm backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-lg font-black">Cuotas asignadas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {visibleFeeAssignments.length === 0 ? (
+                  <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
+                    No hay cuotas programadas que coincidan con los filtros.
+                  </p>
+                ) : (
+                  visibleFeeAssignments.map((assignment) => (
+                    <div key={assignment.id} className="rounded-lg border border-border bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-black text-foreground">{assignment.feeName}</p>
+                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                          Próximo: {assignment.nextChargeDate}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {assignment.scheduledCharges} pendientes · {assignment.paidCharges} pagados · día {assignment.chargeDay}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === 'informes' ? (
+        <section aria-labelledby="pagos-informes" className="space-y-5" role="tabpanel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+              Revisión de directiva
+            </p>
+            <h2 id="pagos-informes" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+              Informes
+            </h2>
+          </div>
+
+          <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+            <div className="grid gap-3 md:grid-cols-[1fr_240px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  type="search"
+                  value={reportSearch}
+                  onChange={(event) => setReportSearch(event.target.value)}
+                  placeholder="Buscar en informes por concepto, categoría, método o temporada"
+                  className="pl-9"
+                />
+              </div>
+              <select value={reportSeasonFilter} onChange={(event) => setReportSeasonFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                <option value="todos">Todas las temporadas</option>
+                <option value="sin-temporada">Sin temporada</option>
+                {seasons.map((season) => (
+                  <option key={season.id} value={season.id}>{season.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-4">
+            <SummaryCard title="Efectivo" value={formatEuro(reportCashTotal)} detail="Movimientos confirmados filtrados" icon={Wallet} tone="green" />
+            <SummaryCard title="Banco / Bizum" value={formatEuro(reportBankTotal)} detail="Transferencia, Bizum y tarjeta" icon={Landmark} tone="blue" />
+            <SummaryCard title="Stripe cobrado" value={formatEuro(summary.stripeTotal)} detail="Cobros confirmados por plataforma" icon={CreditCard} tone="blue" />
+            <SummaryCard title="Balance filtrado" value={formatEuro(reportIncomeTotal - reportExpenseTotal)} detail="Ingresos menos gastos filtrados" icon={BarChart3} tone={reportIncomeTotal - reportExpenseTotal >= 0 ? 'green' : 'amber'} />
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-3">
+            {[
+              {
+                title: 'Ingresos por categoría',
+                rows: INCOME_CATEGORIES.map((category) => ({
+                  label: category,
+                  value: sumMovements(reportMovements.filter((movement) => movement.tipo === 'ingreso' && movement.categoria === category)),
+                })),
+              },
+              {
+                title: 'Gastos por categoría',
+                rows: EXPENSE_CATEGORIES.map((category) => ({
+                  label: category,
+                  value: sumMovements(reportMovements.filter((movement) => movement.tipo === 'gasto' && movement.categoria === category)),
+                })),
+              },
+              {
+                title: 'Movimientos por temporada',
+                rows: seasons
+                  .filter((season) => reportSeasonFilter === 'todos' || reportSeasonFilter === season.id)
+                  .map((season) => ({
+                  label: season.nombre,
+                  value:
+                    sumMovements(reportMovements.filter((movement) => movement.tipo === 'ingreso' && movement.seasonId === season.id)) -
+                    sumMovements(reportMovements.filter((movement) => movement.tipo === 'gasto' && movement.seasonId === season.id)),
+                })),
+              },
+            ].map((block) => (
+              <Card key={block.title} className="bg-white/88 shadow-sm backdrop-blur">
+                <CardHeader>
+                  <CardTitle className="text-lg font-black">{block.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {block.rows.filter((row) => row.value !== 0).length === 0 ? (
+                    <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Sin datos todavía.</p>
+                  ) : (
+                    block.rows.filter((row) => row.value !== 0).map((row) => (
+                      <div key={row.label}>
+                        <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                          <span className="font-semibold text-foreground">{row.label}</span>
+                          <span className="font-black text-foreground">{formatEuro(row.value)}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted">
+                          <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(100, Math.max(8, Math.abs(row.value) / Math.max(1, Math.abs(summary.confirmedIncomeTotal), Math.abs(summary.manualExpenseTotal)) * 100))}%` }} />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {(activeTab === 'ingresos' || activeTab === 'gastos') ? (
       <section aria-labelledby="pagos-movimientos" className="space-y-5" role="tabpanel">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-            Caja manual
+            {currentMovementType === 'ingreso' ? 'Entradas del club' : 'Salidas del club'}
           </p>
           <h2 id="pagos-movimientos" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-            Ingresos y gastos
+            {currentMovementType === 'ingreso' ? 'Ingresos' : 'Gastos'}
           </h2>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <SummaryCard
-            title="Ingresos manuales"
-            value={formatEuro(movementSummary.incomeTotal)}
-            detail={`${movementSummary.incomes.length} registro${movementSummary.incomes.length !== 1 ? 's' : ''} de entrada`}
-            icon={TrendingUp}
-            tone="green"
+            title={currentMovementType === 'ingreso' ? 'Ingresos confirmados' : 'Gastos confirmados'}
+            value={formatEuro(tabMovementTotal)}
+            detail={`${confirmedTabMovements.length} registro${confirmedTabMovements.length !== 1 ? 's' : ''} confirmado${confirmedTabMovements.length !== 1 ? 's' : ''}`}
+            icon={currentMovementType === 'ingreso' ? TrendingUp : TrendingDown}
+            tone={currentMovementType === 'ingreso' ? 'green' : 'amber'}
           />
           <SummaryCard
-            title="Gastos"
-            value={formatEuro(movementSummary.expenseTotal)}
-            detail={`${movementSummary.expenses.length} registro${movementSummary.expenses.length !== 1 ? 's' : ''} de salida`}
-            icon={TrendingDown}
+            title="Pendientes"
+            value={formatEuro(pendingTabMovements.reduce((sum, movement) => sum + movement.importe, 0))}
+            detail={`${pendingTabMovements.length} registro${pendingTabMovements.length !== 1 ? 's' : ''} pendiente${pendingTabMovements.length !== 1 ? 's' : ''}`}
+            icon={ShieldAlert}
             tone="amber"
           />
           <SummaryCard
-            title="Balance"
-            value={formatEuro(movementSummary.balance)}
-            detail="Ingresos manuales menos gastos"
-            icon={Wallet}
-            tone={movementSummary.balance >= 0 ? 'blue' : 'amber'}
+            title="Total registros"
+            value={String(tabMovements.length)}
+            detail="Incluye confirmados, pendientes y anulados"
+            icon={ReceiptText}
+            tone="blue"
           />
         </div>
 
@@ -708,18 +1115,28 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 className="space-y-4"
               >
                 <input type="hidden" name="id" value={editingMovement?.id ?? ''} />
+                <input type="hidden" name="tipo" value={editingMovement?.tipo ?? movementFormType} />
                 <div>
-                  <label htmlFor="tipo" className="text-sm font-black text-foreground">
-                    Tipo
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary">
+                    {editingMovement?.tipo ?? movementFormType}
+                  </span>
+                </div>
+
+                <div>
+                  <label htmlFor="categoria" className="text-sm font-black text-foreground">
+                    Categoría
                   </label>
                   <select
-                    id="tipo"
-                    name="tipo"
-                    defaultValue={editingMovement?.tipo ?? 'ingreso'}
+                    id="categoria"
+                    name="categoria"
+                    defaultValue={editingMovement?.categoria ?? currentMovementCategories[0]}
                     className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
-                    <option value="ingreso">Ingreso</option>
-                    <option value="gasto">Gasto</option>
+                    {currentMovementCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -768,6 +1185,76 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                   />
                 </div>
 
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="metodoPago" className="text-sm font-black text-foreground">
+                      Método de pago
+                    </label>
+                    <select
+                      id="metodoPago"
+                      name="metodoPago"
+                      defaultValue={editingMovement?.metodoPago ?? 'cash'}
+                      className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {Object.entries(METHOD_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="estado" className="text-sm font-black text-foreground">
+                      Estado
+                    </label>
+                    <select
+                      id="estado"
+                      name="estado"
+                      defaultValue={editingMovement?.estado ?? 'confirmed'}
+                      className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {Object.entries(MOVEMENT_STATUS_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="seasonId" className="text-sm font-black text-foreground">
+                    Temporada
+                  </label>
+                  <select
+                    id="seasonId"
+                    name="seasonId"
+                    defaultValue={editingMovement?.seasonId ?? ''}
+                    className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <option value="">Sin temporada</option>
+                    {seasons.map((season) => (
+                      <option key={season.id} value={season.id}>
+                        {season.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="justificanteUrl" className="text-sm font-black text-foreground">
+                    Justificante <span className="font-semibold text-muted-foreground">(opcional)</span>
+                  </label>
+                  <Input
+                    id="justificanteUrl"
+                    name="justificanteUrl"
+                    type="url"
+                    placeholder="https://..."
+                    className="mt-2"
+                    defaultValue={editingMovement?.justificanteUrl ?? ''}
+                  />
+                </div>
+
                 {movementState.message ? (
                   <p
                     className={cn(
@@ -811,11 +1298,11 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {financeMovements.length} movimientos
+                {tabMovements.length} {currentMovementType === 'ingreso' ? 'ingresos' : 'gastos'}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                 <ReceiptText className="size-3.5" aria-hidden="true" />
-                Manual
+                Tesorería
               </span>
             </div>
 
@@ -828,33 +1315,39 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                   />
                   <Input
                     type="search"
-                    placeholder="Buscar por concepto, detalle, tipo o fecha"
+                    placeholder="Buscar por concepto, detalle, categoría, método o fecha"
                     value={movementSearch}
                     onChange={(event) => setMovementSearch(event.target.value)}
                     className="pl-9"
                   />
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { label: 'Todos', value: 'todos' },
-                    { label: 'Ingresos', value: 'ingreso' },
-                    { label: 'Gastos', value: 'gasto' },
-                  ].map((filter) => (
-                    <button
-                      key={filter.value}
-                      type="button"
-                      onClick={() => setMovementTypeFilter(filter.value as typeof movementTypeFilter)}
-                      className={cn(
-                        'rounded-full px-3 py-1 text-xs font-black transition-colors',
-                        movementTypeFilter === filter.value
-                          ? 'bg-primary text-white'
-                          : 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary',
-                      )}
-                    >
-                      {filter.label}
-                    </button>
+              </div>
+              <div className="grid gap-2 md:grid-cols-4">
+                <select value={movementCategoryFilter} onChange={(event) => setMovementCategoryFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                  <option value="todos">Todas las categorías</option>
+                  {getMovementCategories(currentMovementType).map((category) => (
+                    <option key={category} value={category}>{category}</option>
                   ))}
-                </div>
+                </select>
+                <select value={movementMethodFilter} onChange={(event) => setMovementMethodFilter(event.target.value as typeof movementMethodFilter)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                  <option value="todos">Todos los métodos</option>
+                  {Object.entries(METHOD_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+                <select value={movementStatusFilter} onChange={(event) => setMovementStatusFilter(event.target.value as typeof movementStatusFilter)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                  <option value="todos">Todos los estados</option>
+                  {Object.entries(MOVEMENT_STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+                <select value={movementSeasonFilter} onChange={(event) => setMovementSeasonFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
+                  <option value="todos">Todas las temporadas</option>
+                  <option value="sin-temporada">Sin temporada</option>
+                  {seasons.map((season) => (
+                    <option key={season.id} value={season.id}>{season.nombre}</option>
+                  ))}
+                </select>
               </div>
 
               {(deleteMessage?.message || deletePendingId) ? (
@@ -874,10 +1367,13 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                      <th className="px-4 py-2.5">Tipo</th>
                       <th className="px-4 py-2.5">Concepto</th>
+                      <th className="px-4 py-2.5">Categoría</th>
+                      <th className="hidden px-4 py-2.5 lg:table-cell">Método</th>
+                      <th className="px-4 py-2.5">Estado</th>
                       <th className="hidden px-4 py-2.5 md:table-cell">Detalle</th>
                       <th className="px-4 py-2.5">Importe</th>
+                      <th className="hidden px-4 py-2.5 xl:table-cell">Temporada</th>
                       <th className="hidden px-4 py-2.5 lg:table-cell">Fecha</th>
                       <th className="px-4 py-2.5 text-right">Acciones</th>
                     </tr>
@@ -885,31 +1381,35 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                   <tbody className="divide-y divide-border bg-card">
                     {visibleMovements.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                        <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
                           Aún no hay movimientos que coincidan con los filtros.
                         </td>
                       </tr>
                     ) : (
                       visibleMovements.map((movement) => (
                         <tr key={movement.id} className="transition-colors hover:bg-muted/30">
+                          <td className="px-4 py-3 font-semibold text-foreground">{movement.concepto}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{movement.categoria}</td>
+                          <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{METHOD_LABELS[movement.metodoPago]}</td>
                           <td className="px-4 py-3">
-                            <span
-                              className={cn(
-                                'rounded-full px-2.5 py-1 text-xs font-black',
-                                movement.tipo === 'ingreso'
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-amber-100 text-amber-700',
-                              )}
-                            >
-                              {movement.tipo}
+                            <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', MOVEMENT_STATUS_STYLES[movement.estado])}>
+                              {MOVEMENT_STATUS_LABELS[movement.estado]}
                             </span>
                           </td>
-                          <td className="px-4 py-3 font-semibold text-foreground">{movement.concepto}</td>
                           <td className="hidden max-w-xs px-4 py-3 text-muted-foreground md:table-cell">
                             <span className="line-clamp-2">{movement.detalle || '—'}</span>
+                            {movement.justificanteUrl ? (
+                              <a href={movement.justificanteUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs font-black text-primary">
+                                <FileText className="size-3" />
+                                Justificante
+                              </a>
+                            ) : null}
                           </td>
                           <td className="px-4 py-3 font-semibold text-foreground">
                             {formatEuro(movement.importe)}
+                          </td>
+                          <td className="hidden px-4 py-3 text-muted-foreground xl:table-cell">
+                            {movement.temporada}
                           </td>
                           <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
                             {movement.fecha}
@@ -946,7 +1446,10 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                                 variant="ghost"
                                 size="icon-sm"
                                 aria-label={`Editar ${movement.concepto}`}
-                                onClick={() => setEditingMovement(movement)}
+                                onClick={() => {
+                                  setEditingMovement(movement)
+                                  setMovementFormType(movement.tipo)
+                                }}
                               >
                                 <Pencil className="size-4" aria-hidden="true" />
                               </Button>
