@@ -2,18 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { PageContainer } from '@/components/page-container'
 import { cn } from '@/lib/utils'
 import type { AdminCategoryRow } from '@/lib/admin-app'
@@ -197,21 +189,29 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
         </table>
       </div>
 
-      {/* ── Sheet ───────────────────────────────────────────────────── */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right">
-          <SheetHeader>
-            <SheetTitle>
-              {mode === 'create' ? 'Nueva categoría' : 'Editar categoría'}
-            </SheetTitle>
-            <SheetDescription>
-              {mode === 'create'
-                ? 'Rellena los datos para crear una nueva categoría deportiva.'
-                : 'Modifica los datos de la categoría.'}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="flex flex-col gap-4 px-4 py-2">
+      <AdminFormDialog
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={mode === 'create' ? 'Nueva categoría' : 'Editar categoría'}
+        description={mode === 'create'
+          ? 'Rellena los datos para crear una nueva categoría deportiva.'
+          : 'Modifica los datos de la categoría.'}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setSheetOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending
+                ? 'Guardando...'
+                : mode === 'create'
+                  ? 'Crear categoría'
+                  : 'Guardar cambios'}
+            </Button>
+          </>
+        }
+      >
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cat-name">Nombre</Label>
               <Input
@@ -233,8 +233,9 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
                 onChange={(e) => setSortOrder(e.target.value)}
               />
             </div>
+          </div>
 
-            <div className="flex items-center gap-2">
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
               <input
                 id="cat-active"
                 type="checkbox"
@@ -246,30 +247,11 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
             </div>
 
             {formError && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {formError}
               </p>
             )}
-          </div>
-
-          <SheetFooter>
-            <Button onClick={handleSubmit} disabled={isPending} className="w-full">
-              {isPending
-                ? 'Guardando…'
-                : mode === 'create'
-                  ? 'Crear categoría'
-                  : 'Guardar cambios'}
-            </Button>
-            <SheetClose
-              render={
-                <Button variant="outline" className="w-full">
-                  Cancelar
-                </Button>
-              }
-            />
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      </AdminFormDialog>
     </>
   )
 

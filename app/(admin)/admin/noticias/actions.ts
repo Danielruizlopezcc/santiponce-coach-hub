@@ -74,6 +74,10 @@ export async function createNews(formData: FormData) {
     throw new Error('Selecciona una sección para la noticia.')
   }
 
+  if (!body || typeof body !== 'string' || !body.trim()) {
+    throw new Error('El contenido de la noticia es obligatorio.')
+  }
+
   if (!image) {
     throw new Error('Selecciona una imagen para la noticia.')
   }
@@ -83,7 +87,7 @@ export async function createNews(formData: FormData) {
 
   const { error } = await supabase.from('news').insert({
     title: title.trim(),
-    body: typeof body === 'string' && body.trim() ? body.trim() : null,
+    body: body.trim(),
     section_id: sectionId,
     image_url: imageUrl,
   })
@@ -91,6 +95,8 @@ export async function createNews(formData: FormData) {
   if (error) throw new Error(error.message)
 
   revalidatePath('/admin/noticias')
+  revalidatePath('/noticias')
+  revalidatePath('/app/noticias')
 }
 
 export async function updateNews(formData: FormData) {
@@ -112,10 +118,14 @@ export async function updateNews(formData: FormData) {
     throw new Error('Selecciona una sección para la noticia.')
   }
 
+  if (!body || typeof body !== 'string' || !body.trim()) {
+    throw new Error('El contenido de la noticia es obligatorio.')
+  }
+
   const supabase = await getAdminSupabase()
   const updates: Record<string, unknown> = {
     title: title.trim(),
-    body: typeof body === 'string' && body.trim() ? body.trim() : null,
+    body: body.trim(),
     section_id: sectionId,
   }
 
@@ -127,6 +137,10 @@ export async function updateNews(formData: FormData) {
   if (error) throw new Error(error.message)
 
   revalidatePath('/admin/noticias')
+  revalidatePath('/noticias')
+  revalidatePath(`/noticias/${id}`)
+  revalidatePath('/app/noticias')
+  revalidatePath(`/app/noticias/${id}`)
 }
 
 export async function createNewsSection(name: string) {
@@ -149,6 +163,8 @@ export async function createNewsSection(name: string) {
   if (error) throw new Error(error.message)
 
   revalidatePath('/admin/noticias')
+  revalidatePath('/noticias')
+  revalidatePath('/app/noticias')
 }
 
 export async function updateNewsSection(id: string, name: string, isActive: boolean) {
@@ -169,6 +185,8 @@ export async function updateNewsSection(id: string, name: string, isActive: bool
   if (error) throw new Error(error.message)
 
   revalidatePath('/admin/noticias')
+  revalidatePath('/noticias')
+  revalidatePath('/app/noticias')
 }
 
 export async function deleteNewsSection(id: string) {
@@ -190,6 +208,10 @@ export async function deleteNewsSection(id: string) {
   if (error) throw new Error(error.message)
 
   revalidatePath('/admin/noticias')
+  revalidatePath('/noticias')
+  revalidatePath(`/noticias/${id}`)
+  revalidatePath('/app/noticias')
+  revalidatePath(`/app/noticias/${id}`)
 }
 
 export async function deleteNews(id: string) {

@@ -72,6 +72,8 @@ export type PrivateNewsItem = {
   createdAt: string
 }
 
+export type PrivateNewsDetail = PrivateNewsItem
+
 export type PrivateNewsData = {
   sections: PrivateNewsSection[]
   news: PrivateNewsItem[]

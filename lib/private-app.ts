@@ -7,6 +7,7 @@ import type {
   PrivateDashboardData,
   PrivateMemberProfile,
   PrivateNewsData,
+  PrivateNewsDetail,
   PrivateSponsor,
   PrivateTeamDetail,
   PrivateTeamPlayer,
@@ -375,6 +376,31 @@ export async function getPrivateNewsData(): Promise<PrivateNewsData> {
           createdAt: item.created_at,
         }
       }),
+  }
+}
+
+export async function getPrivateNewsDetail(id: string): Promise<PrivateNewsDetail | null> {
+  noStore()
+
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('news')
+    .select('id, title, body, image_url, section_id, created_at, news_sections(name)')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!data) return null
+
+  const section = Array.isArray(data.news_sections) ? data.news_sections[0] : data.news_sections
+
+  return {
+    id: data.id,
+    title: data.title,
+    body: data.body ?? null,
+    imageUrl: data.image_url,
+    sectionId: data.section_id ?? null,
+    sectionName: section?.name ?? 'Sin seccion',
+    createdAt: data.created_at,
   }
 }
 

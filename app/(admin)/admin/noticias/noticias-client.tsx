@@ -1,21 +1,16 @@
 'use client'
 
 import { ChangeEvent, useState, useTransition } from 'react'
+import { Dialog } from '@base-ui/react/dialog'
 import Image from 'next/image'
-import { Folder, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Folder, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { PageContainer } from '@/components/page-container'
+import { RichTextEditor } from '@/components/rich-text-editor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import type { AdminNewsRow, AdminNewsSectionRow } from '@/lib/admin-app'
+import { getPlainNewsText } from '@/lib/news-content'
 import { cn } from '@/lib/utils'
 import {
   createNews,
@@ -93,6 +88,11 @@ export function NoticiasClient({ news, sections }: Props) {
 
     if (!sectionId) {
       setFormError('Selecciona una sección.')
+      return
+    }
+
+    if (!body.trim()) {
+      setFormError('El contenido de la noticia es obligatorio.')
       return
     }
 
@@ -354,8 +354,8 @@ export function NoticiasClient({ news, sections }: Props) {
                     </span>
                   </td>
                   <td className="hidden max-w-md px-4 py-3 text-muted-foreground md:table-cell">
-                    {item.body ? item.body.slice(0, 120) : 'Sin cuerpo'}
-                    {item.body && item.body.length > 120 ? '…' : ''}
+                    {item.body ? getPlainNewsText(item.body).slice(0, 120) : 'Sin cuerpo'}
+                    {item.body && getPlainNewsText(item.body).length > 120 ? '…' : ''}
                   </td>
                   <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{item.createdAt}</td>
                   <td className="px-4 py-3 text-right">
@@ -394,98 +394,115 @@ export function NoticiasClient({ news, sections }: Props) {
         </table>
       </div>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right">
-          <SheetHeader>
-            <SheetTitle>{mode === 'create' ? 'Nueva noticia' : 'Editar noticia'}</SheetTitle>
-            <SheetDescription>
-              {mode === 'create'
-                ? 'Añade una imagen obligatoria, un título y un cuerpo opcional.'
-                : 'Actualiza los datos de la noticia. Deja la imagen vacía para conservarla.'}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="flex flex-col gap-4 px-4 py-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="news-title">Título</Label>
-              <Input
-                id="news-title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Ej. Nueva jornada del club"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="news-section">Sección</Label>
-              <select
-                id="news-section"
-                value={sectionId}
-                onChange={(event) => setSectionId(event.target.value)}
-                className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Selecciona una sección…</option>
-                {sectionOptions.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
-                    {section.isActive ? '' : ' (inactiva)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="news-body">Cuerpo (opcional)</Label>
-              <textarea
-                id="news-body"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                placeholder="Contenido de la noticia…"
-                rows={6}
-                className="min-h-32 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
-
-            {mode === 'edit' && editing ? (
-              <div className="grid gap-2 rounded-xl border border-border bg-muted/30 p-3">
-                <span className="text-sm font-medium text-foreground">Imagen actual</span>
-                <div className="relative h-28 overflow-hidden rounded-xl bg-muted">
-                  <Image src={editing.imageUrl} alt={editing.title} fill className="object-cover" />
-                </div>
+      <Dialog.Root open={sheetOpen} onOpenChange={setSheetOpen}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-50 bg-[#06172f]/55 backdrop-blur-sm" />
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[calc(100vw-2rem)] max-w-6xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-border bg-[#06172f] px-6 py-5 text-white">
+              <div>
+                <Dialog.Title className="text-2xl font-black tracking-tight">
+                  {mode === 'create' ? 'Nueva noticia' : 'Editar noticia'}
+                </Dialog.Title>
+                <Dialog.Description className="mt-1 text-sm font-medium text-white/70">
+                  {mode === 'create'
+                    ? 'Añade imagen, título, sección y contenido completo para la página de la noticia.'
+                    : 'Actualiza los datos de la noticia. Deja la imagen vacía para conservarla.'}
+                </Dialog.Description>
               </div>
-            ) : null}
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="news-image">Imagen</Label>
-              <input
-                key={inputKey}
-                id="news-image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
-              />
+              <Dialog.Close
+                render={
+                  <Button type="button" variant="ghost" size="icon-sm" className="text-white hover:bg-white/10 hover:text-white" />
+                }
+              >
+                <X className="size-5" aria-hidden="true" />
+                <span className="sr-only">Cerrar</span>
+              </Dialog.Close>
             </div>
 
-            {formError ? (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {formError}
-              </p>
-            ) : null}
-          </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-6">
+              <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="news-title">Título</Label>
+                    <Input
+                      id="news-title"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      placeholder="Ej. Nueva jornada del club"
+                      autoFocus
+                    />
+                  </div>
 
-          <SheetFooter>
-            <Button onClick={handleSubmit} disabled={isPending} className="w-full">
-              {isPending
-                ? 'Guardando…'
-                : mode === 'create'
-                  ? 'Crear noticia'
-                  : 'Guardar cambios'}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="news-body">Contenido de la noticia</Label>
+                    <RichTextEditor id="news-body" value={body} onChange={setBody} />
+                  </div>
+                </div>
+
+                <aside className="space-y-4 rounded-lg border border-border bg-[#f8fafc] p-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="news-section">Sección</Label>
+                    <select
+                      id="news-section"
+                      value={sectionId}
+                      onChange={(event) => setSectionId(event.target.value)}
+                      className="h-10 rounded-lg border border-input bg-white px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value="">Selecciona una sección...</option>
+                      {sectionOptions.map((section) => (
+                        <option key={section.id} value={section.id}>
+                          {section.name}
+                          {section.isActive ? '' : ' (inactiva)'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {mode === 'edit' && editing ? (
+                    <div className="grid gap-2 rounded-lg border border-border bg-white p-3">
+                      <span className="text-sm font-black text-foreground">Imagen actual</span>
+                      <div className="relative h-44 overflow-hidden rounded-lg bg-muted">
+                        <Image src={editing.imageUrl} alt={editing.title} fill className="object-cover" />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="news-image">Imagen</Label>
+                    <input
+                      key={inputKey}
+                      id="news-image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
+                    />
+                  </div>
+
+                  {formError ? (
+                    <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+                      {formError}
+                    </p>
+                  ) : null}
+                </aside>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border bg-white px-6 py-4">
+              <Dialog.Close render={<Button type="button" variant="outline" />}>
+                Cancelar
+              </Dialog.Close>
+              <Button onClick={handleSubmit} disabled={isPending}>
+                {isPending
+                  ? 'Guardando...'
+                  : mode === 'create'
+                    ? 'Crear noticia'
+                    : 'Guardar cambios'}
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </PageContainer>
   )
 }

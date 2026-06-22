@@ -125,7 +125,7 @@ export function LandingHero({
 
         {featuredNews ? (
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <Link href={newsHref} className="group block overflow-hidden rounded-lg bg-[#071c44] text-white shadow-sm">
+            <Link href={`${newsHref}/${featuredNews.id}`} className="group block overflow-hidden rounded-lg bg-[#071c44] text-white shadow-sm">
               <div className="relative aspect-[16/9] bg-muted">
                 <Image
                   src={featuredNews.imageUrl}
@@ -151,7 +151,7 @@ export function LandingHero({
                 moreNews.map((item) => (
                   <Link
                     key={item.id}
-                    href={newsHref}
+                    href={`${newsHref}/${item.id}`}
                     className="group grid grid-cols-[128px_1fr] overflow-hidden rounded-lg bg-[#f3f6fa] transition-colors hover:bg-blue-50"
                   >
                     <div className="relative min-h-32 bg-muted">

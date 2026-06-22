@@ -35,3 +35,4 @@ https://react.dev/link/hydration-mismatch
 
     at <unknown> (https://react.dev/link/hydration-mismatch)
     at Suspense (<anonymous>)
+[browser] Image with src "https://fuyewdiafenvxwggguaw.supabase.co/storage/v1/object/public/news/noticias/1781603623454-bjxv72ag-bado.jpg" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.

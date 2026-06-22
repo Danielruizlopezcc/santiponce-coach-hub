@@ -1,10 +1,11 @@
 'use client'
 
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
+import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, CheckCircle2, CreditCard, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X, XCircle } from 'lucide-react'
+import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatEuro, formatSpanishPhone, maskDocument } from '@/lib/format'
 import type { AdminFeeTemplateRow, AdminMemberRow, AdminTutorFeeAssignmentRow, AdminTutorRow } from '@/lib/admin-app'
@@ -124,6 +125,7 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
   const [approvePendingId, setApprovePendingId] = useState<string | null>(null)
   const [rejectPendingId, setRejectPendingId] = useState<string | null>(null)
   const [showTutorForm, setShowTutorForm] = useState(false)
+  const [showMemberForm, setShowMemberForm] = useState(false)
   const [editingTutor, setEditingTutor] = useState<AdminTutorRow | null>(null)
   const [assigningTutor, setAssigningTutor] = useState<AdminTutorRow | null>(null)
   const [editingMember, setEditingMember] = useState<AdminMemberRow | null>(null)
@@ -264,71 +266,89 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
               type="button"
               onClick={() => {
                 setEditingTutor(null)
-                setShowTutorForm((current) => !current)
+                setShowTutorForm(true)
               }}
             >
-              {showTutorForm && !editingTutor ? <X className="size-4" /> : <Plus className="size-4" />}
-              {showTutorForm && !editingTutor ? 'Cerrar formulario' : 'Crear tutor'}
+              <Plus className="size-4" />
+              Crear tutor
             </Button>
           </div>
 
-          {showTutorForm || editingTutor ? (
-          <Card className="bg-white/88 shadow-sm backdrop-blur">
-            <CardHeader>
-              <CardTitle className="text-lg font-black">
-                {editingTutor ? 'Editar tutor' : 'Añadir tutor'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form key={editingTutor?.id ?? 'new-tutor'} ref={tutorFormRef} action={tutorAction} className="space-y-3">
-                <input type="hidden" name="id" value={editingTutor?.id ?? ''} />
-                <input type="hidden" name="userId" value={editingTutor?.userId ?? ''} />
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <Input name="nombre" placeholder="Nombre" defaultValue={editingTutor?.nombre.split(' ')[0] ?? ''} required />
-                  <Input name="apellidos" placeholder="Apellidos" defaultValue={editingTutor ? editingTutor.nombre.split(' ').slice(1).join(' ') : ''} required />
+          <Dialog.Root
+            open={showTutorForm || Boolean(editingTutor)}
+            onOpenChange={(open) => {
+              setShowTutorForm(open)
+              if (!open) setEditingTutor(null)
+            }}
+          >
+            <Dialog.Portal>
+              <Dialog.Backdrop className="fixed inset-0 z-50 bg-[#06172f]/55 backdrop-blur-sm" />
+              <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[92vh] w-[calc(100vw-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg border border-border bg-white shadow-2xl">
+                <div className="flex items-start justify-between gap-4 border-b border-border bg-[#06172f] px-6 py-5 text-white">
+                  <div>
+                    <Dialog.Title className="text-2xl font-black tracking-tight">
+                      {editingTutor ? 'Editar tutor' : 'Crear tutor'}
+                    </Dialog.Title>
+                    <Dialog.Description className="mt-1 text-sm font-medium text-white/70">
+                      {editingTutor
+                        ? 'Actualiza los datos administrativos del tutor.'
+                        : 'Crea una cuenta de tutor con sus datos de acceso y consentimientos.'}
+                    </Dialog.Description>
+                  </div>
+                  <Dialog.Close render={<Button type="button" variant="ghost" size="icon-sm" className="text-white hover:bg-white/10 hover:text-white" />}>
+                    <X className="size-5" aria-hidden="true" />
+                    <span className="sr-only">Cerrar</span>
+                  </Dialog.Close>
                 </div>
-                <Input name="email" type="email" placeholder="Email" defaultValue={editingTutor?.email ?? ''} required />
-                {!editingTutor ? (
-                  <Input name="password" type="password" placeholder="Contraseña" minLength={8} required />
-                ) : null}
-                <Input name="telefono" placeholder="Teléfono" defaultValue={editingTutor?.telefono ?? ''} required />
-                <Input name="documento" placeholder="DNI/NIE" defaultValue={editingTutor?.documento ?? ''} required />
-                <Input name="ciudad" placeholder="Ciudad" defaultValue={editingTutor?.ciudad ?? ''} required />
-                <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                  <input type="checkbox" name="isSocio" className="size-4" defaultChecked={editingTutor?.isSocio ?? false} />
-                  También es socio
-                </label>
-                {!editingTutor ? (
-                  <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                    <input type="checkbox" name="imageConsent" className="size-4" />
-                    Acepta consentimiento de imagen
-                  </label>
-                ) : null}
-                <FormMessage state={tutorState} />
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                  {editingTutor ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setEditingTutor(null)
-                        setShowTutorForm(false)
-                      }}
-                      disabled={tutorPending}
-                    >
-                      <X className="size-4" />
-                      Cancelar
-                    </Button>
-                  ) : null}
-                  <Button type="submit" className="w-full" disabled={tutorPending}>
-                    {tutorPending ? <Loader2 className="size-4 animate-spin" /> : editingTutor ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-                    {editingTutor ? 'Guardar cambios' : 'Crear tutor'}
-                  </Button>
+
+                <div className="max-h-[calc(92vh-142px)] overflow-y-auto p-6">
+                  <form key={editingTutor?.id ?? 'new-tutor'} ref={tutorFormRef} action={tutorAction} className="space-y-4">
+                    <input type="hidden" name="id" value={editingTutor?.id ?? ''} />
+                    <input type="hidden" name="userId" value={editingTutor?.userId ?? ''} />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input name="nombre" placeholder="Nombre" defaultValue={editingTutor?.nombre.split(' ')[0] ?? ''} required />
+                      <Input name="apellidos" placeholder="Apellidos" defaultValue={editingTutor ? editingTutor.nombre.split(' ').slice(1).join(' ') : ''} required />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input name="email" type="email" placeholder="Email" defaultValue={editingTutor?.email ?? ''} required />
+                      {!editingTutor ? (
+                        <Input name="password" type="password" placeholder="Contraseña" minLength={8} required />
+                      ) : (
+                        <Input value="La contraseña no se edita desde aquí" readOnly className="text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <Input name="telefono" placeholder="Teléfono" defaultValue={editingTutor?.telefono ?? ''} required />
+                      <Input name="documento" placeholder="DNI/NIE" defaultValue={editingTutor?.documento ?? ''} required />
+                      <Input name="ciudad" placeholder="Ciudad" defaultValue={editingTutor?.ciudad ?? ''} required />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+                        <input type="checkbox" name="isSocio" className="size-4" defaultChecked={editingTutor?.isSocio ?? false} />
+                        También es socio
+                      </label>
+                      {!editingTutor ? (
+                        <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+                          <input type="checkbox" name="imageConsent" className="size-4" />
+                          Acepta consentimiento de imagen
+                        </label>
+                      ) : null}
+                    </div>
+                    <FormMessage state={tutorState} />
+                    <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+                      <Dialog.Close render={<Button type="button" variant="outline" disabled={tutorPending} />}>
+                        Cancelar
+                      </Dialog.Close>
+                      <Button type="submit" disabled={tutorPending}>
+                        {tutorPending ? <Loader2 className="size-4 animate-spin" /> : editingTutor ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+                        {editingTutor ? 'Guardar cambios' : 'Crear tutor'}
+                      </Button>
+                    </div>
+                  </form>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-          ) : null}
+              </Dialog.Popup>
+            </Dialog.Portal>
+          </Dialog.Root>
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -683,41 +703,64 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
       ) : null}
 
       {activeTab === 'socios' ? (
-        <section className="grid gap-5 xl:grid-cols-[380px_1fr]">
-          <Card className="bg-white/88 shadow-sm backdrop-blur">
-            <CardHeader>
-              <CardTitle className="text-lg font-black">{editingMember ? 'Editar socio' : 'Añadir socio'}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form key={editingMember?.id ?? 'new-member'} ref={memberFormRef} action={memberAction} className="space-y-3">
-                <input type="hidden" name="id" value={editingMember?.id ?? ''} />
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <Input name="nombre" placeholder="Nombre" defaultValue={editingMember?.nombre.split(' ')[0] ?? ''} required />
-                  <Input name="apellidos" placeholder="Apellidos" defaultValue={editingMember ? editingMember.nombre.split(' ').slice(1).join(' ') : ''} required />
-                </div>
-                <Input name="email" type="email" placeholder="Email" defaultValue={editingMember?.email ?? ''} required />
-                <FormMessage state={memberState} />
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                  {editingMember ? (
-                    <Button type="button" variant="outline" onClick={() => setEditingMember(null)} disabled={memberPending}>
-                      <X className="size-4" />
-                      Cancelar
-                    </Button>
-                  ) : null}
-                  <Button type="submit" className="w-full" disabled={memberPending}>
-                    {memberPending ? <Loader2 className="size-4 animate-spin" /> : editingMember ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-                    {editingMember ? 'Guardar cambios' : 'Crear socio'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+        <section className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              {members.length} socios
+            </span>
+            <Button
+              type="button"
+              onClick={() => {
+                setEditingMember(null)
+                setShowMemberForm(true)
+              }}
+            >
+              <Plus className="size-4" />
+              Crear socio
+            </Button>
+          </div>
+
+          <AdminFormDialog
+            open={showMemberForm || Boolean(editingMember)}
+            onOpenChange={(open) => {
+              setShowMemberForm(open)
+              if (!open) setEditingMember(null)
+            }}
+            title={editingMember ? 'Editar socio' : 'Crear socio'}
+            description={editingMember ? 'Actualiza los datos del socio.' : 'Crea una cuenta de socio del club.'}
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingMember(null)
+                    setShowMemberForm(false)
+                  }}
+                  disabled={memberPending}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" form="member-form" disabled={memberPending}>
+                  {memberPending ? <Loader2 className="size-4 animate-spin" /> : editingMember ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+                  {editingMember ? 'Guardar cambios' : 'Crear socio'}
+                </Button>
+              </>
+            }
+          >
+            <form id="member-form" key={editingMember?.id ?? 'new-member'} ref={memberFormRef} action={memberAction} className="space-y-4">
+              <input type="hidden" name="id" value={editingMember?.id ?? ''} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input name="nombre" placeholder="Nombre" defaultValue={editingMember?.nombre.split(' ')[0] ?? ''} required />
+                <Input name="apellidos" placeholder="Apellidos" defaultValue={editingMember ? editingMember.nombre.split(' ').slice(1).join(' ') : ''} required />
+              </div>
+              <Input name="email" type="email" placeholder="Email" defaultValue={editingMember?.email ?? ''} required />
+              <FormMessage state={memberState} />
+            </form>
+          </AdminFormDialog>
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {members.length} socios
-              </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                 <Users className="size-3.5" />
                 Gestión de socios
@@ -762,7 +805,7 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                           </div>
                         ) : (
                           <div className="flex justify-end gap-1">
-                            <Button size="icon-sm" variant="ghost" aria-label="Editar socio" onClick={() => setEditingMember(member)}>
+                            <Button size="icon-sm" variant="ghost" aria-label="Editar socio" onClick={() => { setEditingMember(member); setShowMemberForm(true) }}>
                               <Pencil className="size-4" />
                             </Button>
                             <Button size="icon-sm" variant="destructive" aria-label="Eliminar socio" onClick={() => setConfirmDeleteMemberId(member.id)}>

@@ -3,13 +3,10 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Sheet, SheetClose, SheetContent, SheetDescription,
-  SheetFooter, SheetHeader, SheetTitle,
-} from '@/components/ui/sheet'
 import { PageContainer } from '@/components/page-container'
 import { cn } from '@/lib/utils'
 import type { AdminTeamRow, AdminCategoryRow, AdminSeasonRow } from '@/lib/admin-app'
@@ -230,17 +227,24 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
         </table>
       </div>
 
-      {/* ── Sheet ────────────────────────────────────────────────── */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right">
-          <SheetHeader>
-            <SheetTitle>{mode === 'create' ? 'Nuevo equipo' : 'Editar equipo'}</SheetTitle>
-            <SheetDescription>
-              {mode === 'create' ? 'Rellena los datos para crear un equipo.' : 'Modifica los datos del equipo.'}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="flex flex-col gap-4 px-4 py-2">
+      <AdminFormDialog
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={mode === 'create' ? 'Nuevo equipo' : 'Editar equipo'}
+        description={mode === 'create' ? 'Rellena los datos para crear un equipo.' : 'Modifica los datos del equipo.'}
+        maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setSheetOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending ? 'Guardando...' : mode === 'create' ? 'Crear equipo' : 'Guardar cambios'}
+            </Button>
+          </>
+        }
+      >
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="team-name">Nombre</Label>
               <Input
@@ -258,7 +262,7 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
                 id="team-category"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Selecciona categoría…</option>
                 {categories.map((c) => (
@@ -273,7 +277,7 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
                 id="team-season"
                 value={seasonId}
                 onChange={(e) => setSeasonId(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Selecciona temporada…</option>
                 {seasons.map((s) => (
@@ -291,8 +295,9 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
                 placeholder="Observaciones internas…"
               />
             </div>
+          </div>
 
-            <div className="flex items-center gap-2">
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
               <input
                 id="team-active"
                 type="checkbox"
@@ -304,20 +309,11 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
             </div>
 
             {formError && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {formError}
               </p>
             )}
-          </div>
-
-          <SheetFooter>
-            <Button onClick={handleSubmit} disabled={isPending} className="w-full">
-              {isPending ? 'Guardando…' : mode === 'create' ? 'Crear equipo' : 'Guardar cambios'}
-            </Button>
-            <SheetClose render={<Button variant="outline" className="w-full">Cancelar</Button>} />
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      </AdminFormDialog>
         </>
       )}
     </PageContainer>

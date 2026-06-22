@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -137,6 +138,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
   useEffect(() => {
     if (createState.ok) {
       createFormRef.current?.reset()
+      setShowCreate(false)
     }
   }, [createState.ok, createState.message])
 
@@ -161,9 +163,26 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         </Button>
       </div>
 
-      {showCreate ? (
-        <form ref={createFormRef} action={createAction} className="mb-6 rounded-xl bg-white/82 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <AdminFormDialog
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        title="Añadir jugador"
+        description="Crea un deportista y asígnalo a tutor, categoría, temporada y equipo si corresponde."
+        maxWidth="xl"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="create-athlete-form" disabled={createPending}>
+              {createPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              Crear jugador
+            </Button>
+          </>
+        }
+      >
+        <form id="create-athlete-form" ref={createFormRef} action={createAction} className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <Input name="nombre" placeholder="Nombre" required />
             <Input name="apellidos" placeholder="Apellidos" required />
             <Input name="fechaNacimiento" type="date" required />
@@ -189,21 +208,88 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
             </select>
           </div>
           {createState.message ? (
-            <p className={cn('mt-3 rounded-lg px-3 py-2 text-sm font-semibold', createState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
+            <p className={cn('rounded-lg px-3 py-2 text-sm font-semibold', createState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
               {createState.message}
             </p>
           ) : null}
-          <div className="mt-4 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
+        </form>
+      </AdminFormDialog>
+
+      <AdminFormDialog
+        open={Boolean(editId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditId(null)
+            setDraft(null)
+          }
+        }}
+        title="Editar deportista"
+        description="Actualiza tutor, categoría, equipo, temporada y estado administrativo."
+        maxWidth="lg"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => { setEditId(null); setDraft(null) }}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={createPending}>
-              {createPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              Crear jugador
+            <Button
+              type="button"
+              disabled={isPending || !draft}
+              onClick={() => {
+                const athlete = athletes.find((item) => item.id === editId)
+                if (athlete) handleSave(athlete)
+              }}
+            >
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : <Pencil className="size-4" />}
+              Guardar cambios
             </Button>
+          </>
+        }
+      >
+        {draft ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-black text-foreground">Tutor</label>
+              <select
+                value={draft.guardianId}
+                onChange={(event) => setDraft((prev) => prev && { ...prev, guardianId: event.target.value })}
+                className="h-10 rounded-md border border-input bg-white px-3 text-sm text-foreground"
+              >
+                <option value="">Sin tutor</option>
+                {tutors.map((tutor) => (
+                  <option key={tutor.id} value={tutor.id}>
+                    {tutor.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-black text-foreground">Categoría</label>
+              <select value={draft.categoryId} onChange={(event) => setDraft((prev) => prev && { ...prev, categoryId: event.target.value })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-black text-foreground">Equipo</label>
+              <select value={draft.assignedTeamId} onChange={(event) => setDraft((prev) => prev && { ...prev, assignedTeamId: event.target.value })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
+                <option value="">Sin equipo asignado</option>
+                {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-black text-foreground">Temporada</label>
+              <select value={draft.seasonId} onChange={(event) => setDraft((prev) => prev && { ...prev, seasonId: event.target.value })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
+                {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-sm font-black text-foreground">Estado</label>
+              <select value={draft.status} onChange={(event) => setDraft((prev) => prev && { ...prev, status: event.target.value as Draft['status'] })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
+                {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+              </select>
+            </div>
           </div>
-        </form>
-      ) : null}
+        ) : null}
+      </AdminFormDialog>
 
       <div className="mb-4 space-y-3">
         <div className="flex gap-2">
@@ -269,73 +355,30 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
             ) : null}
 
             {filtered.map((athlete) => {
-              const isEditing = editId === athlete.id
               const isDeleting = deleteId === athlete.id
 
               return (
                 <tr key={athlete.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
                   <td className="px-4 py-3 font-medium">{athlete.nombre}</td>
                   <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                    {isEditing && draft ? (
-                      <select
-                        value={draft.guardianId}
-                        onChange={(event) => setDraft((prev) => prev && { ...prev, guardianId: event.target.value })}
-                        className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-foreground"
-                      >
-                        <option value="">Sin tutor</option>
-                        {tutors.map((tutor) => (
-                          <option key={tutor.id} value={tutor.id}>
-                            {tutor.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    ) : athlete.tutor}
+                    {athlete.tutor}
                   </td>
                   <td className="px-4 py-3">
-                    {isEditing && draft ? (
-                      <select value={draft.categoryId} onChange={(event) => setDraft((prev) => prev && { ...prev, categoryId: event.target.value })} className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm">
-                        {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
-                      </select>
-                    ) : athlete.categoriaSolicitada}
+                    {athlete.categoriaSolicitada}
                   </td>
                   <td className="px-4 py-3">
-                    {isEditing && draft ? (
-                      <select value={draft.assignedTeamId} onChange={(event) => setDraft((prev) => prev && { ...prev, assignedTeamId: event.target.value })} className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm">
-                        <option value="">Sin equipo asignado</option>
-                        {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
-                      </select>
-                    ) : athlete.equipoAsignado}
+                    {athlete.equipoAsignado}
                   </td>
                   <td className="px-4 py-3">
-                    {isEditing && draft ? (
-                      <select value={draft.seasonId} onChange={(event) => setDraft((prev) => prev && { ...prev, seasonId: event.target.value })} className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm">
-                        {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
-                      </select>
-                    ) : athlete.temporada}
+                    {athlete.temporada}
                   </td>
                   <td className="px-4 py-3">
-                    {isEditing && draft ? (
-                      <select value={draft.status} onChange={(event) => setDraft((prev) => prev && { ...prev, status: event.target.value as Draft['status'] })} className="h-9 w-full rounded-md border border-input bg-white px-3 text-sm">
-                        {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-                      </select>
-                    ) : (
                       <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', ESTADO_STYLES[athlete.estadoMatricula])}>
                         {athlete.estadoMatricula}
                       </span>
-                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {isEditing ? (
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" disabled={isPending} onClick={() => handleSave(athlete)}>
-                          {isPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                          Guardar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { setEditId(null); setDraft(null) }}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    ) : isDeleting ? (
+                    {isDeleting ? (
                       <div className="flex items-center justify-end gap-2">
                         <span className="text-xs text-muted-foreground">¿Eliminar?</span>
                         <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(athlete.id)}>

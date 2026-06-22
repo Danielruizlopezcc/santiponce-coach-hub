@@ -3,17 +3,10 @@
 import { ChangeEvent, useState, useTransition } from 'react'
 import { BadgeCheck, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import Image from 'next/image'
+import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { PageContainer } from '@/components/page-container'
 import { cn } from '@/lib/utils'
 import type { AdminSponsorRow } from '@/lib/admin-app'
@@ -251,20 +244,31 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
         </table>
       </div>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right">
-          <SheetHeader>
-            <SheetTitle>
-              {mode === 'create' ? 'Nuevo patrocinador' : 'Editar patrocinador'}
-            </SheetTitle>
-            <SheetDescription>
-              {mode === 'create'
-                ? 'Añade un título y una imagen para que se muestre a los usuarios.'
-                : 'Actualiza los datos del patrocinador. Deja la imagen vacía para conservarla.'}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="flex flex-col gap-4 px-4 py-2">
+      <AdminFormDialog
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={mode === 'create' ? 'Nuevo patrocinador' : 'Editar patrocinador'}
+        description={mode === 'create'
+          ? 'Añade un título y una imagen para que se muestre a los usuarios.'
+          : 'Actualiza los datos del patrocinador. Deja la imagen vacía para conservarla.'}
+        maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setSheetOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending
+                ? 'Guardando...'
+                : mode === 'create'
+                  ? 'Crear patrocinador'
+                  : 'Guardar cambios'}
+            </Button>
+          </>
+        }
+      >
+          <div className="grid gap-5 md:grid-cols-[1fr_260px]">
+            <div className="space-y-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="sponsor-title">Título</Label>
               <Input
@@ -292,7 +296,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
               <input
                 id="sponsor-active"
                 type="checkbox"
@@ -302,11 +306,13 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
               />
               <Label htmlFor="sponsor-active">Visible para usuarios</Label>
             </div>
+            </div>
 
+            <div className="space-y-4 rounded-lg border border-border bg-[#f8fafc] p-4">
             {mode === 'edit' && editing ? (
-              <div className="grid gap-2 rounded-xl border border-border bg-muted/30 p-3">
+              <div className="grid gap-2 rounded-xl border border-border bg-white p-3">
                 <span className="text-sm font-medium text-foreground">Imagen actual</span>
-                <div className="relative h-28 overflow-hidden rounded-xl bg-muted">
+                <div className="relative h-40 overflow-hidden rounded-xl bg-muted">
                   <Image
                     src={editing.imageUrl}
                     alt={editing.title}
@@ -325,28 +331,18 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
+                className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
               />
             </div>
+            </div>
+          </div>
 
             {formError ? (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {formError}
               </p>
             ) : null}
-          </div>
-
-          <SheetFooter>
-            <Button onClick={handleSubmit} disabled={isPending} className="w-full">
-              {isPending
-                ? 'Guardando…'
-                : mode === 'create'
-                ? 'Crear patrocinador'
-                : 'Guardar cambios'}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      </AdminFormDialog>
     </PageContainer>
   )
 }

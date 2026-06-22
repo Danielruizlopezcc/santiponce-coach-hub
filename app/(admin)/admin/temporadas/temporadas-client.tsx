@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { AdminSeasonRow } from '@/lib/admin-app'
@@ -102,73 +103,94 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
           onClick={() => {
             setEditId(null)
             setDeleteId(null)
-            setShowCreate((current) => !current)
+            setShowCreate(true)
           }}
         >
-          {showCreate ? <X className="size-4" /> : <Plus className="size-4" />}
-          {showCreate ? 'Cerrar' : 'Añadir temporada'}
+          <Plus className="size-4" />
+          Añadir temporada
         </Button>
       </div>
 
-      {showCreate ? (
-        <div className="rounded-xl bg-white/82 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-          <div className="mb-3">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Nueva temporada</p>
-            <h3 className="mt-1 text-lg font-black text-foreground">Crear temporada</h3>
-          </div>
-          <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end">
+      <AdminFormDialog
+        open={showCreate || Boolean(editId)}
+        onOpenChange={(open) => {
+          setShowCreate(open)
+          if (!open) setEditId(null)
+        }}
+        title={editId ? 'Editar temporada' : 'Crear temporada'}
+        description={editId ? 'Actualiza las fechas y el estado de la temporada.' : 'Crea una nueva temporada para el club.'}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => { setShowCreate(false); setEditId(null) }}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => editId ? handleSave(editId) : handleCreate()}
+              disabled={isPending}
+            >
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : editId ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+              {editId ? 'Guardar cambios' : 'Crear temporada'}
+            </Button>
+          </>
+        }
+      >
+          <div className="grid gap-3 md:grid-cols-3">
             <div>
-              <label className="text-sm font-black text-foreground" htmlFor="new-season-name">
+              <label className="text-sm font-black text-foreground" htmlFor="season-name">
                 Nombre
               </label>
               <Input
-                id="new-season-name"
-                value={createForm.nombre}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, nombre: event.target.value }))}
+                id="season-name"
+                value={editId ? form.nombre : createForm.nombre}
+                onChange={(event) => editId
+                  ? setForm((prev) => ({ ...prev, nombre: event.target.value }))
+                  : setCreateForm((prev) => ({ ...prev, nombre: event.target.value }))}
                 placeholder="Temporada 2027/2028"
                 className="mt-2"
               />
             </div>
             <div>
-              <label className="text-sm font-black text-foreground" htmlFor="new-season-start">
+              <label className="text-sm font-black text-foreground" htmlFor="season-start">
                 Fecha inicio
               </label>
               <Input
-                id="new-season-start"
+                id="season-start"
                 type="date"
-                value={createForm.startsAt}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, startsAt: event.target.value }))}
+                value={editId ? form.startsAt : createForm.startsAt}
+                onChange={(event) => editId
+                  ? setForm((prev) => ({ ...prev, startsAt: event.target.value }))
+                  : setCreateForm((prev) => ({ ...prev, startsAt: event.target.value }))}
                 className="mt-2"
               />
             </div>
             <div>
-              <label className="text-sm font-black text-foreground" htmlFor="new-season-end">
+              <label className="text-sm font-black text-foreground" htmlFor="season-end">
                 Fecha fin
               </label>
               <Input
-                id="new-season-end"
+                id="season-end"
                 type="date"
-                value={createForm.endsAt}
-                onChange={(event) => setCreateForm((prev) => ({ ...prev, endsAt: event.target.value }))}
+                value={editId ? form.endsAt : createForm.endsAt}
+                onChange={(event) => editId
+                  ? setForm((prev) => ({ ...prev, endsAt: event.target.value }))
+                  : setCreateForm((prev) => ({ ...prev, endsAt: event.target.value }))}
                 className="mt-2"
               />
             </div>
-            <Button type="button" onClick={handleCreate} disabled={isPending}>
-              {isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              Crear
-            </Button>
           </div>
-          <label className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+          <label className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
             <input
               type="checkbox"
-              checked={createForm.isActive}
-              onChange={(event) => setCreateForm((prev) => ({ ...prev, isActive: event.target.checked }))}
+              checked={editId ? form.isActive : createForm.isActive}
+              onChange={(event) => editId
+                ? setForm((prev) => ({ ...prev, isActive: event.target.checked }))
+                : setCreateForm((prev) => ({ ...prev, isActive: event.target.checked }))}
               className="size-4"
             />
             Marcar como temporada activa
           </label>
-        </div>
-      ) : null}
+      </AdminFormDialog>
 
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -198,59 +220,26 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
           </thead>
           <tbody className="divide-y divide-border bg-card">
             {filtered.map((season) => {
-              const isEditing = editId === season.id
               const isDeleting = deleteId === season.id
 
               return (
                 <tr key={season.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
                   <td className="px-4 py-3">
-                    {isEditing ? (
-                      <Input value={form.nombre} onChange={(event) => setForm((prev) => ({ ...prev, nombre: event.target.value }))} />
-                    ) : (
-                      season.nombre
-                    )}
+                    {season.nombre}
                   </td>
                   <td className="px-4 py-3">
-                    {isEditing ? (
-                      <Input type="date" value={form.startsAt} onChange={(event) => setForm((prev) => ({ ...prev, startsAt: event.target.value }))} />
-                    ) : (
-                      season.fechaInicio
-                    )}
+                    {season.fechaInicio}
                   </td>
                   <td className="px-4 py-3">
-                    {isEditing ? (
-                      <Input type="date" value={form.endsAt} onChange={(event) => setForm((prev) => ({ ...prev, endsAt: event.target.value }))} />
-                    ) : (
-                      season.fechaFin
-                    )}
+                    {season.fechaFin}
                   </td>
                   <td className="px-4 py-3">
-                    {isEditing ? (
-                      <label className="flex items-center gap-2 text-xs font-semibold">
-                        <input
-                          type="checkbox"
-                          checked={form.isActive}
-                          onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))}
-                        />
-                        Activa
-                      </label>
-                    ) : (
                       <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                         {season.estado}
                       </span>
-                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {isEditing ? (
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" disabled={isPending} onClick={() => handleSave(season.id)}>
-                          Guardar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    ) : isDeleting ? (
+                    {isDeleting ? (
                       <div className="flex items-center justify-end gap-2">
                         <span className="text-xs text-muted-foreground">¿Eliminar?</span>
                         <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(season.id)}>

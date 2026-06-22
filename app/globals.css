@@ -156,3 +156,85 @@
     animation: blob 12s infinite ease-in-out 2s;
   }
 }
+
+.news-rich-content {
+  color: var(--foreground);
+  font-size: 1.125rem;
+  line-height: 2;
+}
+
+.news-rich-content > * + * {
+  margin-top: 1.25rem;
+}
+
+.news-rich-content h2,
+.news-editor h2 {
+  color: var(--primary);
+  font-size: clamp(1.65rem, 2.5vw, 2.35rem);
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.news-rich-content h3,
+.news-editor h3 {
+  color: var(--foreground);
+  font-size: clamp(1.3rem, 2vw, 1.75rem);
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.news-rich-content p,
+.news-editor p {
+  min-height: 1.5em;
+}
+
+.news-rich-content strong,
+.news-rich-content b,
+.news-editor strong,
+.news-editor b {
+  font-weight: 900;
+}
+
+.news-rich-content u,
+.news-editor u {
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 0.08em;
+}
+
+.news-rich-content ul,
+.news-rich-content ol,
+.news-editor ul,
+.news-editor ol {
+  padding-left: 1.5rem;
+}
+
+.news-rich-content ul,
+.news-editor ul {
+  list-style: disc;
+}
+
+.news-rich-content ol,
+.news-editor ol {
+  list-style: decimal;
+}
+
+.news-editor {
+  font-size: 0.95rem;
+}
+
+.news-rich-content font[size='6'],
+.news-editor font[size='6'] {
+  font-size: clamp(1.7rem, 2.5vw, 2.35rem);
+  line-height: 1.15;
+}
+
+.news-rich-content font[size='5'],
+.news-editor font[size='5'] {
+  font-size: clamp(1.3rem, 2vw, 1.75rem);
+  line-height: 1.2;
+}
+
+.news-rich-content font[size='3'],
+.news-editor font[size='3'] {
+  font-size: 1em;
+}

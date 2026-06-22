@@ -29,6 +29,10 @@ function getSectionHref(basePath: string, sectionId?: string) {
   return sectionId ? `${basePath}?section=${sectionId}` : basePath
 }
 
+function getNewsHref(basePath: string, itemId: string) {
+  return `${basePath}/${itemId}`
+}
+
 function NewsMeta({ item, compact = false }: { item: PrivateNewsItem; compact?: boolean }) {
   return (
     <p
@@ -46,9 +50,9 @@ function NewsMeta({ item, compact = false }: { item: PrivateNewsItem; compact?: 
   )
 }
 
-function FeaturedNewsCard({ item }: { item: PrivateNewsItem }) {
+function FeaturedNewsCard({ item, href }: { item: PrivateNewsItem; href: string }) {
   return (
-    <article className="group relative min-h-[520px] overflow-hidden rounded-lg bg-foreground text-white shadow-xl ring-1 ring-black/10">
+    <Link href={href} className="group relative block min-h-[520px] overflow-hidden rounded-lg bg-foreground text-white shadow-xl ring-1 ring-black/10">
       <div className="absolute inset-0 bg-muted">
         <Image
           src={item.imageUrl}
@@ -77,13 +81,13 @@ function FeaturedNewsCard({ item }: { item: PrivateNewsItem }) {
         ) : null}
         <NewsMeta item={item} compact />
       </div>
-    </article>
+    </Link>
   )
 }
 
-function HeadlineCard({ item, index }: { item: PrivateNewsItem; index: number }) {
+function HeadlineCard({ item, index, href }: { item: PrivateNewsItem; index: number; href: string }) {
   return (
-    <article className="group grid grid-cols-[92px_1fr] gap-4 border-b border-border/80 py-5 last:border-b-0">
+    <Link href={href} className="group grid grid-cols-[92px_1fr] gap-4 border-b border-border/80 py-5 last:border-b-0">
       <div className="relative aspect-square overflow-hidden rounded-md bg-muted">
         <Image src={item.imageUrl} alt={item.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" sizes="92px" />
       </div>
@@ -96,13 +100,13 @@ function HeadlineCard({ item, index }: { item: PrivateNewsItem; index: number })
         </h3>
         <NewsMeta item={item} compact />
       </div>
-    </article>
+    </Link>
   )
 }
 
-function NewsCard({ item }: { item: PrivateNewsItem }) {
+function NewsCard({ item, href }: { item: PrivateNewsItem; href: string }) {
   return (
-    <article className="group overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <Link href={href} className="group block overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl">
       <div className="relative aspect-[16/10] bg-muted">
         <Image
           src={item.imageUrl}
@@ -118,7 +122,7 @@ function NewsCard({ item }: { item: PrivateNewsItem }) {
         </h2>
         <NewsMeta item={item} compact />
       </div>
-    </article>
+    </Link>
   )
 }
 
@@ -222,7 +226,7 @@ export function NewsListing({
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-              {mainNews ? <FeaturedNewsCard item={mainNews} /> : null}
+              {mainNews ? <FeaturedNewsCard item={mainNews} href={getNewsHref(basePath, mainNews.id)} /> : null}
 
               {headlineNews.length > 0 ? (
                 <aside className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-black/5">
@@ -236,7 +240,7 @@ export function NewsListing({
                   </div>
                   <div>
                     {headlineNews.map((item, index) => (
-                      <HeadlineCard key={item.id} item={item} index={index} />
+                      <HeadlineCard key={item.id} item={item} index={index} href={getNewsHref(basePath, item.id)} />
                     ))}
                   </div>
                 </aside>
@@ -255,7 +259,7 @@ export function NewsListing({
                 </div>
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {regularNews.map((item) => (
-                  <NewsCard key={item.id} item={item} />
+                    <NewsCard key={item.id} item={item} href={getNewsHref(basePath, item.id)} />
                   ))}
                 </div>
               </div>
