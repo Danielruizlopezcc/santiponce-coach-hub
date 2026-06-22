@@ -4,6 +4,7 @@ import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
 import { formatSpanishDate, formatSpanishDateTime } from '@/lib/format'
 import { getPrivateViewer } from '@/lib/private-app'
 import type { PlayerPosition, PrivateViewer } from '@/lib/private-app-shared'
+import { getSponsorTierFromSortOrder, type SponsorTier } from '@/lib/sponsors'
 import { createClient } from '@/lib/supabase/server'
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
@@ -251,6 +252,7 @@ export type AdminSponsorRow = {
   imageUrl: string
   isActive: boolean
   sortOrder: number
+  tier: SponsorTier
   createdAt: string
 }
 
@@ -886,6 +888,7 @@ export async function getAdminSponsors(): Promise<AdminSponsorRow[]> {
     imageUrl: sponsor.image_url,
     isActive: sponsor.is_active,
     sortOrder: sponsor.sort_order,
+    tier: getSponsorTierFromSortOrder(sponsor.sort_order),
     createdAt: sponsor.created_at,
   }))
 }

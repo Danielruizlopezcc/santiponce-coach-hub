@@ -2,6 +2,7 @@ import type {
   DeportistaFormValues,
   TutorProfileFormValues,
 } from '@/lib/registro-schema'
+import type { SponsorTier } from '@/lib/sponsors'
 
 export type PrivateViewer = {
   id: string
@@ -53,6 +54,7 @@ export type PrivateSponsor = {
   id: string
   title: string
   imageUrl: string
+  tier: SponsorTier
 }
 
 export type PrivateNewsSection = {

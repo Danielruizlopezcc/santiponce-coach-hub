@@ -18,6 +18,7 @@ import type {
 } from '@/lib/private-app-shared'
 import { normalizeDocument, normalizeEmail, normalizeOptionalEmail, normalizeOptionalPhone, normalizePhone } from '@/lib/private-app-shared'
 import { getSavedStripeCardByEmail } from '@/lib/stripe-payment-methods'
+import { getSponsorTierFromSortOrder } from '@/lib/sponsors'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
@@ -304,14 +305,16 @@ export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('sponsors')
-    .select('id, title, image_url')
+    .select('id, title, image_url, sort_order')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   return (data ?? []).map((sponsor) => ({
     id: sponsor.id,
     title: sponsor.title,
     imageUrl: sponsor.image_url,
+    tier: getSponsorTierFromSortOrder(sponsor.sort_order),
   }))
 }
 

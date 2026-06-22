@@ -1,144 +1,176 @@
 import Image from 'next/image'
-import { Handshake, ShieldCheck, Star } from 'lucide-react'
+import { BadgeCheck, Building2, Handshake, ShieldCheck, Sparkles, Trophy } from 'lucide-react'
+import { CLUB } from '@/lib/club'
 import type { PrivateSponsor } from '@/lib/private-app-shared'
+import { getSponsorTierOption } from '@/lib/sponsors'
+import { cn } from '@/lib/utils'
 
 type SponsorsShowcaseProps = {
   sponsors: PrivateSponsor[]
   emptyDescription: string
 }
 
-export function SponsorsShowcase({ sponsors, emptyDescription }: SponsorsShowcaseProps) {
-  const [mainSponsor, secondSponsor, ...restSponsors] = sponsors
-  const principalSponsors = [mainSponsor, secondSponsor].filter(Boolean)
+type SponsorSectionProps = {
+  title: string
+  eyebrow: string
+  sponsors: PrivateSponsor[]
+  variant: 'principal' | 'standard'
+}
 
-  if (sponsors.length === 0) {
-    return (
-      <div className="rounded-lg border border-border bg-white/88 p-8 text-center shadow-sm backdrop-blur">
-        <p className="text-base font-bold text-foreground">Aún no hay patrocinadores disponibles.</p>
-        <p className="mt-2 text-sm text-muted-foreground">{emptyDescription}</p>
-      </div>
-    )
-  }
+function SponsorCard({
+  sponsor,
+  priority = false,
+  variant,
+}: {
+  sponsor: PrivateSponsor
+  priority?: boolean
+  variant: 'principal' | 'standard'
+}) {
+  const tierOption = getSponsorTierOption(sponsor.tier)
+  const isPrincipal = sponsor.tier === 'principal'
+  const isPrincipalVariant = variant === 'principal'
 
   return (
-    <div className="space-y-8">
-      <section className="overflow-hidden rounded-lg border border-[#0b2d66]/20 bg-[#06172f] text-white shadow-xl">
-        <div className="relative">
-          <div
-            className="absolute inset-0 opacity-30"
-            aria-hidden="true"
-            style={{
-              backgroundImage:
-                'linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-              backgroundSize: '64px 64px',
-            }}
+    <li className="group overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+      <article className={cn('grid h-full', isPrincipalVariant && 'lg:grid-cols-[1.05fr_0.95fr]')}>
+        <div className={cn('relative bg-white', isPrincipalVariant ? 'min-h-[280px]' : 'aspect-[16/10]')}>
+          <Image
+            src={sponsor.imageUrl}
+            alt={sponsor.title}
+            fill
+            priority={priority}
+            className="object-contain p-8 transition-transform duration-500 group-hover:scale-[1.035]"
+            sizes={isPrincipalVariant ? '(max-width: 1024px) 100vw, 50vw' : '(max-width: 1280px) 50vw, 33vw'}
           />
-          <div className="relative grid gap-8 px-6 py-8 md:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-white/75 ring-1 ring-white/15">
-                <ShieldCheck className="size-3.5" aria-hidden="true" />
-                Área empresarial
-              </span>
-              <h2 className="mt-5 text-4xl font-black leading-none tracking-tight md:text-6xl">
-                Empresas que impulsan al CD Santiponce
-              </h2>
-              <p className="mt-5 max-w-2xl text-base font-medium leading-7 text-white/76">
-                Patrocinadores oficiales que sostienen la cantera, la competición y la identidad del club durante la temporada.
-              </p>
-              <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg bg-white/10 p-4 ring-1 ring-white/12">
-                  <p className="text-3xl font-black">{sponsors.length}</p>
-                  <p className="text-xs font-bold uppercase tracking-wide text-white/60">
-                    Colaboradores
-                  </p>
-                </div>
-                <div className="rounded-lg bg-white/10 p-4 ring-1 ring-white/12">
-                  <p className="text-3xl font-black">1ª</p>
-                  <p className="text-xs font-bold uppercase tracking-wide text-white/60">
-                    Línea local
-                  </p>
-                </div>
-                <div className="rounded-lg bg-white/10 p-4 ring-1 ring-white/12">
-                  <p className="text-3xl font-black">26/27</p>
-                  <p className="text-xs font-bold uppercase tracking-wide text-white/60">
-                    Temporada
-                  </p>
-                </div>
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
+        </div>
+        <div className="flex flex-col justify-between border-t border-border bg-[#fbfcff] p-5 lg:border-t-0">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-primary">
+              {isPrincipal ? (
+                <Sparkles className="size-3.5" aria-hidden="true" />
+              ) : (
+                <BadgeCheck className="size-3.5" aria-hidden="true" />
+              )}
+              {tierOption.label}
+            </span>
+            <h3 className={cn('mt-4 font-black leading-tight tracking-tight text-foreground', isPrincipalVariant ? 'text-3xl md:text-4xl' : 'text-2xl')}>
+              {sponsor.title}
+            </h3>
+          </div>
+          <div className="mt-8 flex items-center justify-between border-t border-border pt-4 text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">
+            <span>{CLUB.shortName}</span>
+            <span>Club oficial</span>
+          </div>
+        </div>
+      </article>
+    </li>
+  )
+}
+
+function SponsorSection({ title, eyebrow, sponsors, variant }: SponsorSectionProps) {
+  if (sponsors.length === 0) return null
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">{eyebrow}</p>
+        <h3 className="mt-1 text-2xl font-black tracking-tight text-foreground md:text-3xl">{title}</h3>
+      </div>
+      <ul className={cn('grid gap-5', variant === 'principal' ? 'xl:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3')}>
+        {sponsors.map((sponsor, index) => (
+          <SponsorCard
+            key={sponsor.id}
+            sponsor={sponsor}
+            priority={variant === 'principal' && index === 0}
+            variant={variant}
+          />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+export function SponsorsShowcase({ sponsors, emptyDescription }: SponsorsShowcaseProps) {
+  const principalSponsors = sponsors.filter((sponsor) => sponsor.tier === 'principal')
+  const featuredSponsors = sponsors.filter((sponsor) => sponsor.tier === 'destacado')
+  const partnerSponsors = sponsors.filter((sponsor) => sponsor.tier === 'partner')
+
+  return (
+    <section className="bg-[#f4f6f8]">
+      <div className="relative overflow-hidden bg-[#06172f] text-white">
+        <div
+          className="absolute inset-0 opacity-25"
+          aria-hidden="true"
+          style={{
+            backgroundImage:
+              'linear-gradient(135deg, rgba(255,255,255,0.12) 0 1px, transparent 1px 54px), linear-gradient(90deg, rgba(39,113,203,0.28), transparent 55%)',
+            backgroundSize: '56px 56px, 100% 100%',
+          }}
+        />
+        <div className="relative mx-auto max-w-7xl px-4 py-12 md:px-8 md:py-16">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.32em] text-white/70">
+              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+              Area corporativa
+            </p>
+            <h1 className="mt-3 max-w-4xl text-4xl font-black leading-none tracking-tight md:text-7xl">
+              Patrocinadores oficiales
+            </h1>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-12">
+        {sponsors.length === 0 ? (
+          <div className="flex min-h-80 flex-col items-center justify-center rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
+            <span className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Building2 className="size-7" aria-hidden="true" />
+            </span>
+            <h2 className="mt-4 text-xl font-black text-foreground">Aun no hay patrocinadores disponibles</h2>
+            <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{emptyDescription}</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-primary">
+                  <Handshake className="size-4" aria-hidden="true" />
+                  Red empresarial
+                </p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-foreground md:text-4xl">
+                  Marcas que compiten con nosotros
+                </h2>
+              </div>
+              <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-black text-[#06172f] shadow-sm ring-1 ring-black/5">
+                <Trophy className="size-4 text-primary" aria-hidden="true" />
+                Colaboradores oficiales
               </div>
             </div>
 
-            <div className="grid gap-4">
-              {principalSponsors.map((sponsor, index) => (
-                <article
-                  key={sponsor.id}
-                  className="grid gap-5 rounded-lg bg-white p-4 text-foreground shadow-2xl ring-1 ring-white/20 sm:grid-cols-[260px_1fr] sm:items-center"
-                >
-                  <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-white">
-                    <Image
-                      src={sponsor.imageUrl}
-                      alt={sponsor.title}
-                      fill
-                      priority={index === 0}
-                      className="object-contain p-3"
-                      sizes="260px"
-                    />
-                  </div>
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-primary">
-                      <Star className="size-3.5" aria-hidden="true" />
-                      {index === 0 ? 'Patrocinador principal' : 'Patrocinador destacado'}
-                    </span>
-                    <h3 className="mt-3 text-2xl font-black tracking-tight">{sponsor.title}</h3>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">
-                      Presencia preferente en la comunidad del club.
-                    </p>
-                  </div>
-                </article>
-              ))}
+            <div className="space-y-12">
+              <SponsorSection
+                title="Patrocinadores principales"
+                eyebrow="Máxima visibilidad"
+                sponsors={principalSponsors}
+                variant="principal"
+              />
+              <SponsorSection
+                title="Patrocinadores destacados"
+                eyebrow="Apoyo preferente"
+                sponsors={featuredSponsors}
+                variant="standard"
+              />
+              <SponsorSection
+                title="Partners oficiales"
+                eyebrow="Red de colaboradores"
+                sponsors={partnerSponsors}
+                variant="standard"
+              />
             </div>
           </div>
-        </div>
-      </section>
-
-      {restSponsors.length > 0 ? (
-        <section className="rounded-lg border border-border bg-white/90 p-5 shadow-sm backdrop-blur md:p-6">
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-primary">
-                <Handshake className="size-4" aria-hidden="true" />
-                Club de patrocinadores
-              </p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground">
-                Red oficial de colaboradores
-              </h2>
-            </div>
-          </div>
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {restSponsors.map((sponsor) => (
-              <li
-                key={sponsor.id}
-                className="group overflow-hidden rounded-lg border border-border bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg"
-              >
-                <div className="relative aspect-[4/3] bg-white">
-                  <Image
-                    src={sponsor.imageUrl}
-                    alt={sponsor.title}
-                    fill
-                    className="object-contain p-5 transition-transform duration-500 group-hover:scale-[1.04]"
-                    sizes="(max-width: 1280px) 50vw, 25vw"
-                  />
-                </div>
-                <div className="border-t border-border bg-[#f8fafc] px-4 py-3 text-center">
-                  <p className="truncate text-sm font-black text-foreground">{sponsor.title}</p>
-                  <p className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                    Partner oficial
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-    </div>
+        )}
+      </div>
+    </section>
   )
 }

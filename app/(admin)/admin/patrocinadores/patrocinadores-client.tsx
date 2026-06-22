@@ -1,7 +1,7 @@
 'use client'
 
 import { ChangeEvent, useState, useTransition } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { BadgeCheck, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,7 @@ import {
 import { PageContainer } from '@/components/page-container'
 import { cn } from '@/lib/utils'
 import type { AdminSponsorRow } from '@/lib/admin-app'
+import { getSponsorTierOption, SPONSOR_TIER_OPTIONS, type SponsorTier } from '@/lib/sponsors'
 import { createSponsor, deleteSponsor, updateSponsor } from './actions'
 
 type SheetMode = 'create' | 'edit'
@@ -29,7 +30,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [title, setTitle] = useState('')
-  const [sortOrder, setSortOrder] = useState('1')
+  const [tier, setTier] = useState<SponsorTier>('partner')
   const [isActive, setIsActive] = useState(true)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [inputKey, setInputKey] = useState('initial')
@@ -38,7 +39,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
     setMode('create')
     setEditing(null)
     setTitle('')
-    setSortOrder(String(sponsors.length + 1))
+    setTier('partner')
     setIsActive(true)
     setImageFile(null)
     setFormError(null)
@@ -50,7 +51,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
     setMode('edit')
     setEditing(sponsor)
     setTitle(sponsor.title)
-    setSortOrder(String(sponsor.sortOrder))
+    setTier(sponsor.tier)
     setIsActive(sponsor.isActive)
     setImageFile(null)
     setFormError(null)
@@ -65,15 +66,9 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
 
   function handleSubmit() {
     const trimmedTitle = title.trim()
-    const order = parseInt(sortOrder, 10)
 
     if (!trimmedTitle) {
       setFormError('El título es obligatorio.')
-      return
-    }
-
-    if (isNaN(order) || order < 1) {
-      setFormError('El orden debe ser un número mayor que 0.')
       return
     }
 
@@ -88,7 +83,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
       try {
         const formData = new FormData()
         formData.set('title', trimmedTitle)
-        formData.set('sortOrder', String(order))
+        formData.set('tier', tier)
         formData.set('isActive', String(isActive))
 
         if (mode === 'create') {
@@ -148,7 +143,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
                 Título
               </th>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                Orden
+                Tipo
               </th>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
                 Estado
@@ -166,28 +161,40 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
                 </td>
               </tr>
             ) : (
-              sponsors.map((sponsor) => (
-                <tr
-                  key={sponsor.id}
-                  className={cn(
-                    'transition-colors hover:bg-muted/30',
-                    confirmDeleteId === sponsor.id && 'bg-destructive/5',
-                  )}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="relative h-16 w-24 overflow-hidden rounded-lg bg-muted">
-                        <Image
-                          src={sponsor.imageUrl}
-                          alt={sponsor.title}
-                          fill
-                          className="object-cover"
-                        />
+              sponsors.map((sponsor) => {
+                const tierOption = getSponsorTierOption(sponsor.tier)
+
+                return (
+                  <tr
+                    key={sponsor.id}
+                    className={cn(
+                      'transition-colors hover:bg-muted/30',
+                      confirmDeleteId === sponsor.id && 'bg-destructive/5',
+                    )}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-16 w-24 overflow-hidden rounded-lg bg-white ring-1 ring-border">
+                          <Image
+                            src={sponsor.imageUrl}
+                            alt={sponsor.title}
+                            fill
+                            className="object-contain p-2"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-medium text-foreground">{sponsor.title}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{sponsor.sortOrder}</td>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-foreground">{sponsor.title}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                        {sponsor.tier === 'principal' ? (
+                          <Sparkles className="size-3.5" aria-hidden="true" />
+                        ) : (
+                          <BadgeCheck className="size-3.5" aria-hidden="true" />
+                        )}
+                        {tierOption.label}
+                      </span>
+                    </td>
                   <td className="px-4 py-3">
                     <span
                       className={cn(
@@ -237,7 +244,8 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
                     )}
                   </td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>
@@ -269,14 +277,19 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sponsor-order">Orden</Label>
-              <Input
-                id="sponsor-order"
-                type="number"
-                min={1}
-                value={sortOrder}
-                onChange={(event) => setSortOrder(event.target.value)}
-              />
+              <Label htmlFor="sponsor-tier">Tipo de patrocinio</Label>
+              <select
+                id="sponsor-tier"
+                value={tier}
+                onChange={(event) => setTier(event.target.value as SponsorTier)}
+                className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                {SPONSOR_TIER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">
@@ -298,7 +311,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
                     src={editing.imageUrl}
                     alt={editing.title}
                     fill
-                    className="object-cover"
+                    className="object-contain p-3"
                   />
                 </div>
               </div>

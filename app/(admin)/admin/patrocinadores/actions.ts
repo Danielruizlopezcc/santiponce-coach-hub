@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdminAction } from '@/lib/auth'
+import { getSponsorTierOption, SPONSOR_TIER_OPTIONS, type SponsorTier } from '@/lib/sponsors'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const BUCKET_NAME = 'sponsors'
@@ -60,9 +61,15 @@ async function uploadSponsorImage(supabase: ReturnType<typeof createAdminClient>
   return publicUrlData.publicUrl
 }
 
+function getSponsorSortOrder(value: FormDataEntryValue | null) {
+  const tier = typeof value === 'string' ? value : 'partner'
+  const isValidTier = SPONSOR_TIER_OPTIONS.some((option) => option.value === tier)
+  return getSponsorTierOption(isValidTier ? (tier as SponsorTier) : 'partner').sortOrder
+}
+
 export async function createSponsor(formData: FormData) {
   const title = formData.get('title')
-  const sortOrder = Number(formData.get('sortOrder'))
+  const sortOrder = getSponsorSortOrder(formData.get('tier'))
   const isActive = formData.get('isActive') === 'true'
   const image = formData.get('image') as File | null
 
@@ -81,7 +88,7 @@ export async function createSponsor(formData: FormData) {
     title: title.trim(),
     image_url: imageUrl,
     is_active: isActive,
-    sort_order: Number.isFinite(sortOrder) && sortOrder > 0 ? sortOrder : 1,
+    sort_order: sortOrder,
   })
 
   if (error) {
@@ -89,13 +96,14 @@ export async function createSponsor(formData: FormData) {
   }
 
   revalidatePath('/admin/patrocinadores')
+  revalidatePath('/patrocinadores')
   revalidatePath('/app/patrocinadores')
 }
 
 export async function updateSponsor(formData: FormData) {
   const id = formData.get('id')
   const title = formData.get('title')
-  const sortOrder = Number(formData.get('sortOrder'))
+  const sortOrder = getSponsorSortOrder(formData.get('tier'))
   const isActive = formData.get('isActive') === 'true'
   const image = formData.get('image') as File | null
 
@@ -112,7 +120,7 @@ export async function updateSponsor(formData: FormData) {
   const updates: Record<string, unknown> = {
     title: title.trim(),
     is_active: isActive,
-    sort_order: Number.isFinite(sortOrder) && sortOrder > 0 ? sortOrder : 1,
+    sort_order: sortOrder,
   }
 
   if (image) {
@@ -125,6 +133,7 @@ export async function updateSponsor(formData: FormData) {
   }
 
   revalidatePath('/admin/patrocinadores')
+  revalidatePath('/patrocinadores')
   revalidatePath('/app/patrocinadores')
 }
 
@@ -134,5 +143,6 @@ export async function deleteSponsor(id: string) {
   if (error) throw new Error(error.message)
 
   revalidatePath('/admin/patrocinadores')
+  revalidatePath('/patrocinadores')
   revalidatePath('/app/patrocinadores')
 }
