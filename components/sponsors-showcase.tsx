@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { BadgeCheck, Building2, Handshake, ShieldCheck, Sparkles, Trophy } from 'lucide-react'
+import { BrandedPageHero } from '@/components/branded-page-hero'
 import { CLUB } from '@/lib/club'
 import type { PrivateSponsor } from '@/lib/private-app-shared'
 import { getSponsorTierOption } from '@/lib/sponsors'
@@ -98,28 +99,15 @@ export function SponsorsShowcase({ sponsors, emptyDescription }: SponsorsShowcas
 
   return (
     <section className="bg-[#f4f6f8]">
-      <div className="relative overflow-hidden bg-[#06172f] text-white">
-        <div
-          className="absolute inset-0 opacity-25"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              'linear-gradient(135deg, rgba(255,255,255,0.12) 0 1px, transparent 1px 54px), linear-gradient(90deg, rgba(39,113,203,0.28), transparent 55%)',
-            backgroundSize: '56px 56px, 100% 100%',
-          }}
-        />
-        <div className="relative mx-auto max-w-7xl px-4 py-12 md:px-8 md:py-16">
-          <div>
-            <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.32em] text-white/70">
-              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
-              Area corporativa
-            </p>
-            <h1 className="mt-3 max-w-4xl text-4xl font-black leading-none tracking-tight md:text-7xl">
-              Patrocinadores oficiales
-            </h1>
-          </div>
-        </div>
-      </div>
+      <BrandedPageHero
+        eyebrow={(
+          <span className="inline-flex items-center gap-2">
+            <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+            Area corporativa
+          </span>
+        )}
+        title="Patrocinadores oficiales"
+      />
 
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-12">
         {sponsors.length === 0 ? (

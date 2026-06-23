@@ -23,6 +23,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: 'Tutores / Socios', href: '/admin/tutores', icon: UserCheck },
   { label: 'Deportistas', href: '/admin/deportistas', icon: Trophy },
   { label: 'Equipos', href: '/admin/equipos', icon: Shield },
+  { label: 'Calendario', href: '/admin/calendario', icon: Calendar },
   { label: 'Noticias', href: '/admin/noticias', icon: Newspaper },
   { label: 'Patrocinadores', href: '/admin/patrocinadores', icon: Trophy },
   { label: 'Temporadas', href: '/admin/temporadas', icon: Calendar },

@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { CalendarDays, Newspaper } from 'lucide-react'
+import { BrandedPageHero } from '@/components/branded-page-hero'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateNewsSection } from '@/lib/private-app-shared'
 import { cn } from '@/lib/utils'
@@ -148,21 +149,10 @@ export function NewsListing({
 
   return (
     <section className="bg-[#f4f6f8]">
-      <div className="bg-[#06172f] text-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 md:px-8 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.32em] text-primary-foreground/70">
-              Actualidad oficial
-            </p>
-            <h1 className="mt-3 text-4xl font-black leading-none tracking-tight md:text-6xl">
-              Noticias
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-white/72">
-              Toda la informacion del {CLUB.shortName}, organizada por secciones y siempre al dia.
-            </p>
-          </div>
-        </div>
-      </div>
+      <BrandedPageHero
+        eyebrow="Actualidad oficial"
+        title="Noticias"
+      />
 
       <div className="border-b border-border bg-white/95 shadow-sm backdrop-blur">
         <nav

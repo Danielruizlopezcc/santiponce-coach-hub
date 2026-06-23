@@ -291,11 +291,11 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         ) : null}
       </AdminFormDialog>
 
-      <div className="mb-4 space-y-3">
+      <div className="mb-5 space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input type="search" placeholder="Buscar por deportista, tutor o categoría" value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" />
+            <Input type="search" placeholder="Búsqueda general" value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" />
           </div>
           {hasActiveFilters ? (
             <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
@@ -305,24 +305,67 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
           ) : null}
         </div>
 
-        <div className="grid gap-2 md:grid-cols-4">
-          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-            <option value="">Todas las categorías</option>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
-          </select>
-          <select value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-            <option value="">Todos los equipos</option>
-            <option value="sin-equipo">Sin equipo asignado</option>
-            {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
-          </select>
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-            <option value="">Todos los estados</option>
-            {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-          </select>
-          <select value={seasonFilter} onChange={(event) => setSeasonFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-            <option value="">Todas las temporadas</option>
-            {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
-          </select>
+        <div className="grid gap-3 rounded-xl bg-white p-4 ring-1 ring-foreground/10 md:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="athlete-filter-category" className="text-sm font-medium text-foreground">
+              Categoría
+            </label>
+            <select
+              id="athlete-filter-category"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="">Todas</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="athlete-filter-team" className="text-sm font-medium text-foreground">
+              Equipo
+            </label>
+            <select
+              id="athlete-filter-team"
+              value={teamFilter}
+              onChange={(event) => setTeamFilter(event.target.value)}
+              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="">Todos</option>
+              <option value="sin-equipo">Sin equipo asignado</option>
+              {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="athlete-filter-status" className="text-sm font-medium text-foreground">
+              Estado
+            </label>
+            <select
+              id="athlete-filter-status"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="">Todos</option>
+              {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="athlete-filter-season" className="text-sm font-medium text-foreground">
+              Temporada
+            </label>
+            <select
+              id="athlete-filter-season"
+              value={seasonFilter}
+              onChange={(event) => setSeasonFilter(event.target.value)}
+              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="">Todas</option>
+              {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 

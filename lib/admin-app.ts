@@ -153,6 +153,33 @@ export type AdminTeamDetail = AdminTeamRow & {
   available: AdminAvailableAthlete[]
 }
 
+export type AdminMatchStatus = 'scheduled' | 'played' | 'postponed' | 'cancelled'
+export type AdminMatchType = 'league' | 'friendly'
+
+export type AdminMatchRow = {
+  id: string
+  teamId: string
+  teamName: string
+  categoryName: string
+  seasonId: string
+  seasonName: string
+  opponentName: string
+  matchDate: string
+  matchTime: string
+  dateLabel: string
+  timeLabel: string
+  weekLabel: string
+  weekRangeLabel: string
+  location: string
+  isHome: boolean
+  matchType: AdminMatchType
+  roundLabel: string
+  status: AdminMatchStatus
+  homeScore: number | null
+  awayScore: number | null
+  notes: string
+}
+
 export type AdminSeasonRow = {
   id: string
   nombre: string
@@ -873,6 +900,88 @@ export async function getAdminTeams(): Promise<AdminTeamRow[]> {
       return a.nombre.localeCompare(b.nombre, 'es')
     })
     .map(({ categoryOrder, suffixOrder, ...team }) => team)
+}
+
+function formatMatchTime(value: string | null) {
+  if (!value) return 'Hora por confirmar'
+  return value.slice(0, 5)
+}
+
+function getDateFromDateString(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function getMatchWeekInfo(value: string) {
+  const date = getDateFromDateString(value)
+  const day = date.getDay() || 7
+  const monday = new Date(date)
+  monday.setDate(date.getDate() - day + 1)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+
+  const thursday = new Date(monday)
+  thursday.setDate(monday.getDate() + 3)
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4)
+  const firstDay = firstThursday.getDay() || 7
+  firstThursday.setDate(firstThursday.getDate() - firstDay + 4)
+  const weekNumber = 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / 604_800_000)
+  const rangeFormatter = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short' })
+
+  return {
+    weekLabel: `Semana ${weekNumber}`,
+    weekRangeLabel: `${rangeFormatter.format(monday)} - ${rangeFormatter.format(sunday)}`,
+  }
+}
+
+export async function getAdminMatches(): Promise<AdminMatchRow[]> {
+  const supabase = await createClient()
+  const [{ data: matches }, { data: teams }, { data: categories }, { data: seasons }] =
+    await Promise.all([
+      supabase
+        .from('matches')
+        .select('id, team_id, season_id, opponent_name, match_date, match_time, location, is_home, match_type, round_label, status, home_score, away_score, notes')
+        .order('match_date', { ascending: false })
+        .order('match_time', { ascending: false, nullsFirst: false }),
+      supabase.from('teams').select('id, name, category_id, season_id'),
+      supabase.from('categories').select('id, name'),
+      supabase.from('seasons').select('id, name'),
+    ])
+
+  const teamById = new Map((teams ?? []).map((team) => [team.id, team]))
+  const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
+  const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+
+  return (matches ?? []).map((match) => {
+    const team = teamById.get(match.team_id)
+    const categoryName = team ? categoryById.get(team.category_id) ?? 'Sin categoría' : 'Sin categoría'
+    const sortInfo = getTeamCategorySortInfo(team?.name ?? '', categoryName)
+    const weekInfo = getMatchWeekInfo(match.match_date)
+
+    return {
+      id: match.id,
+      teamId: match.team_id,
+      teamName: team?.name ?? 'Equipo no disponible',
+      categoryName: sortInfo.label,
+      seasonId: match.season_id,
+      seasonName: seasonById.get(match.season_id) ?? 'Temporada no disponible',
+      opponentName: match.opponent_name,
+      matchDate: match.match_date,
+      matchTime: match.match_time ?? '',
+      dateLabel: formatSpanishDate(match.match_date),
+      timeLabel: formatMatchTime(match.match_time),
+      weekLabel: weekInfo.weekLabel,
+      weekRangeLabel: weekInfo.weekRangeLabel,
+      location: match.location ?? '',
+      isHome: Boolean(match.is_home),
+      matchType: (match.match_type ?? 'league') as AdminMatchType,
+      roundLabel: match.round_label ?? '',
+      status: match.status as AdminMatchStatus,
+      homeScore: match.home_score,
+      awayScore: match.away_score,
+      notes: match.notes ?? '',
+    }
+  })
 }
 
 export async function getAdminSponsors(): Promise<AdminSponsorRow[]> {

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { NewsDetail } from '@/components/news-detail'
 import { requireUser } from '@/lib/auth'
-import { getPrivateNewsDetail } from '@/lib/private-app'
+import { getPrivateNewsData, getPrivateNewsDetail } from '@/lib/private-app'
 
 type PrivateNewsDetailPageProps = {
   params: Promise<{
@@ -13,9 +13,16 @@ export default async function PrivateNewsDetailPage({ params }: PrivateNewsDetai
   await requireUser()
 
   const { id } = await params
-  const item = await getPrivateNewsDetail(id)
+  const [item, data] = await Promise.all([
+    getPrivateNewsDetail(id),
+    getPrivateNewsData(),
+  ])
 
   if (!item) notFound()
 
-  return <NewsDetail item={item} backHref="/app/noticias" />
+  const relatedNews = data.news.filter(
+    (newsItem) => newsItem.id !== item.id && newsItem.sectionId === item.sectionId,
+  )
+
+  return <NewsDetail item={item} backHref="/app/noticias" relatedNews={relatedNews} />
 }

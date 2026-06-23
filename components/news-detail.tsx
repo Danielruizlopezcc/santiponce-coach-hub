@@ -2,12 +2,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, CalendarDays, Newspaper, Share2 } from 'lucide-react'
 import { CLUB } from '@/lib/club'
-import { getPlainNewsText, sanitizeNewsHtml } from '@/lib/news-content'
-import type { PrivateNewsDetail } from '@/lib/private-app-shared'
+import { sanitizeNewsHtml } from '@/lib/news-content'
+import type { PrivateNewsDetail, PrivateNewsItem } from '@/lib/private-app-shared'
 
 type NewsDetailProps = {
   item: PrivateNewsDetail
   backHref: string
+  relatedNews?: PrivateNewsItem[]
 }
 
 function formatNewsDate(value: string) {
@@ -18,15 +19,14 @@ function formatNewsDate(value: string) {
   }).format(new Date(value))
 }
 
-export function NewsDetail({ item, backHref }: NewsDetailProps) {
+export function NewsDetail({ item, backHref, relatedNews = [] }: NewsDetailProps) {
   const contentHtml = sanitizeNewsHtml(item.body)
-  const leadParagraph = getPlainNewsText(item.body).split(/\n+/).find(Boolean)
 
   return (
     <article className="bg-[#f4f6f8]">
       <header className="bg-[#06172f] text-white">
-        <div className="grid min-h-[460px] lg:grid-cols-[0.92fr_1.08fr]">
-          <div className="relative flex flex-col justify-center px-4 py-10 md:px-10 lg:px-[max(2rem,calc((100vw-80rem)/2))]">
+        <div className="grid min-h-[460px] lg:grid-cols-[35fr_65fr]">
+          <div className="relative flex flex-col justify-center px-4 py-10 md:px-10 lg:px-12 xl:px-14">
             <div
               className="absolute inset-0 opacity-16"
               aria-hidden="true"
@@ -49,7 +49,7 @@ export function NewsDetail({ item, backHref }: NewsDetailProps) {
                 <span className="h-px w-8 bg-white/25" aria-hidden="true" />
                 <span>{formatNewsDate(item.createdAt)}</span>
               </p>
-              <h1 className="mt-4 text-4xl font-black leading-[0.98] tracking-tight md:text-6xl">
+              <h1 className="mt-4 text-4xl font-black leading-[0.98] tracking-tight md:text-5xl xl:text-6xl">
                 {item.title}
               </h1>
               <div className="mt-8 flex flex-wrap gap-3">
@@ -72,7 +72,7 @@ export function NewsDetail({ item, backHref }: NewsDetailProps) {
               fill
               priority
               className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 55vw"
+              sizes="(max-width: 1024px) 100vw, 65vw"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#06172f]/38 via-transparent to-transparent" />
           </div>
@@ -90,15 +90,11 @@ export function NewsDetail({ item, backHref }: NewsDetailProps) {
           </p>
         </div>
 
-        {leadParagraph && contentHtml ? (
-          <p className="mb-8 text-2xl font-black leading-snug tracking-tight text-primary md:text-3xl">
-            {leadParagraph}
-          </p>
-        ) : (
+        {!contentHtml ? (
           <p className="text-xl font-bold leading-8 text-foreground">
             Esta noticia todavia no tiene contenido desarrollado.
           </p>
-        )}
+        ) : null}
 
         {contentHtml ? (
           <div
@@ -107,6 +103,58 @@ export function NewsDetail({ item, backHref }: NewsDetailProps) {
           />
         ) : null}
       </div>
+
+      {relatedNews.length > 0 ? (
+        <section className="border-t border-border bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-14">
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-primary">
+                  {item.sectionName}
+                </p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-foreground">
+                  Noticias relacionadas
+                </h2>
+              </div>
+              <span className="text-sm font-bold text-muted-foreground">
+                {relatedNews.length} {relatedNews.length === 1 ? 'publicacion' : 'publicaciones'}
+              </span>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {relatedNews.map((relatedItem) => (
+                <Link
+                  key={relatedItem.id}
+                  href={`${backHref}/${relatedItem.id}`}
+                  className="group block overflow-hidden rounded-lg bg-[#f4f6f8] shadow-sm ring-1 ring-black/5 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="relative aspect-[16/10] bg-muted">
+                    <Image
+                      src={relatedItem.imageUrl}
+                      alt={relatedItem.title}
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    />
+                  </div>
+                  <div className="p-5">
+                    <h3 className="line-clamp-3 text-xl font-black leading-tight text-foreground transition-colors group-hover:text-primary">
+                      {relatedItem.title}
+                    </h3>
+                    <p className="mt-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-tight">
+                      <span className="text-primary">{relatedItem.sectionName}</span>
+                      <span className="h-px w-5 bg-border" aria-hidden="true" />
+                      <span className="font-semibold text-muted-foreground">
+                        {formatNewsDate(relatedItem.createdAt)}
+                      </span>
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
     </article>
   )
 }

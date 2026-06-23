@@ -1,23 +1,25 @@
-import { PageContainer } from '@/components/page-container'
+import { BrandedPageHero } from '@/components/branded-page-hero'
 import { PublicShell } from '@/components/public-shell'
 
 export default function ClubPage() {
   return (
     <PublicShell>
-      <PageContainer
-        title="Club"
-        description="Próximamente estará disponible esta sección."
-        className="max-w-7xl"
-      >
-        <div className="rounded-2xl border border-border bg-card/80 p-8 text-center shadow-sm backdrop-blur">
-          <p className="text-base font-medium text-foreground">
-            Estamos preparando la información del club.
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            En esta sección se podrá consultar la historia, identidad y datos del CD Santiponce.
-          </p>
+      <section className="bg-[#f4f6f8]">
+        <BrandedPageHero
+          eyebrow="Identidad del club"
+          title="Club"
+        />
+        <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-12">
+          <div className="rounded-lg border border-border bg-white p-8 text-center shadow-sm">
+            <p className="text-base font-medium text-foreground">
+              Estamos preparando la información del club.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              En esta sección se podrá consultar la historia, identidad y datos del CD Santiponce.
+            </p>
+          </div>
         </div>
-      </PageContainer>
+      </section>
     </PublicShell>
   )
 }
