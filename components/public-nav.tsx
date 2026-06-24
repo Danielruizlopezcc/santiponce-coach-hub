@@ -1,10 +1,23 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import Image from 'next/image'
-import { ArrowRight, ChevronDown, LogIn, Menu, UserPlus } from 'lucide-react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
+import {
+  ArrowRight,
+  CalendarDays,
+  ChevronDown,
+  Handshake,
+  Home,
+  LogIn,
+  Menu,
+  Newspaper,
+  Shield,
+  UserPlus,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -17,9 +30,18 @@ import { CLUB, PUBLIC_NAV } from '@/lib/club'
 import type { PublicNavData } from '@/lib/public-app'
 import { cn } from '@/lib/utils'
 
-const ACTION_ICONS: Record<string, typeof UserPlus> = {
+const ACTION_ICONS: Partial<Record<string, LucideIcon>> = {
   '/registro': UserPlus,
   '/iniciar-sesion': LogIn,
+}
+
+const NAV_ICONS: Partial<Record<string, LucideIcon>> = {
+  '/': Home,
+  '/noticias': Newspaper,
+  '/calendario': CalendarDays,
+  '/equipos': UsersRound,
+  '/club': Shield,
+  '/patrocinadores': Handshake,
 }
 
 const AUTH_HREFS = new Set(['/registro', '/iniciar-sesion'])
@@ -41,7 +63,7 @@ function getDropdownItems(href: string, navData: PublicNavData): DropdownItem[] 
 
   if (href === '/noticias') {
     return [
-      { href: '/noticias', label: 'Todas las secciones', description: 'Ver todas las noticias' },
+      { href: '/noticias', label: 'Todas las noticias', description: 'Actualidad del club' },
       ...navData.newsSections.map((section) => ({
         href: `/noticias?section=${section.id}`,
         label: section.name,
@@ -53,18 +75,32 @@ function getDropdownItems(href: string, navData: PublicNavData): DropdownItem[] 
   return []
 }
 
+function isActivePath(pathname: string, href: string) {
+  return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
+}
+
+function getPrimaryHref(itemHref: string, dropdownItems: DropdownItem[]) {
+  return itemHref === '/equipos' && dropdownItems[0] ? dropdownItems[0].href : itemHref
+}
+
 function NavLinks({
   pathname,
   navData,
   onMegaOpen,
   onNavigate,
   orientation = 'horizontal',
+  items = PUBLIC_NAV,
+  openVerticalHref,
+  setOpenVerticalHref,
 }: {
   pathname: string
   navData: PublicNavData
   onMegaOpen?: (href: string | null) => void
   onNavigate?: () => void
   orientation?: 'horizontal' | 'vertical'
+  items?: typeof PUBLIC_NAV
+  openVerticalHref?: string | null
+  setOpenVerticalHref?: Dispatch<SetStateAction<string | null>>
 }) {
   return (
     <ul
@@ -73,54 +109,83 @@ function NavLinks({
         orientation === 'vertical' ? 'flex-col' : 'flex-row items-center',
       )}
     >
-      {PUBLIC_NAV.map((item) => {
+      {items.map((item) => {
         if (orientation === 'horizontal' && AUTH_HREFS.has(item.href)) return null
 
         const dropdownItems = getDropdownItems(item.href, navData)
-        const href = item.href === '/equipos' && dropdownItems[0] ? dropdownItems[0].href : item.href
-        const active =
-          item.href === '/'
-            ? pathname === '/'
-            : pathname === item.href || pathname.startsWith(`${item.href}/`)
-        const Icon = ACTION_ICONS[item.href]
+        const href = getPrimaryHref(item.href, dropdownItems)
+        const active = isActivePath(pathname, item.href)
+        const Icon = ACTION_ICONS[item.href] ?? NAV_ICONS[item.href]
+        const expanded = openVerticalHref === item.href
+
         return (
           <li key={item.href}>
-            <Link
-              href={href}
-              onClick={onNavigate}
-              onMouseEnter={() => {
-                if (orientation !== 'horizontal') return
-                onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
-              }}
-              onFocus={() => {
-                if (orientation !== 'horizontal') return
-                onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
-              }}
-              aria-current={active ? 'page' : undefined}
+            <div
               className={cn(
-                'flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-black uppercase transition-colors outline-none',
-                'focus-visible:ring-2 focus-visible:ring-white/80',
-                active
-                  ? 'bg-white text-primary shadow-sm'
-                  : 'text-white/82 hover:bg-white/12 hover:text-white',
-                orientation === 'vertical' && 'text-primary hover:bg-primary/10 hover:text-primary',
-                orientation === 'vertical' && active && 'bg-primary text-primary-foreground',
+                'flex items-center',
+                orientation === 'vertical' && 'border-b border-border',
               )}
             >
-              {Icon ? <Icon className="size-4" aria-hidden="true" /> : null}
-              {item.label}
-              {orientation === 'horizontal' && dropdownItems.length > 0 ? (
-                <ChevronDown className="size-4" aria-hidden="true" />
+              <Link
+                href={href}
+                onClick={onNavigate}
+                onMouseEnter={() => {
+                  if (orientation !== 'horizontal') return
+                  onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
+                }}
+                onFocus={() => {
+                  if (orientation !== 'horizontal') return
+                  onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
+                }}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-black uppercase outline-none transition-colors',
+                  'focus-visible:ring-2 focus-visible:ring-white/80',
+                  orientation === 'horizontal' &&
+                    (active
+                      ? 'text-white underline decoration-white decoration-3 underline-offset-[18px]'
+                      : 'text-white/88 hover:text-white'),
+                  orientation === 'vertical' &&
+                    'flex-1 px-0 py-4 text-foreground hover:text-primary focus-visible:ring-ring',
+                  orientation === 'vertical' && active && 'text-primary',
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  {Icon && orientation === 'vertical' ? (
+                    <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  ) : null}
+                  <span className="truncate">{item.label}</span>
+                </span>
+              </Link>
+              {dropdownItems.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenVerticalHref?.((current) => (current === item.href ? null : item.href))}
+                  aria-label={`${expanded ? 'Cerrar' : 'Abrir'} secciones de ${item.label}`}
+                  aria-expanded={expanded}
+                  className={cn(
+                    'grid size-11 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring',
+                    orientation === 'horizontal' && 'hidden',
+                  )}
+                >
+                  <ChevronDown
+                    className={cn('size-4 transition-transform', expanded && 'rotate-180')}
+                    aria-hidden="true"
+                  />
+                </button>
               ) : null}
-            </Link>
-            {orientation === 'vertical' && dropdownItems.length > 0 ? (
-              <div className="mt-1 grid gap-1 pl-4">
+              {orientation === 'horizontal' && dropdownItems.length > 0 ? (
+                <ChevronDown className="mr-2 size-4 shrink-0 text-white/88" aria-hidden="true" />
+              ) : null}
+            </div>
+            {orientation === 'vertical' && dropdownItems.length > 0 && expanded ? (
+              <div className="grid gap-1 border-b border-border pb-3 pl-7">
                 {dropdownItems.map((dropdownItem) => (
                   <Link
                     key={dropdownItem.href}
                     href={dropdownItem.href}
                     onClick={onNavigate}
-                    className="rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground outline-none hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded-md px-3 py-2 text-sm font-bold text-muted-foreground outline-none hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {dropdownItem.label}
                   </Link>
@@ -134,14 +199,150 @@ function NavLinks({
   )
 }
 
+function ClubIdentity() {
+  return (
+    <Link
+      href="/"
+      className="flex min-w-0 items-center gap-4 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:gap-5"
+      aria-label={`${CLUB.shortName} - Inicio`}
+    >
+      <span className="grid size-16 shrink-0 place-items-center rounded-md shadow-sm ring-1 ring-white/20 md:size-20">
+        <Image
+          src={CLUB.crest}
+          alt={`Escudo del ${CLUB.legalName}`}
+          width={74}
+          height={74}
+          priority
+          className="size-12 rounded-md object-contain md:size-16"
+        />
+      </span>
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className="truncate text-2xl font-black text-white md:text-3xl">
+          {CLUB.shortName}
+        </span>
+        <span className="mt-1 text-sm font-black uppercase text-white/72 md:text-base">
+          Temporada {CLUB.season}
+        </span>
+      </span>
+    </Link>
+  )
+}
+
+function AuthActions() {
+  return (
+    <div className="hidden items-center gap-2 md:flex">
+      <Link
+        href="/registro"
+        className="flex h-10 items-center gap-2 rounded-md bg-white/10 px-3 text-xs font-black uppercase text-white outline-none ring-1 ring-white/24 transition-colors hover:bg-white hover:text-primary focus-visible:ring-2 focus-visible:ring-white/80"
+      >
+        <UserPlus className="size-4" aria-hidden="true" />
+        Registrarse
+      </Link>
+      <Link
+        href="/iniciar-sesion"
+        className="flex h-10 items-center gap-2 rounded-md bg-white px-3 text-xs font-black uppercase text-primary shadow-sm outline-none transition-colors hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/80"
+      >
+        <LogIn className="size-4" aria-hidden="true" />
+        Iniciar sesión
+      </Link>
+    </div>
+  )
+}
+
+function MenuDrawer({
+  open,
+  setOpen,
+  pathname,
+  navData,
+}: {
+  open: boolean
+  setOpen: (open: boolean) => void
+  pathname: string
+  navData: PublicNavData
+}) {
+  const [openVerticalHref, setOpenVerticalHref] = useState<string | null>(null)
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger
+        render={
+          <Button
+            variant="ghost"
+            aria-label="Abrir menú"
+            className="h-16 min-w-20 flex-col gap-1 rounded-none bg-transparent px-4 text-white hover:bg-white/10 hover:text-white"
+          >
+            <Menu className="size-6" aria-hidden="true" />
+            <span className="text-[0.65rem] font-black uppercase leading-none tracking-[0.18em]">
+              Menú
+            </span>
+          </Button>
+        }
+      />
+      <SheetContent side="left" className="w-[86vw] max-w-[420px] gap-0 p-0">
+        <SheetHeader className="border-b border-border p-5">
+          <SheetTitle className="text-left">
+            <span className="flex items-center gap-3">
+              <Image
+                src={CLUB.crest}
+                alt={`Escudo del ${CLUB.legalName}`}
+                width={50}
+                height={50}
+                className="size-12 rounded-md object-contain"
+              />
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate text-base font-black">{CLUB.shortName}</span>
+                <span className="text-xs font-bold text-muted-foreground">
+                  Temporada {CLUB.season}
+                </span>
+              </span>
+            </span>
+          </SheetTitle>
+        </SheetHeader>
+        <nav aria-label="Menú principal" className="flex-1 overflow-y-auto px-5 py-4">
+          <NavLinks
+            pathname={pathname}
+            navData={navData}
+            orientation="vertical"
+            onNavigate={() => setOpen(false)}
+            openVerticalHref={openVerticalHref}
+            setOpenVerticalHref={setOpenVerticalHref}
+          />
+        </nav>
+        <div className="grid gap-2 border-t border-border p-5">
+          <Link
+            href="/registro"
+            onClick={() => setOpen(false)}
+            className="flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-black uppercase text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <UserPlus className="size-4" aria-hidden="true" />
+            Registrarse
+          </Link>
+          <Link
+            href="/iniciar-sesion"
+            onClick={() => setOpen(false)}
+            className="flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-black uppercase text-primary outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <LogIn className="size-4" aria-hidden="true" />
+            Iniciar sesión
+          </Link>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 export function PublicNav({ navData }: { navData: PublicNavData }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [activeMegaHref, setActiveMegaHref] = useState<string | null>(null)
+  const primaryNav = PUBLIC_NAV.filter((item) => !AUTH_HREFS.has(item.href))
+  const leftNav = primaryNav.slice(0, 3)
+  const rightNav = primaryNav.slice(3)
   const megaItems = activeMegaHref ? getDropdownItems(activeMegaHref, navData) : []
   const megaTitle = activeMegaHref === '/equipos' ? 'Equipos' : 'Noticias'
   const megaPrimaryHref = activeMegaHref === '/equipos' ? '/equipos' : '/noticias'
-  const megaPrimaryLabel = activeMegaHref === '/equipos' ? 'Ver todos los equipos' : 'Ver todas las noticias'
+  const megaPrimaryLabel =
+    activeMegaHref === '/equipos' ? 'Ver todos los equipos' : 'Ver todas las noticias'
   const showMegaPrimary = activeMegaHref !== '/equipos'
   const megaVisibleItems = activeMegaHref === '/noticias' ? megaItems.slice(1) : megaItems
   const megaGroups =
@@ -158,137 +359,103 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
 
   return (
     <header
-      className="sticky top-0 z-40 w-full overflow-visible bg-[linear-gradient(135deg,#061a3d_0%,#0b3f86_48%,#1f72c8_100%)] text-primary-foreground shadow-[0_18px_45px_rgba(4,20,46,0.28)]"
+      className="sticky top-0 z-40 w-full overflow-visible bg-[#071b3f] text-primary-foreground shadow-[0_14px_34px_rgba(4,20,46,0.24)]"
       onMouseLeave={() => setActiveMegaHref(null)}
     >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-35"
-        aria-hidden="true"
-        style={{
-          backgroundImage:
-            'linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-          backgroundSize: '72px 72px',
-          maskImage: 'linear-gradient(90deg, transparent, black 16%, black 84%, transparent)',
-        }}
-      />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/45" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-black/20" aria-hidden="true" />
-
-      <div className="relative flex min-h-20 w-full items-center justify-between gap-5 px-4 py-3 md:px-8 lg:px-10">
-        <Link
-          href="/"
-          className="flex min-w-0 items-center gap-5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-          aria-label={`${CLUB.shortName} — Inicio`}
-        >
-          <span className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/25 md:size-20">
-            <Image
-              src={CLUB.crest}
-              alt={`Escudo del ${CLUB.legalName}`}
-              width={86}
-              height={86}
-              priority
-              className="size-12 rounded-lg object-contain md:size-16"
-            />
-          </span>
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span className="text-2xl font-black tracking-tight text-white md:text-[1.7rem]">
-              {CLUB.shortName}
-            </span>
-            <span className="mt-1 text-sm font-bold text-white/75 md:text-base">
-              Temporada {CLUB.season}
-            </span>
-          </span>
-        </Link>
-
-        <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href="/registro"
-            className="flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2.5 text-xs font-black uppercase text-white outline-none ring-1 ring-white/20 transition-colors hover:bg-white hover:text-primary focus-visible:ring-2 focus-visible:ring-white/80"
-          >
-            <UserPlus className="size-3.5" aria-hidden="true" />
-            Registrarse
-          </Link>
+      <div className="border-b border-white/14 bg-[#09285b]">
+        <div className="flex h-12 w-full items-center justify-between gap-4 px-4 text-sm font-black uppercase text-white md:px-8 lg:px-10">
+          <div className="flex min-w-0 items-center gap-8">
+            <Link href="/" className="truncate outline-none hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/80">
+              CDSANTIPONCE.COM
+            </Link>
+            <span className="hidden text-white/75 sm:inline">Temporada {CLUB.season}</span>
+          </div>
           <Link
             href="/iniciar-sesion"
-            className="flex items-center gap-2 rounded-lg bg-white px-3.5 py-2.5 text-xs font-black uppercase text-primary shadow-sm outline-none transition-colors hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/80"
+            className="shrink-0 outline-none hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/80"
           >
-            <LogIn className="size-3.5" aria-hidden="true" />
-            Iniciar sesión
+            Iniciar sesión / Registrarse
           </Link>
-        </div>
-
-        {/* Mobile drawer */}
-        <div className="md:hidden">
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Abrir menú"
-                  className="border-white/35 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-                >
-                  <Menu className="h-5 w-5" aria-hidden="true" />
-                </Button>
-              }
-            />
-            <SheetContent side="right" className="w-72">
-              <SheetHeader>
-                <SheetTitle className="text-left">
-                  <span className="flex items-center gap-3">
-                    <Image
-                      src={CLUB.crest}
-                      alt={`Escudo del ${CLUB.legalName}`}
-                      width={44}
-                      height={44}
-                      className="size-11 rounded-md object-contain"
-                    />
-                    <span className="flex flex-col leading-tight">
-                      <span className="text-base font-bold">{CLUB.shortName}</span>
-                      <span className="text-xs text-muted-foreground">Temporada {CLUB.season}</span>
-                    </span>
-                  </span>
-                </SheetTitle>
-              </SheetHeader>
-              <nav
-                aria-label="Navegación principal"
-                className="mt-6 flex flex-col gap-4 px-4"
-              >
-                <NavLinks
-                  pathname={pathname}
-                  navData={navData}
-                  orientation="vertical"
-                  onNavigate={() => setOpen(false)}
-                />
-              </nav>
-            </SheetContent>
-          </Sheet>
         </div>
       </div>
 
-      <div className="relative border-t border-white/16 bg-[#0b3b7e]/38 backdrop-blur">
-        <div className="hidden w-full px-2 py-1.5 md:block md:px-8 lg:px-10">
-          <nav aria-label="Navegación principal">
-            <NavLinks pathname={pathname} navData={navData} onMegaOpen={setActiveMegaHref} />
+      <div className="relative bg-[#174f9e]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/14" aria-hidden="true" />
+        <div className="absolute left-1/2 top-0 hidden h-full w-36 -translate-x-1/2 bg-[#0b2f6d] [clip-path:polygon(20%_0,80%_0,100%_100%,0_100%)] md:block" />
+        <Link
+          href="/"
+          aria-label={`${CLUB.shortName} - Inicio`}
+          className="absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:block"
+        >
+          <Image
+            src={CLUB.crest}
+            alt={`Escudo del ${CLUB.legalName}`}
+            width={96}
+            height={96}
+            priority
+            className="size-22 rounded-md object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.28)]"
+          />
+        </Link>
+
+        <div className="absolute left-3 top-1/2 z-20 -translate-y-1/2 md:left-5">
+          <MenuDrawer open={open} setOpen={setOpen} pathname={pathname} navData={navData} />
+        </div>
+
+        <div className="mx-auto grid min-h-22 max-w-7xl grid-cols-1 items-center gap-4 px-4 py-3 md:grid-cols-[1fr_180px_1fr] md:px-8 lg:px-10">
+          <nav aria-label="Navegación principal izquierda" className="hidden justify-self-end md:block">
+            <NavLinks
+              pathname={pathname}
+              navData={navData}
+              onMegaOpen={setActiveMegaHref}
+              items={leftNav}
+            />
+          </nav>
+
+          <Link
+            href="/"
+            aria-label={`${CLUB.shortName} - Inicio`}
+            className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:pointer-events-none md:invisible"
+          >
+            <Image
+              src={CLUB.crest}
+              alt={`Escudo del ${CLUB.legalName}`}
+              width={58}
+              height={58}
+              priority
+              className="size-14 rounded-md object-contain"
+            />
+            <span className="min-w-0">
+              <span className="block truncate text-lg font-black text-white">{CLUB.shortName}</span>
+              <span className="block text-xs font-black uppercase text-white/72">
+                Temporada {CLUB.season}
+              </span>
+            </span>
+          </Link>
+
+          <nav aria-label="Navegación principal derecha" className="hidden justify-self-start md:block">
+            <NavLinks
+              pathname={pathname}
+              navData={navData}
+              onMegaOpen={setActiveMegaHref}
+              items={rightNav}
+            />
           </nav>
         </div>
       </div>
 
       {activeMegaHref ? (
         <div
-          className="absolute left-0 top-full hidden w-full border-t border-border bg-white text-foreground shadow-[0_24px_55px_rgba(3,18,43,0.18)] md:block"
+          className="absolute left-0 top-full hidden w-full border-t border-border bg-white text-foreground shadow-[0_24px_55px_rgba(3,18,43,0.18)] lg:block"
           onMouseEnter={() => setActiveMegaHref(activeMegaHref)}
         >
-          <div className="mx-auto grid w-full max-w-7xl grid-cols-[240px_1fr] gap-12 px-8 py-10">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-[220px_1fr] gap-10 px-8 py-8">
             <div>
-              <p className="text-4xl font-black uppercase tracking-tight text-primary">
-                {megaTitle}
-              </p>
+              <p className="text-3xl font-black uppercase text-primary">{megaTitle}</p>
               {showMegaPrimary ? (
                 <Link
                   href={megaPrimaryHref}
                   onClick={() => setActiveMegaHref(null)}
-                  className="mt-7 inline-flex items-center gap-2 text-sm font-black uppercase text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring"
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-black uppercase text-primary outline-none hover:text-primary/80 focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {megaPrimaryLabel}
                   <ArrowRight className="size-4" aria-hidden="true" />
@@ -301,10 +468,10 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
                 No hay elementos disponibles.
               </p>
             ) : (
-              <div className="grid content-start gap-x-14 gap-y-8 lg:grid-cols-3">
+              <div className="grid content-start gap-x-12 gap-y-7 lg:grid-cols-3">
                 {megaGroups.map((group) => (
                   <section key={group.title}>
-                    <h3 className="border-b border-border pb-3 text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">
+                    <h3 className="border-b border-border pb-3 text-xs font-black uppercase text-muted-foreground">
                       {group.title}
                     </h3>
                     <div className="mt-2">
@@ -315,12 +482,13 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
                           onClick={() => setActiveMegaHref(null)}
                           className="group flex items-center justify-between gap-5 border-b border-border/70 py-4 text-foreground outline-none transition-colors hover:text-primary focus-visible:text-primary"
                         >
-                          <span>
-                            <span className="block text-base font-black leading-tight">
-                              {item.label}
-                            </span>
+                          <span className="block text-base font-black leading-tight">
+                            {item.label}
                           </span>
-                          <ArrowRight className="size-4 shrink-0 text-primary/70 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                          <ArrowRight
+                            className="size-4 shrink-0 text-primary/70 transition-transform group-hover:translate-x-1"
+                            aria-hidden="true"
+                          />
                         </Link>
                       ))}
                     </div>

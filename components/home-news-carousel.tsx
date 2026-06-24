@@ -37,7 +37,7 @@ export function HomeNewsCarousel({ news, linkHref = '/noticias' }: HomeNewsCarou
 
   if (slides.length === 0) {
     return (
-      <section className="relative flex min-h-[560px] items-center overflow-hidden bg-[#061a3b] text-white md:min-h-[620px]">
+      <section className="relative flex min-h-[430px] items-center overflow-hidden bg-[#061a3b] text-white md:min-h-[500px]">
         <Image src="/images/Fondo1.png" alt="" fill priority className="object-cover opacity-35" sizes="100vw" />
         <div className="absolute inset-0 bg-[linear-gradient(105deg,#03142f_0%,rgba(7,40,91,0.86)_52%,rgba(14,75,150,0.72)_100%)]" />
         <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6">
@@ -60,7 +60,7 @@ export function HomeNewsCarousel({ news, linkHref = '/noticias' }: HomeNewsCarou
   return (
     <section
       aria-label="Últimas noticias del club"
-      className="relative min-h-[560px] overflow-hidden bg-[#03142f] text-white md:min-h-[620px]"
+      className="relative min-h-[430px] overflow-hidden bg-[#03142f] text-white md:min-h-[500px]"
     >
       {slides.map((item, index) => (
         <Link
@@ -93,12 +93,9 @@ export function HomeNewsCarousel({ news, linkHref = '/noticias' }: HomeNewsCarou
             }}
           />
 
-          <div className="relative mx-auto flex min-h-[560px] max-w-7xl items-end px-4 py-12 sm:px-6 md:min-h-[620px] md:py-16">
+          <div className="relative mx-auto flex min-h-[430px] max-w-7xl items-end px-4 py-12 sm:px-6 md:min-h-[500px] md:py-14">
             <div className="max-w-4xl pb-4 md:pb-2">
-              <p className="inline-flex rounded-full bg-primary px-3 py-1 text-xs font-black uppercase text-white">
-                Noticia {index + 1} de {slides.length}
-              </p>
-              <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight md:text-4xl lg:text-5xl">
+              <h2 className="text-3xl font-black leading-tight tracking-tight md:text-4xl lg:text-5xl">
                 {item.title}
               </h2>
               <p className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-black uppercase text-primary shadow-lg">

@@ -2,7 +2,7 @@ export const CLUB = {
   shortName: 'CD Santiponce',
   legalName: 'Club Deportivo Santiponce',
   season: '2026/2027',
-  crest: '/images/escudo-santiponce.png',
+  crest: '/images/Escudo_Santiponce_transparente.png',
 } as const
 
 export const MEMBERSHIP_IMPORTE = 20
