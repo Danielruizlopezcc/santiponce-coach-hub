@@ -139,12 +139,12 @@ function NavLinks({
                 }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-black uppercase outline-none transition-colors',
+                  'flex min-h-9 items-center gap-2 rounded-md px-3 py-1.5 text-[0.84rem] font-semibold uppercase tracking-[0.14em] outline-none transition-all duration-150',
                   'focus-visible:ring-2 focus-visible:ring-white/80',
                   orientation === 'horizontal' &&
                     (active
-                      ? 'text-white underline decoration-white decoration-3 underline-offset-[18px]'
-                      : 'text-white/88 hover:text-white'),
+                      ? 'text-white drop-shadow-[0_1px_6px_rgba(255,255,255,0.34)]'
+                      : 'text-white/88 drop-shadow-[0_1px_2px_rgba(0,0,0,0.24)] hover:bg-white/8 hover:text-white hover:drop-shadow-[0_1px_5px_rgba(255,255,255,0.2)]'),
                   orientation === 'vertical' &&
                     'flex-1 px-0 py-4 text-foreground hover:text-primary focus-visible:ring-ring',
                   orientation === 'vertical' && active && 'text-primary',
@@ -269,10 +269,10 @@ function MenuDrawer({
           <Button
             variant="ghost"
             aria-label="Abrir menú"
-            className="h-16 min-w-20 flex-col gap-1 rounded-none bg-transparent px-4 text-white hover:bg-white/10 hover:text-white"
+            className="h-12 min-w-16 flex-col gap-0.5 rounded-none bg-transparent px-3 text-white hover:bg-white/10 hover:text-white"
           >
-            <Menu className="size-6" aria-hidden="true" />
-            <span className="text-[0.65rem] font-black uppercase leading-none tracking-[0.18em]">
+            <Menu className="size-5" aria-hidden="true" />
+            <span className="text-[0.58rem] font-bold uppercase leading-none tracking-[0.2em]">
               Menú
             </span>
           </Button>
@@ -362,8 +362,8 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
       className="sticky top-0 z-40 w-full overflow-visible bg-[#071b3f] text-primary-foreground shadow-[0_14px_34px_rgba(4,20,46,0.24)]"
       onMouseLeave={() => setActiveMegaHref(null)}
     >
-      <div className="border-b border-white/14 bg-[#09285b]">
-        <div className="flex h-12 w-full items-center justify-between gap-4 px-4 text-sm font-black uppercase text-white md:px-8 lg:px-10">
+      <div className="border-b border-white/12 bg-[#061a3d]">
+        <div className="flex h-10 w-full items-center justify-between gap-4 px-4 text-[0.86rem] font-extrabold uppercase tracking-[0.025em] text-white md:px-8 lg:px-10">
           <div className="flex min-w-0 items-center gap-8">
             <Link href="/" className="truncate outline-none hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/80">
               CDSANTIPONCE.COM
@@ -379,9 +379,9 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
         </div>
       </div>
 
-      <div className="relative bg-[#174f9e]">
+      <div className="relative bg-[#0f3f86]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/14" aria-hidden="true" />
-        <div className="absolute left-1/2 top-0 hidden h-full w-36 -translate-x-1/2 bg-[#0b2f6d] [clip-path:polygon(20%_0,80%_0,100%_100%,0_100%)] md:block" />
+        <div className="absolute left-1/2 top-0 hidden h-full w-30 -translate-x-1/2 bg-[#2367bd] [clip-path:polygon(20%_0,80%_0,100%_100%,0_100%)] md:block" />
         <Link
           href="/"
           aria-label={`${CLUB.shortName} - Inicio`}
@@ -390,10 +390,10 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
           <Image
             src={CLUB.crest}
             alt={`Escudo del ${CLUB.legalName}`}
-            width={96}
-            height={96}
+            width={74}
+            height={74}
             priority
-            className="size-22 rounded-md object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.28)]"
+            className="size-16 rounded-md object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.28)]"
           />
         </Link>
 
@@ -401,7 +401,7 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
           <MenuDrawer open={open} setOpen={setOpen} pathname={pathname} navData={navData} />
         </div>
 
-        <div className="mx-auto grid min-h-22 max-w-7xl grid-cols-1 items-center gap-4 px-4 py-3 md:grid-cols-[1fr_180px_1fr] md:px-8 lg:px-10">
+        <div className="mx-auto grid min-h-16 max-w-7xl grid-cols-1 items-center gap-4 px-4 py-1.5 md:grid-cols-[1fr_148px_1fr] md:px-8 lg:px-10">
           <nav aria-label="Navegación principal izquierda" className="hidden justify-self-end md:block">
             <NavLinks
               pathname={pathname}

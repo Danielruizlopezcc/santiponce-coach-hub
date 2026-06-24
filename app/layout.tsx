@@ -15,21 +15,9 @@ export const metadata: Metadata = {
     'Plataforma oficial del Club Deportivo Santiponce para familias, deportistas y gestión de matrículas. Temporada 2026/2027.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/images/Escudo_Santiponce_transparente.png',
+    shortcut: '/images/Escudo_Santiponce_transparente.png',
+    apple: '/images/Escudo_Santiponce_transparente.png',
   },
 }
 
