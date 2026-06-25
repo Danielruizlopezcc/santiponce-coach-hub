@@ -11,6 +11,14 @@ export async function updateSession(request: NextRequest) {
     },
   })
 
+  const isPrivateRoute =
+    request.nextUrl.pathname.startsWith('/app') ||
+    request.nextUrl.pathname.startsWith('/admin')
+
+  if (!isPrivateRoute) {
+    return response
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -38,7 +46,11 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  await supabase.auth.getClaims()
+  try {
+    await supabase.auth.getClaims()
+  } catch (error) {
+    console.warn('No se ha podido refrescar la sesión de Supabase.', error)
+  }
 
   return response
 }

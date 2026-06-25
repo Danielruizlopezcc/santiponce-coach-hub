@@ -278,20 +278,23 @@ function MenuDrawer({
           </Button>
         }
       />
-      <SheetContent side="left" className="w-[86vw] max-w-[420px] gap-0 p-0">
-        <SheetHeader className="border-b border-border p-5">
-          <SheetTitle className="text-left">
+      <SheetContent
+        side="left"
+        className="w-[86vw] max-w-[420px] gap-0 p-0 [&_[data-slot=sheet-close]]:text-white [&_[data-slot=sheet-close]]:hover:bg-white/10 [&_[data-slot=sheet-close]]:hover:text-white"
+      >
+        <SheetHeader className="border-b border-white/15 bg-[#0f3f86] p-5 text-white">
+          <SheetTitle className="text-left text-white">
             <span className="flex items-center gap-3">
               <Image
                 src={CLUB.crest}
                 alt={`Escudo del ${CLUB.legalName}`}
                 width={50}
                 height={50}
-                className="size-12 rounded-md object-contain"
+                className="size-12 rounded-md bg-white/10 object-contain ring-1 ring-white/20"
               />
               <span className="flex min-w-0 flex-col leading-tight">
                 <span className="truncate text-base font-black">{CLUB.shortName}</span>
-                <span className="text-xs font-bold text-muted-foreground">
+                <span className="text-xs font-bold text-white/72">
                   Temporada {CLUB.season}
                 </span>
               </span>
