@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CalendarDays, Clock, Filter, MapPin, Trophy } from 'lucide-react'
 import { BrandedPageHero } from '@/components/branded-page-hero'
+import { MatchCountdown } from '@/components/match-countdown'
 import { CLUB } from '@/lib/club'
 import {
   getClubScore,
@@ -131,9 +132,10 @@ function ResultBadge({ match }: { match: PublicCalendarMatch }) {
 
 function FeaturedMatch({ match, isPlayedMode }: { match: PublicCalendarMatch; isPlayedMode: boolean }) {
   const score = getScoreLabel(match)
+  const competitionLabel = getCompetitionLabel(match)
 
   return (
-    <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-[#06172f] text-white shadow-[0_18px_50px_rgba(6,23,47,0.18)]">
+    <section className="relative overflow-hidden bg-[#f4f6f8] text-white shadow-[0_18px_50px_rgba(6,23,47,0.18)]">
       <div className="absolute inset-0 opacity-20" aria-hidden="true">
         <div
           className="size-full"
@@ -160,33 +162,39 @@ function FeaturedMatch({ match, isPlayedMode }: { match: PublicCalendarMatch; is
             </div>
           </div>
 
-          <div className="flex flex-col justify-center px-4 py-8 text-center md:px-8 md:py-10 lg:px-20">
-            <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-white/72">
-              <span>{match.dayLabel}</span>
-              <span className="h-px w-8 bg-white/20" aria-hidden="true" />
-              <span>{match.dateLabel}</span>
+          <div className="relative flex flex-col justify-center overflow-hidden bg-[#102846] px-4 py-10 text-center md:px-8 md:py-12 lg:px-20">
+            <div
+              className="absolute inset-0 opacity-70"
+              aria-hidden="true"
+              style={{
+                background:
+                  'radial-gradient(circle at 50% 12%, rgba(47,123,205,0.35), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,0.06), transparent 45%), linear-gradient(180deg, transparent, rgba(6,23,47,0.4))',
+              }}
+            />
+            <div className="relative mx-auto flex size-11 items-center justify-center rounded-full border border-white/20 bg-white/12">
+              <Trophy className="size-6 text-white/90" aria-hidden="true" />
             </div>
+            <p className="relative mt-4 text-sm font-black uppercase tracking-[0.18em] text-white">
+              {match.matchType === 'friendly' ? 'Amistosos' : competitionLabel}
+            </p>
+            <p className="relative mt-2 text-sm font-bold text-white/86">
+              {competitionLabel} | {match.location || 'Lugar por confirmar'}
+            </p>
 
-            <div className="mt-7 grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+            <div className="relative mt-7 grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
               <p className="text-3xl font-black leading-tight tracking-tight md:text-4xl">{CLUB.shortName}</p>
-              {score ? (
-                <p className="rounded-lg bg-white px-6 py-4 text-4xl font-black text-[#06172f] shadow-lg">{score}</p>
-              ) : (
-                <p className="rounded-lg bg-white/10 px-6 py-4 text-2xl font-black text-white ring-1 ring-white/15">vs</p>
-              )}
+              <div className="grid gap-1">
+                {score ? (
+                  <p className="text-4xl font-black leading-none text-white md:text-5xl">{score}</p>
+                ) : (
+                  <p className="text-4xl font-black leading-none text-white md:text-5xl">{match.timeLabel}</p>
+                )}
+                <p className="text-sm font-black text-white/90">{match.dateLabel}</p>
+              </div>
               <p className="text-3xl font-black leading-tight tracking-tight md:text-4xl">{match.opponentName}</p>
             </div>
 
-            <div className="mt-8 flex flex-wrap justify-center gap-3 text-sm font-bold text-white/85">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15">
-                <Clock className="size-4" aria-hidden="true" />
-                {match.timeLabel}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15">
-                <MapPin className="size-4" aria-hidden="true" />
-                {match.location || 'Lugar por confirmar'}
-              </span>
-            </div>
+            <MatchCountdown matchDate={match.matchDate} matchTime={match.matchTime} />
           </div>
       </div>
     </section>

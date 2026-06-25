@@ -155,6 +155,16 @@
   .animate-blob-slow {
     animation: blob 12s infinite ease-in-out 2s;
   }
+
+  .footer-gap > :last-child {
+    padding-bottom: 4rem;
+  }
+
+  @media (min-width: 48rem) {
+    .footer-gap > :last-child {
+      padding-bottom: 6rem;
+    }
+  }
 }
 
 .news-rich-content {
