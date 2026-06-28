@@ -16,7 +16,7 @@ export function AdminNav({ onNavigate }: AdminNavProps) {
   return (
     <nav
       aria-label="Navegación de administración"
-      className="flex min-h-0 flex-1 flex-col p-3"
+      className="flex min-h-0 flex-1 flex-col p-2"
     >
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="grid gap-0.5">
@@ -34,14 +34,14 @@ export function AdminNav({ onNavigate }: AdminNavProps) {
                 onClick={onNavigate}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
                   'outline-none focus-visible:ring-2 focus-visible:ring-white/60',
                   isActive
                     ? 'bg-white/15 text-white'
                     : 'text-blue-100/70 hover:bg-white/10 hover:text-white',
                 )}
               >
-                <Icon className="size-4 shrink-0" aria-hidden="true" />
+                <Icon className="size-3.5 shrink-0" aria-hidden="true" />
                 {item.label}
               </Link>
             )

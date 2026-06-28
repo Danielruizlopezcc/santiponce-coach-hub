@@ -99,6 +99,21 @@ export type AdminMemberRow = {
   fechaAlta: string
 }
 
+export type AdminCoachRow = {
+  id: string
+  nombre: string
+  email: string
+  equipo: string
+  rol: 'Entrenador'
+  estado: 'Activo'
+  fechaAlta: string
+}
+
+export type AdminCoachTeamOption = {
+  id: string
+  nombre: string
+}
+
 export type AdminAthleteRow = {
   id: string
   nombre: string
@@ -177,6 +192,34 @@ export type AdminMatchRow = {
   status: AdminMatchStatus
   homeScore: number | null
   awayScore: number | null
+  homePossession: number | null
+  awayPossession: number | null
+  homeOffsides: number | null
+  awayOffsides: number | null
+  homeCorners: number | null
+  awayCorners: number | null
+  homeTotalShots: number | null
+  awayTotalShots: number | null
+  homeShots: number | null
+  awayShots: number | null
+  homeShotsOnTarget: number | null
+  awayShotsOnTarget: number | null
+  homeBlockedShots: number | null
+  awayBlockedShots: number | null
+  homeGoalkeeperSaves: number | null
+  awayGoalkeeperSaves: number | null
+  homeTackles: number | null
+  awayTackles: number | null
+  homePasses: number | null
+  awayPasses: number | null
+  homeCompletedPasses: number | null
+  awayCompletedPasses: number | null
+  homeFouls: number | null
+  awayFouls: number | null
+  homeYellowCards: number | null
+  awayYellowCards: number | null
+  homeRedCards: number | null
+  awayRedCards: number | null
   notes: string
 }
 
@@ -407,6 +450,7 @@ async function getAdminCollections() {
     { data: payments },
     { data: sponsors },
     { data: news },
+    { data: coachTeamAssignments },
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -434,6 +478,7 @@ async function getAdminCollections() {
       .order('created_at', { ascending: false }),
     supabase.from('sponsors').select('id, is_active'),
     supabase.from('news').select('id'),
+    supabase.from('coach_team_assignments').select('coach_user_id, team_id'),
   ])
 
   const guardiansWithApproval = await supabase
@@ -463,6 +508,7 @@ async function getAdminCollections() {
     payments: (payments ?? []) as AdminPaymentRecord[],
     sponsors: sponsors ?? [],
     news: news ?? [],
+    coachTeamAssignments: coachTeamAssignments ?? [],
   }
 }
 
@@ -936,11 +982,15 @@ function getMatchWeekInfo(value: string) {
 
 export async function getAdminMatches(): Promise<AdminMatchRow[]> {
   const supabase = await createClient()
-  const [{ data: matches }, { data: teams }, { data: categories }, { data: seasons }] =
+  const matchSelect =
+    'id, team_id, season_id, opponent_name, match_date, match_time, location, is_home, match_type, round_label, status, home_score, away_score, home_possession, away_possession, home_offsides, away_offsides, home_corners, away_corners, home_total_shots, away_total_shots, home_shots, away_shots, home_shots_on_target, away_shots_on_target, home_blocked_shots, away_blocked_shots, home_goalkeeper_saves, away_goalkeeper_saves, home_tackles, away_tackles, home_passes, away_passes, home_completed_passes, away_completed_passes, home_fouls, away_fouls, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, notes'
+  const fallbackMatchSelect =
+    'id, team_id, season_id, opponent_name, match_date, match_time, location, is_home, match_type, round_label, status, home_score, away_score, notes'
+  const [{ data: matchesWithStats, error: matchesError }, { data: teams }, { data: categories }, { data: seasons }] =
     await Promise.all([
       supabase
         .from('matches')
-        .select('id, team_id, season_id, opponent_name, match_date, match_time, location, is_home, match_type, round_label, status, home_score, away_score, notes')
+        .select(matchSelect)
         .order('match_date', { ascending: false })
         .order('match_time', { ascending: false, nullsFirst: false }),
       supabase.from('teams').select('id, name, category_id, season_id'),
@@ -948,11 +998,20 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
       supabase.from('seasons').select('id, name'),
     ])
 
+  const matches = matchesError
+    ? (await supabase
+        .from('matches')
+        .select(fallbackMatchSelect)
+        .order('match_date', { ascending: false })
+        .order('match_time', { ascending: false, nullsFirst: false })).data
+    : matchesWithStats
+
   const teamById = new Map((teams ?? []).map((team) => [team.id, team]))
   const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
 
   return (matches ?? []).map((match) => {
+    const stats = match as typeof match & Record<string, number | null | undefined>
     const team = teamById.get(match.team_id)
     const categoryName = team ? categoryById.get(team.category_id) ?? 'Sin categoría' : 'Sin categoría'
     const sortInfo = getTeamCategorySortInfo(team?.name ?? '', categoryName)
@@ -979,6 +1038,34 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
       status: match.status as AdminMatchStatus,
       homeScore: match.home_score,
       awayScore: match.away_score,
+      homePossession: stats.home_possession ?? null,
+      awayPossession: stats.away_possession ?? null,
+      homeOffsides: stats.home_offsides ?? null,
+      awayOffsides: stats.away_offsides ?? null,
+      homeCorners: stats.home_corners ?? null,
+      awayCorners: stats.away_corners ?? null,
+      homeTotalShots: stats.home_total_shots ?? null,
+      awayTotalShots: stats.away_total_shots ?? null,
+      homeShots: stats.home_shots ?? null,
+      awayShots: stats.away_shots ?? null,
+      homeShotsOnTarget: stats.home_shots_on_target ?? null,
+      awayShotsOnTarget: stats.away_shots_on_target ?? null,
+      homeBlockedShots: stats.home_blocked_shots ?? null,
+      awayBlockedShots: stats.away_blocked_shots ?? null,
+      homeGoalkeeperSaves: stats.home_goalkeeper_saves ?? null,
+      awayGoalkeeperSaves: stats.away_goalkeeper_saves ?? null,
+      homeTackles: stats.home_tackles ?? null,
+      awayTackles: stats.away_tackles ?? null,
+      homePasses: stats.home_passes ?? null,
+      awayPasses: stats.away_passes ?? null,
+      homeCompletedPasses: stats.home_completed_passes ?? null,
+      awayCompletedPasses: stats.away_completed_passes ?? null,
+      homeFouls: stats.home_fouls ?? null,
+      awayFouls: stats.away_fouls ?? null,
+      homeYellowCards: stats.home_yellow_cards ?? null,
+      awayYellowCards: stats.away_yellow_cards ?? null,
+      homeRedCards: stats.home_red_cards ?? null,
+      awayRedCards: stats.away_red_cards ?? null,
       notes: match.notes ?? '',
     }
   })
@@ -1311,6 +1398,43 @@ export async function getAdminManagers(): Promise<AdminManagerRow[]> {
       email: user.email,
       rol: 'Administrador',
       estado: 'Activo',
+    }))
+}
+
+export async function getAdminCoaches(): Promise<AdminCoachRow[]> {
+  const { profiles, roles, teams, coachTeamAssignments } = await getAdminCollections()
+  const coachIds = new Set(roles.filter((role) => role.role === 'coach').map((role) => role.user_id))
+  const teamById = new Map(teams.map((team) => [team.id, team.name]))
+  const assignmentByCoachId = new Map(
+    coachTeamAssignments.map((assignment) => [assignment.coach_user_id, assignment.team_id]),
+  )
+
+  return profiles
+    .filter((profile) => coachIds.has(profile.id))
+    .map((profile) => {
+      const teamId = assignmentByCoachId.get(profile.id)
+
+      return {
+        id: profile.id,
+        nombre: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Entrenador',
+        email: profile.email,
+        equipo: teamId ? teamById.get(teamId) ?? 'Equipo no disponible' : 'Sin equipo',
+        rol: 'Entrenador' as const,
+        estado: 'Activo' as const,
+        fechaAlta: formatSpanishDate(profile.created_at),
+      }
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+export async function getAdminCoachTeamOptions(): Promise<AdminCoachTeamOption[]> {
+  const teams = await getAdminTeams()
+
+  return teams
+    .filter((team) => team.isActive)
+    .map((team) => ({
+      id: team.id,
+      nombre: `${team.nombre} · ${team.categoria} · ${team.temporada}`,
     }))
 }
 

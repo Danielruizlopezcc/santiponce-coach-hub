@@ -9,6 +9,7 @@ import {
   Shield,
   ShieldCheck,
   Trophy,
+  ClipboardList,
   UserCheck,
 } from 'lucide-react'
 
@@ -21,6 +22,7 @@ export type AdminNavItem = {
 export const ADMIN_NAV: AdminNavItem[] = [
   { label: 'Inicio', href: '/admin', icon: LayoutDashboard },
   { label: 'Tutores / Socios', href: '/admin/tutores', icon: UserCheck },
+  { label: 'Entrenadores', href: '/admin/entrenadores', icon: ClipboardList },
   { label: 'Deportistas', href: '/admin/deportistas', icon: Trophy },
   { label: 'Equipos', href: '/admin/equipos', icon: Shield },
   { label: 'Calendario', href: '/admin/calendario', icon: Calendar },

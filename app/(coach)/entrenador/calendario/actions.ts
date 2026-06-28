@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { requireAdminAction } from '@/lib/auth'
+import { requireCoachAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const matchStatusSchema = z.enum(['scheduled', 'played', 'postponed', 'cancelled'])
@@ -68,27 +68,59 @@ const matchSchema = matchBaseSchema
     },
   )
 
-const createMatchSchema = matchBaseSchema.omit({ id: true }).refine(
-  (value) => value.status !== 'played' || (value.homeScore !== null && value.awayScore !== null),
-  {
-    message: 'Introduce el resultado para marcar el partido como jugado.',
-    path: ['homeScore'],
-  },
-).refine(
-  (value) => value.matchType !== 'league' || Boolean(value.roundLabel?.trim()),
-  {
-    message: 'Introduce la jornada de liga.',
-    path: ['roundLabel'],
-  },
-)
+const createMatchSchema = matchBaseSchema.omit({ id: true })
+  .refine(
+    (value) => value.status !== 'played' || (value.homeScore !== null && value.awayScore !== null),
+    {
+      message: 'Introduce el resultado para marcar el partido como jugado.',
+      path: ['homeScore'],
+    },
+  )
+  .refine(
+    (value) => value.matchType !== 'league' || Boolean(value.roundLabel?.trim()),
+    {
+      message: 'Introduce la jornada de liga.',
+      path: ['roundLabel'],
+    },
+  )
 
 type MatchInput = z.infer<typeof matchSchema>
 
-function revalidateCalendarPaths() {
+function revalidateCoachCalendarPaths() {
+  revalidatePath('/entrenador')
+  revalidatePath('/entrenador/calendario')
+  revalidatePath('/calendario')
   revalidatePath('/admin/calendario')
   revalidatePath('/admin')
-  revalidatePath('/calendario')
-  revalidatePath('/app/calendario')
+}
+
+async function assertCoachCanUseTeam(coachUserId: string, teamId: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('coach_team_assignments')
+    .select('team_id')
+    .eq('coach_user_id', coachUserId)
+    .eq('team_id', teamId)
+    .maybeSingle()
+
+  if (error || !data) {
+    throw new Error('No tienes permiso para gestionar partidos de ese equipo.')
+  }
+}
+
+async function assertCoachCanUseMatch(coachUserId: string, matchId: string) {
+  const supabase = createAdminClient()
+  const { data: match, error } = await supabase
+    .from('matches')
+    .select('id, team_id')
+    .eq('id', matchId)
+    .maybeSingle()
+
+  if (error || !match) {
+    throw new Error('No se ha encontrado el partido.')
+  }
+
+  await assertCoachCanUseTeam(coachUserId, match.team_id)
 }
 
 async function getTeamSeasonId(teamId: string) {
@@ -157,9 +189,10 @@ function toMatchPayload(parsed: MatchInput, seasonId: string) {
   return payload
 }
 
-export async function createMatchAction(input: MatchInput): Promise<void> {
-  await requireAdminAction()
+export async function createCoachMatchAction(input: MatchInput): Promise<void> {
+  const coach = await requireCoachAction()
   const parsed = createMatchSchema.parse(input)
+  await assertCoachCanUseTeam(coach.id, parsed.teamId)
   const seasonId = await getTeamSeasonId(parsed.teamId)
   const supabase = createAdminClient()
 
@@ -168,12 +201,14 @@ export async function createMatchAction(input: MatchInput): Promise<void> {
     .insert(toMatchPayload(parsed, seasonId))
 
   if (error) throw new Error(error.message)
-  revalidateCalendarPaths()
+  revalidateCoachCalendarPaths()
 }
 
-export async function updateMatchAction(input: MatchInput & { id: string }): Promise<void> {
-  await requireAdminAction()
+export async function updateCoachMatchAction(input: MatchInput & { id: string }): Promise<void> {
+  const coach = await requireCoachAction()
   const parsed = matchSchema.required({ id: true }).parse(input)
+  await assertCoachCanUseMatch(coach.id, parsed.id)
+  await assertCoachCanUseTeam(coach.id, parsed.teamId)
   const seasonId = await getTeamSeasonId(parsed.teamId)
   const supabase = createAdminClient()
 
@@ -183,15 +218,16 @@ export async function updateMatchAction(input: MatchInput & { id: string }): Pro
     .eq('id', parsed.id)
 
   if (error) throw new Error(error.message)
-  revalidateCalendarPaths()
+  revalidateCoachCalendarPaths()
 }
 
-export async function deleteMatchAction(id: string): Promise<void> {
-  await requireAdminAction()
+export async function deleteCoachMatchAction(id: string): Promise<void> {
+  const coach = await requireCoachAction()
   const parsedId = z.string().uuid().parse(id)
+  await assertCoachCanUseMatch(coach.id, parsedId)
   const supabase = createAdminClient()
   const { error } = await supabase.from('matches').delete().eq('id', parsedId)
 
   if (error) throw new Error(error.message)
-  revalidateCalendarPaths()
+  revalidateCoachCalendarPaths()
 }

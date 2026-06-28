@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { CalendarDays, ClipboardList, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,11 +9,17 @@ import { Label } from '@/components/ui/label'
 import { CLUB } from '@/lib/club'
 import type { AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
-import { createMatchAction, deleteMatchAction, updateMatchAction } from './actions'
+import {
+  createMatchAction as adminCreateMatchAction,
+  deleteMatchAction as adminDeleteMatchAction,
+  updateMatchAction as adminUpdateMatchAction,
+} from './actions'
 
 type Props = {
   matches: AdminMatchRow[]
   teams: AdminTeamRow[]
+  actions?: CalendarActions
+  emptyTeamsMessage?: string
 }
 
 type SheetMode = 'create' | 'edit'
@@ -35,6 +41,7 @@ type MatchFormState = {
 
 type ColumnFilters = {
   week: string
+  round: string
   date: string
   team: string
   opponent: string
@@ -46,6 +53,83 @@ type ColumnFilters = {
 type ResultFormState = {
   clubScore: string
   opponentScore: string
+  clubPossession: string
+  opponentPossession: string
+  clubOffsides: string
+  opponentOffsides: string
+  clubCorners: string
+  opponentCorners: string
+  clubTotalShots: string
+  opponentTotalShots: string
+  clubShots: string
+  opponentShots: string
+  clubShotsOnTarget: string
+  opponentShotsOnTarget: string
+  clubBlockedShots: string
+  opponentBlockedShots: string
+  clubGoalkeeperSaves: string
+  opponentGoalkeeperSaves: string
+  clubTackles: string
+  opponentTackles: string
+  clubPasses: string
+  opponentPasses: string
+  clubCompletedPasses: string
+  opponentCompletedPasses: string
+  clubFouls: string
+  opponentFouls: string
+  clubYellowCards: string
+  opponentYellowCards: string
+  clubRedCards: string
+  opponentRedCards: string
+}
+
+type MatchActionInput = {
+  teamId: string
+  opponentName: string
+  matchDate: string
+  matchTime: string
+  location: string
+  isHome: boolean
+  matchType: AdminMatchType
+  roundLabel: string
+  status: AdminMatchStatus
+  homeScore: number | null
+  awayScore: number | null
+  homePossession?: number | null
+  awayPossession?: number | null
+  homeOffsides?: number | null
+  awayOffsides?: number | null
+  homeCorners?: number | null
+  awayCorners?: number | null
+  homeTotalShots?: number | null
+  awayTotalShots?: number | null
+  homeShots?: number | null
+  awayShots?: number | null
+  homeShotsOnTarget?: number | null
+  awayShotsOnTarget?: number | null
+  homeBlockedShots?: number | null
+  awayBlockedShots?: number | null
+  homeGoalkeeperSaves?: number | null
+  awayGoalkeeperSaves?: number | null
+  homeTackles?: number | null
+  awayTackles?: number | null
+  homePasses?: number | null
+  awayPasses?: number | null
+  homeCompletedPasses?: number | null
+  awayCompletedPasses?: number | null
+  homeFouls?: number | null
+  awayFouls?: number | null
+  homeYellowCards?: number | null
+  awayYellowCards?: number | null
+  homeRedCards?: number | null
+  awayRedCards?: number | null
+  notes: string
+}
+
+type CalendarActions = {
+  createMatch: (input: MatchActionInput) => Promise<void>
+  updateMatch: (input: MatchActionInput & { id: string }) => Promise<void>
+  deleteMatch: (id: string) => Promise<void>
 }
 
 const STATUS_LABELS: Record<AdminMatchStatus, string> = {
@@ -93,6 +177,11 @@ function parseScore(value: string) {
   return Number(value)
 }
 
+function parseOptionalStat(value: string) {
+  if (!value.trim()) return null
+  return Number(value)
+}
+
 function getScoreLabel(match: AdminMatchRow) {
   if (match.status !== 'played' || match.homeScore === null || match.awayScore === null) {
     return '-'
@@ -104,10 +193,35 @@ function getScoreLabel(match: AdminMatchRow) {
   return `${clubScore} - ${opponentScore}`
 }
 
-export function CalendarioClient({ matches, teams }: Props) {
+function getStatNumber(value: string) {
+  return value.trim() ? Number(value) : 0
+}
+
+function getStatWidths(leftValue: string, rightValue: string) {
+  const left = getStatNumber(leftValue)
+  const right = getStatNumber(rightValue)
+  const total = left + right
+
+  if (total === 0) {
+    return { left: 50, right: 50 }
+  }
+
+  return {
+    left: Math.max(8, Math.round((left / total) * 100)),
+    right: Math.max(8, Math.round((right / total) * 100)),
+  }
+}
+
+export function CalendarioClient({
+  matches,
+  teams,
+  actions,
+  emptyTeamsMessage = 'Crea al menos un equipo antes de programar partidos.',
+}: Props) {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<ColumnFilters>({
     week: '',
+    round: '',
     date: '',
     team: '',
     opponent: '',
@@ -119,11 +233,47 @@ export function CalendarioClient({ matches, teams }: Props) {
   const [mode, setMode] = useState<SheetMode>('create')
   const [editing, setEditing] = useState<AdminMatchRow | null>(null)
   const [resultMatch, setResultMatch] = useState<AdminMatchRow | null>(null)
-  const [resultForm, setResultForm] = useState<ResultFormState>({ clubScore: '', opponentScore: '' })
+  const [resultForm, setResultForm] = useState<ResultFormState>({
+    clubScore: '',
+    opponentScore: '',
+    clubPossession: '',
+    opponentPossession: '',
+    clubOffsides: '',
+    opponentOffsides: '',
+    clubCorners: '',
+    opponentCorners: '',
+    clubTotalShots: '',
+    opponentTotalShots: '',
+    clubShots: '',
+    opponentShots: '',
+    clubShotsOnTarget: '',
+    opponentShotsOnTarget: '',
+    clubBlockedShots: '',
+    opponentBlockedShots: '',
+    clubGoalkeeperSaves: '',
+    opponentGoalkeeperSaves: '',
+    clubTackles: '',
+    opponentTackles: '',
+    clubPasses: '',
+    opponentPasses: '',
+    clubCompletedPasses: '',
+    opponentCompletedPasses: '',
+    clubFouls: '',
+    opponentFouls: '',
+    clubYellowCards: '',
+    opponentYellowCards: '',
+    clubRedCards: '',
+    opponentRedCards: '',
+  })
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState<MatchFormState>(() => createEmptyForm(teams[0]?.id ?? ''))
   const [formError, setFormError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const calendarActions = actions ?? {
+    createMatch: adminCreateMatchAction,
+    updateMatch: adminUpdateMatchAction,
+    deleteMatch: adminDeleteMatchAction,
+  }
 
   const activeTeams = useMemo(
     () => teams.filter((team) => team.isActive),
@@ -155,6 +305,7 @@ export function CalendarioClient({ matches, teams }: Props) {
 
     if (q && !searchable.includes(q)) return false
     if (filters.week && `${match.weekLabel}|${match.weekRangeLabel}` !== filters.week) return false
+    if (filters.round && !match.roundLabel.toLowerCase().includes(filters.round.toLowerCase())) return false
     if (filters.date && !match.dateLabel.toLowerCase().includes(filters.date.toLowerCase())) return false
     if (filters.team && match.teamId !== filters.team) return false
     if (filters.opponent && !match.opponentName.toLowerCase().includes(filters.opponent.toLowerCase())) return false
@@ -179,6 +330,7 @@ export function CalendarioClient({ matches, teams }: Props) {
     setSearch('')
     setFilters({
       week: '',
+      round: '',
       date: '',
       team: '',
       opponent: '',
@@ -230,6 +382,34 @@ export function CalendarioClient({ matches, teams }: Props) {
       opponentScore: match.status === 'played'
         ? scoreToString(match.isHome ? match.awayScore : match.homeScore)
         : '',
+      clubPossession: scoreToString(match.isHome ? match.homePossession : match.awayPossession),
+      opponentPossession: scoreToString(match.isHome ? match.awayPossession : match.homePossession),
+      clubOffsides: scoreToString(match.isHome ? match.homeOffsides : match.awayOffsides),
+      opponentOffsides: scoreToString(match.isHome ? match.awayOffsides : match.homeOffsides),
+      clubCorners: scoreToString(match.isHome ? match.homeCorners : match.awayCorners),
+      opponentCorners: scoreToString(match.isHome ? match.awayCorners : match.homeCorners),
+      clubTotalShots: scoreToString(match.isHome ? match.homeTotalShots : match.awayTotalShots),
+      opponentTotalShots: scoreToString(match.isHome ? match.awayTotalShots : match.homeTotalShots),
+      clubShots: scoreToString(match.isHome ? match.homeShots : match.awayShots),
+      opponentShots: scoreToString(match.isHome ? match.awayShots : match.homeShots),
+      clubShotsOnTarget: scoreToString(match.isHome ? match.homeShotsOnTarget : match.awayShotsOnTarget),
+      opponentShotsOnTarget: scoreToString(match.isHome ? match.awayShotsOnTarget : match.homeShotsOnTarget),
+      clubBlockedShots: scoreToString(match.isHome ? match.homeBlockedShots : match.awayBlockedShots),
+      opponentBlockedShots: scoreToString(match.isHome ? match.awayBlockedShots : match.homeBlockedShots),
+      clubGoalkeeperSaves: scoreToString(match.isHome ? match.homeGoalkeeperSaves : match.awayGoalkeeperSaves),
+      opponentGoalkeeperSaves: scoreToString(match.isHome ? match.awayGoalkeeperSaves : match.homeGoalkeeperSaves),
+      clubTackles: scoreToString(match.isHome ? match.homeTackles : match.awayTackles),
+      opponentTackles: scoreToString(match.isHome ? match.awayTackles : match.homeTackles),
+      clubPasses: scoreToString(match.isHome ? match.homePasses : match.awayPasses),
+      opponentPasses: scoreToString(match.isHome ? match.awayPasses : match.homePasses),
+      clubCompletedPasses: scoreToString(match.isHome ? match.homeCompletedPasses : match.awayCompletedPasses),
+      opponentCompletedPasses: scoreToString(match.isHome ? match.awayCompletedPasses : match.homeCompletedPasses),
+      clubFouls: scoreToString(match.isHome ? match.homeFouls : match.awayFouls),
+      opponentFouls: scoreToString(match.isHome ? match.awayFouls : match.homeFouls),
+      clubYellowCards: scoreToString(match.isHome ? match.homeYellowCards : match.awayYellowCards),
+      opponentYellowCards: scoreToString(match.isHome ? match.awayYellowCards : match.homeYellowCards),
+      clubRedCards: scoreToString(match.isHome ? match.homeRedCards : match.awayRedCards),
+      opponentRedCards: scoreToString(match.isHome ? match.awayRedCards : match.homeRedCards),
     })
     setFormError(null)
   }
@@ -277,9 +457,9 @@ export function CalendarioClient({ matches, teams }: Props) {
       try {
         const payload = buildPayload()
         if (mode === 'create') {
-          await createMatchAction(payload)
+          await calendarActions.createMatch(payload)
         } else if (editing) {
-          await updateMatchAction({ ...payload, id: editing.id })
+          await calendarActions.updateMatch({ ...payload, id: editing.id })
         }
         setSheetOpen(false)
       } catch (error) {
@@ -290,23 +470,93 @@ export function CalendarioClient({ matches, teams }: Props) {
 
   function handleResultSubmit() {
     if (!resultMatch) return
-    if (!resultForm.clubScore.trim() || !resultForm.opponentScore.trim()) {
-      setFormError('Introduce el resultado del club y del rival.')
+    const hasClubScore = Boolean(resultForm.clubScore.trim())
+    const hasOpponentScore = Boolean(resultForm.opponentScore.trim())
+
+    if (hasClubScore !== hasOpponentScore) {
+      setFormError('Introduce los goles de ambos equipos o deja ambos vacíos.')
       return
     }
 
-    const clubScore = Number(resultForm.clubScore)
-    const opponentScore = Number(resultForm.opponentScore)
+    const values = [
+      resultForm.clubScore,
+      resultForm.opponentScore,
+      resultForm.clubPossession,
+      resultForm.opponentPossession,
+      resultForm.clubOffsides,
+      resultForm.opponentOffsides,
+      resultForm.clubCorners,
+      resultForm.opponentCorners,
+      resultForm.clubTotalShots,
+      resultForm.opponentTotalShots,
+      resultForm.clubShots,
+      resultForm.opponentShots,
+      resultForm.clubShotsOnTarget,
+      resultForm.opponentShotsOnTarget,
+      resultForm.clubBlockedShots,
+      resultForm.opponentBlockedShots,
+      resultForm.clubGoalkeeperSaves,
+      resultForm.opponentGoalkeeperSaves,
+      resultForm.clubTackles,
+      resultForm.opponentTackles,
+      resultForm.clubPasses,
+      resultForm.opponentPasses,
+      resultForm.clubCompletedPasses,
+      resultForm.opponentCompletedPasses,
+      resultForm.clubFouls,
+      resultForm.opponentFouls,
+      resultForm.clubYellowCards,
+      resultForm.opponentYellowCards,
+      resultForm.clubRedCards,
+      resultForm.opponentRedCards,
+    ]
 
-    if (!Number.isInteger(clubScore) || !Number.isInteger(opponentScore) || clubScore < 0 || opponentScore < 0) {
-      setFormError('El resultado debe tener números enteros válidos.')
+    if (values.some((value) => value.trim() && (!Number.isInteger(Number(value)) || Number(value) < 0))) {
+      setFormError('Los datos de la ficha deben ser números enteros válidos.')
       return
     }
+
+    const clubScore = parseOptionalStat(resultForm.clubScore)
+    const opponentScore = parseOptionalStat(resultForm.opponentScore)
+    const clubPossession = parseOptionalStat(resultForm.clubPossession)
+    const opponentPossession = parseOptionalStat(resultForm.opponentPossession)
+    const clubOffsides = parseOptionalStat(resultForm.clubOffsides)
+    const opponentOffsides = parseOptionalStat(resultForm.opponentOffsides)
+    const clubCorners = parseOptionalStat(resultForm.clubCorners)
+    const opponentCorners = parseOptionalStat(resultForm.opponentCorners)
+    const clubTotalShots = parseOptionalStat(resultForm.clubTotalShots)
+    const opponentTotalShots = parseOptionalStat(resultForm.opponentTotalShots)
+    const clubShots = parseOptionalStat(resultForm.clubShots)
+    const opponentShots = parseOptionalStat(resultForm.opponentShots)
+    const clubShotsOnTarget = parseOptionalStat(resultForm.clubShotsOnTarget)
+    const opponentShotsOnTarget = parseOptionalStat(resultForm.opponentShotsOnTarget)
+    const clubBlockedShots = parseOptionalStat(resultForm.clubBlockedShots)
+    const opponentBlockedShots = parseOptionalStat(resultForm.opponentBlockedShots)
+    const clubGoalkeeperSaves = parseOptionalStat(resultForm.clubGoalkeeperSaves)
+    const opponentGoalkeeperSaves = parseOptionalStat(resultForm.opponentGoalkeeperSaves)
+    const clubTackles = parseOptionalStat(resultForm.clubTackles)
+    const opponentTackles = parseOptionalStat(resultForm.opponentTackles)
+    const clubPasses = parseOptionalStat(resultForm.clubPasses)
+    const opponentPasses = parseOptionalStat(resultForm.opponentPasses)
+    const clubCompletedPasses = parseOptionalStat(resultForm.clubCompletedPasses)
+    const opponentCompletedPasses = parseOptionalStat(resultForm.opponentCompletedPasses)
+    const clubFouls = parseOptionalStat(resultForm.clubFouls)
+    const opponentFouls = parseOptionalStat(resultForm.opponentFouls)
+    const clubYellowCards = parseOptionalStat(resultForm.clubYellowCards)
+    const opponentYellowCards = parseOptionalStat(resultForm.opponentYellowCards)
+    const clubRedCards = parseOptionalStat(resultForm.clubRedCards)
+    const opponentRedCards = parseOptionalStat(resultForm.opponentRedCards)
+    const nextStatus =
+      clubScore !== null && opponentScore !== null
+        ? 'played'
+        : resultMatch.status === 'played'
+          ? 'scheduled'
+          : resultMatch.status
 
     setFormError(null)
     startTransition(async () => {
       try {
-        await updateMatchAction({
+        await calendarActions.updateMatch({
           id: resultMatch.id,
           teamId: resultMatch.teamId,
           opponentName: resultMatch.opponentName,
@@ -316,9 +566,37 @@ export function CalendarioClient({ matches, teams }: Props) {
           isHome: resultMatch.isHome,
           matchType: resultMatch.matchType,
           roundLabel: resultMatch.roundLabel,
-          status: 'played',
+          status: nextStatus,
           homeScore: resultMatch.isHome ? clubScore : opponentScore,
           awayScore: resultMatch.isHome ? opponentScore : clubScore,
+          homePossession: resultMatch.isHome ? clubPossession : opponentPossession,
+          awayPossession: resultMatch.isHome ? opponentPossession : clubPossession,
+          homeOffsides: resultMatch.isHome ? clubOffsides : opponentOffsides,
+          awayOffsides: resultMatch.isHome ? opponentOffsides : clubOffsides,
+          homeCorners: resultMatch.isHome ? clubCorners : opponentCorners,
+          awayCorners: resultMatch.isHome ? opponentCorners : clubCorners,
+          homeTotalShots: resultMatch.isHome ? clubTotalShots : opponentTotalShots,
+          awayTotalShots: resultMatch.isHome ? opponentTotalShots : clubTotalShots,
+          homeShots: resultMatch.isHome ? clubShots : opponentShots,
+          awayShots: resultMatch.isHome ? opponentShots : clubShots,
+          homeShotsOnTarget: resultMatch.isHome ? clubShotsOnTarget : opponentShotsOnTarget,
+          awayShotsOnTarget: resultMatch.isHome ? opponentShotsOnTarget : clubShotsOnTarget,
+          homeBlockedShots: resultMatch.isHome ? clubBlockedShots : opponentBlockedShots,
+          awayBlockedShots: resultMatch.isHome ? opponentBlockedShots : clubBlockedShots,
+          homeGoalkeeperSaves: resultMatch.isHome ? clubGoalkeeperSaves : opponentGoalkeeperSaves,
+          awayGoalkeeperSaves: resultMatch.isHome ? opponentGoalkeeperSaves : clubGoalkeeperSaves,
+          homeTackles: resultMatch.isHome ? clubTackles : opponentTackles,
+          awayTackles: resultMatch.isHome ? opponentTackles : clubTackles,
+          homePasses: resultMatch.isHome ? clubPasses : opponentPasses,
+          awayPasses: resultMatch.isHome ? opponentPasses : clubPasses,
+          homeCompletedPasses: resultMatch.isHome ? clubCompletedPasses : opponentCompletedPasses,
+          awayCompletedPasses: resultMatch.isHome ? opponentCompletedPasses : clubCompletedPasses,
+          homeFouls: resultMatch.isHome ? clubFouls : opponentFouls,
+          awayFouls: resultMatch.isHome ? opponentFouls : clubFouls,
+          homeYellowCards: resultMatch.isHome ? clubYellowCards : opponentYellowCards,
+          awayYellowCards: resultMatch.isHome ? opponentYellowCards : clubYellowCards,
+          homeRedCards: resultMatch.isHome ? clubRedCards : opponentRedCards,
+          awayRedCards: resultMatch.isHome ? opponentRedCards : clubRedCards,
           notes: resultMatch.notes,
         })
         setResultMatch(null)
@@ -331,7 +609,7 @@ export function CalendarioClient({ matches, teams }: Props) {
   function handleDelete(id: string) {
     startTransition(async () => {
       try {
-        await deleteMatchAction(id)
+        await calendarActions.deleteMatch(id)
         setDeleteId(null)
       } catch (error) {
         setFormError(error instanceof Error ? error.message : 'No se ha podido eliminar el partido.')
@@ -353,7 +631,7 @@ export function CalendarioClient({ matches, teams }: Props) {
 
       {selectableTeams.length === 0 ? (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
-          Crea al menos un equipo antes de programar partidos.
+          {emptyTeamsMessage}
         </p>
       ) : null}
 
@@ -375,7 +653,7 @@ export function CalendarioClient({ matches, teams }: Props) {
         ) : null}
       </div>
 
-      <div className="grid gap-3 rounded-xl bg-white p-4 ring-1 ring-foreground/10 md:grid-cols-3 xl:grid-cols-7">
+      <div className="grid gap-3 rounded-xl bg-white p-4 ring-1 ring-foreground/10 md:grid-cols-3 xl:grid-cols-8">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="filter-week">Semana</Label>
           <select
@@ -394,6 +672,16 @@ export function CalendarioClient({ matches, teams }: Props) {
               )
             })}
           </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="filter-round">Jornada</Label>
+          <Input
+            id="filter-round"
+            value={filters.round}
+            onChange={(event) => setFilter('round', event.target.value)}
+            placeholder="Jornada"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -488,9 +776,8 @@ export function CalendarioClient({ matches, teams }: Props) {
         <table className="w-full text-center text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
-              <th className="px-4 py-2.5 text-center">Semana</th>
+              <th className="px-4 py-2.5 text-center">Jornada</th>
               <th className="px-4 py-2.5 text-center">Fecha</th>
-              <th className="px-4 py-2.5 text-center">Equipo</th>
               <th className="px-4 py-2.5 text-center">Partido</th>
               <th className="px-4 py-2.5 text-center">Competición</th>
               <th className="px-4 py-2.5 text-center">Lugar</th>
@@ -502,7 +789,7 @@ export function CalendarioClient({ matches, teams }: Props) {
           <tbody className="divide-y divide-border bg-card">
             {filteredMatches.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-14 text-center text-sm text-muted-foreground">
+                <td colSpan={8} className="px-4 py-14 text-center text-sm text-muted-foreground">
                   No hay partidos registrados todavía.
                 </td>
               </tr>
@@ -515,34 +802,26 @@ export function CalendarioClient({ matches, teams }: Props) {
                     key={match.id}
                     className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}
                   >
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">{match.weekLabel}</div>
-                      <div className="text-xs text-muted-foreground">{match.weekRangeLabel}</div>
+                    <td className="px-4 py-3 font-semibold text-foreground">
+                      {match.matchType === 'league' ? match.roundLabel : 'Amistoso'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-semibold text-foreground">{match.dateLabel}</div>
-                      <div className="mt-0.5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                      <div className="mt-0.5 flex items-center justify-center gap-1.5 font-semibold text-foreground">
                         <CalendarDays className="size-3.5" aria-hidden="true" />
                         {match.timeLabel}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">{match.teamName}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">
-                        {CLUB.shortName} vs {match.opponentName}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {match.isHome ? 'Como local' : 'Como visitante'} · {match.seasonName}
+                      <div className="font-semibold leading-tight text-foreground">
+                        <div>{match.isHome ? CLUB.shortName : match.opponentName}</div>
+                        <div className="text-xs font-black uppercase text-muted-foreground">vs</div>
+                        <div>{match.isHome ? match.opponentName : CLUB.shortName}</div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-semibold text-foreground">
                         {MATCH_TYPE_LABELS[match.matchType]}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {match.matchType === 'league' ? match.roundLabel : 'Sin jornada'}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
@@ -570,8 +849,8 @@ export function CalendarioClient({ matches, teams }: Props) {
                       ) : (
                         <div className="flex justify-center gap-1">
                           <Button size="sm" variant="ghost" onClick={() => openResult(match)}>
-                            <CalendarDays className="size-3.5" aria-hidden="true" />
-                            Resultado
+                            <ClipboardList className="size-3.5" aria-hidden="true" />
+                            Ficha
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => openEdit(match)}>
                             <Pencil className="size-3.5" aria-hidden="true" />
@@ -604,7 +883,7 @@ export function CalendarioClient({ matches, teams }: Props) {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         title={mode === 'create' ? 'Nuevo partido' : 'Editar partido'}
-        description={mode === 'create' ? 'Programa un partido para uno de los equipos del club.' : 'Actualiza la fecha, estado o resultado del partido.'}
+        description={mode === 'create' ? 'Programa un partido para uno de los equipos del club.' : 'Actualiza la fecha, estado o datos generales del partido.'}
         maxWidth="xl"
         footer={
           <>
@@ -728,7 +1007,7 @@ export function CalendarioClient({ matches, teams }: Props) {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-[1fr_220px]">
+        <div className="mt-4 grid gap-4">
           <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
             <input
               id="match-home"
@@ -738,31 +1017,6 @@ export function CalendarioClient({ matches, teams }: Props) {
               className="size-4 rounded border-border accent-primary"
             />
             <Label htmlFor="match-home">El equipo del club juega como local</Label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="home-score">Goles local</Label>
-              <Input
-                id="home-score"
-                type="number"
-                min="0"
-                value={form.homeScore}
-                onChange={(event) => setField('homeScore', event.target.value)}
-                disabled={form.status !== 'played'}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="away-score">Goles visitante</Label>
-              <Input
-                id="away-score"
-                type="number"
-                min="0"
-                value={form.awayScore}
-                onChange={(event) => setField('awayScore', event.target.value)}
-                disabled={form.status !== 'played'}
-              />
-            </div>
           </div>
         </div>
 
@@ -790,9 +1044,9 @@ export function CalendarioClient({ matches, teams }: Props) {
         onOpenChange={(open) => {
           if (!open) setResultMatch(null)
         }}
-        title="Añadir resultado"
-        description={resultMatch ? `${CLUB.shortName} vs ${resultMatch.opponentName}` : 'Actualiza el resultado del partido.'}
-        maxWidth="md"
+        title="Ficha del partido"
+        description={resultMatch ? `${CLUB.shortName} vs ${resultMatch.opponentName}` : 'Consulta y edita los datos básicos del partido.'}
+        maxWidth="lg"
         footer={
           <>
             <Button variant="outline" onClick={() => setResultMatch(null)}>
@@ -800,40 +1054,131 @@ export function CalendarioClient({ matches, teams }: Props) {
             </Button>
             <Button onClick={handleResultSubmit} disabled={isPending}>
               {isPending ? <Loader2 className="size-4 animate-spin" /> : <CalendarDays className="size-4" />}
-              Guardar resultado
+              Guardar ficha
             </Button>
           </>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="quick-club-score">Goles {CLUB.shortName}</Label>
-            <Input
-              id="quick-club-score"
-              type="number"
-              min="0"
-              value={resultForm.clubScore}
-              onChange={(event) => setResultForm((current) => ({ ...current, clubScore: event.target.value }))}
-              autoFocus
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="quick-opponent-score">Goles rival</Label>
-            <Input
-              id="quick-opponent-score"
-              type="number"
-              min="0"
-              value={resultForm.opponentScore}
-              onChange={(event) => setResultForm((current) => ({ ...current, opponentScore: event.target.value }))}
-            />
-          </div>
-        </div>
+        <div className="overflow-hidden rounded-lg border border-border bg-white">
+          {resultMatch ? (
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border px-4 py-4">
+              <div className="text-right">
+                <p className="text-sm font-black text-foreground">{CLUB.shortName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {resultMatch.isHome ? 'Local' : 'Visitante'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-muted px-4 py-2 text-2xl font-black text-foreground">
+                {resultForm.clubScore || '-'} - {resultForm.opponentScore || '-'}
+              </div>
+              <div>
+                <p className="text-sm font-black text-foreground">{resultMatch.opponentName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {resultMatch.isHome ? 'Visitante' : 'Local'}
+                </p>
+              </div>
+            </div>
+          ) : null}
 
-        {resultMatch ? (
-          <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
-            Se guardará como partido jugado: {CLUB.shortName} {resultForm.clubScore || '0'} - {resultForm.opponentScore || '0'} {resultMatch.opponentName}
-          </p>
-        ) : null}
+          {[
+            {
+              title: 'Estadísticas generales',
+              rows: [
+                { label: 'Goles', clubKey: 'clubScore', opponentKey: 'opponentScore' },
+                { label: 'Posesión', clubKey: 'clubPossession', opponentKey: 'opponentPossession' },
+                { label: 'Fueras de juego', clubKey: 'clubOffsides', opponentKey: 'opponentOffsides' },
+                { label: 'Saques de esquina', clubKey: 'clubCorners', opponentKey: 'opponentCorners' },
+              ],
+            },
+            {
+              title: 'Ataque',
+              rows: [
+                { label: 'Disparos totales', clubKey: 'clubTotalShots', opponentKey: 'opponentTotalShots' },
+                { label: 'Tiros', clubKey: 'clubShots', opponentKey: 'opponentShots' },
+                { label: 'Tiros a puerta', clubKey: 'clubShotsOnTarget', opponentKey: 'opponentShotsOnTarget' },
+                { label: 'Disparos bloqueados', clubKey: 'clubBlockedShots', opponentKey: 'opponentBlockedShots' },
+              ],
+            },
+            {
+              title: 'Defensa',
+              rows: [
+                { label: 'Paradas del portero', clubKey: 'clubGoalkeeperSaves', opponentKey: 'opponentGoalkeeperSaves' },
+                { label: 'Recuperaciones', clubKey: 'clubTackles', opponentKey: 'opponentTackles' },
+              ],
+            },
+            {
+              title: 'Disciplina',
+              rows: [
+                { label: 'Faltas', clubKey: 'clubFouls', opponentKey: 'opponentFouls' },
+                { label: 'Tarjetas amarillas', clubKey: 'clubYellowCards', opponentKey: 'opponentYellowCards' },
+                { label: 'Tarjetas rojas', clubKey: 'clubRedCards', opponentKey: 'opponentRedCards' },
+              ],
+            },
+          ].map((section) => (
+            <section key={section.title} className="border-b border-border last:border-b-0 px-4 py-3">
+              <h3 className="mb-3 text-center text-xs font-black uppercase text-foreground">
+                {section.title}
+              </h3>
+              <div className="space-y-3">
+                {section.rows.map((row, rowIndex) => {
+                  const clubKey = row.clubKey as keyof ResultFormState
+                  const opponentKey = row.opponentKey as keyof ResultFormState
+                  const widths = getStatWidths(resultForm[clubKey], resultForm[opponentKey])
+
+                  return (
+                    <div key={row.label} className={cn(rowIndex > 0 && 'border-t border-border pt-3')}>
+                      <div className="grid grid-cols-[120px_minmax(220px,1fr)_120px] items-center gap-3">
+                        <Input
+                          id={`sheet-${row.clubKey}`}
+                          type="number"
+                          min="0"
+                          value={resultForm[clubKey]}
+                          onChange={(event) =>
+                            setResultForm((current) => ({ ...current, [row.clubKey]: event.target.value }))
+                          }
+                          className="h-7 rounded-full bg-emerald-100 text-center text-xs font-black text-emerald-800"
+                          autoFocus={section.title === 'Estadísticas generales' && rowIndex === 0}
+                          aria-label={`${row.label} ${CLUB.shortName}`}
+                        />
+                        <Label
+                          htmlFor={`sheet-${row.clubKey}`}
+                          className="justify-self-center text-center text-xs font-semibold text-muted-foreground"
+                        >
+                          {row.label}
+                        </Label>
+                        <Input
+                          id={`sheet-${row.opponentKey}`}
+                          type="number"
+                          min="0"
+                          value={resultForm[opponentKey]}
+                          onChange={(event) =>
+                            setResultForm((current) => ({ ...current, [row.opponentKey]: event.target.value }))
+                          }
+                          className="h-7 rounded-full bg-sky-100 text-center text-xs font-black text-sky-800"
+                          aria-label={`${row.label} rival`}
+                        />
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-1">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="ml-auto h-full rounded-full bg-emerald-400"
+                            style={{ width: `${widths.left}%` }}
+                          />
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-sky-400"
+                            style={{ width: `${widths.right}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
 
         {formError ? (
           <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">

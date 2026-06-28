@@ -38,15 +38,17 @@ export function LoginForm() {
     let targetPath = '/app'
 
     if (userId) {
-      const { data: adminRole } = await supabase
+      const { data: roles } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle()
 
-      if (adminRole) {
+      const roleNames = new Set((roles ?? []).map((role) => role.role))
+
+      if (roleNames.has('admin')) {
         targetPath = '/admin'
+      } else if (roleNames.has('coach')) {
+        targetPath = '/entrenador/calendario'
       }
     }
 
