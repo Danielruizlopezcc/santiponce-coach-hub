@@ -29,8 +29,12 @@ const memberProfileSchema = z.object({
   email: z.string().trim().email('Correo electrónico no válido').max(120),
 })
 
-function mapDeportistaToAthleteRow(values: DeportistaFormValues, seasonId: string) {
-  return {
+function mapDeportistaToAthleteRow(
+  values: DeportistaFormValues,
+  seasonId: string,
+  options: { includeEnrollmentState?: boolean } = {},
+) {
+  const row = {
     first_name: values.nombre,
     last_name: values.apellidos,
     birth_date: values.fechaNacimiento,
@@ -41,9 +45,17 @@ function mapDeportistaToAthleteRow(values: DeportistaFormValues, seasonId: strin
     health_notes: values.alergias || null,
     has_siblings_in_club: values.tieneHermanos === 'si',
     sibling_name: values.nombreHermano || null,
-    status: 'pendiente' as const,
     season_id: seasonId,
   }
+
+  if (options.includeEnrollmentState) {
+    return {
+      ...row,
+      status: 'pendiente' as const,
+    }
+  }
+
+  return row
 }
 
 export async function updateTutorProfileAction(rawValues: unknown): Promise<ActionResult> {
@@ -193,11 +205,30 @@ export async function saveAthleteAction(
   const athletePayload = {
     guardian_id: guardian.id,
     requested_category_id: category.id,
-    ...mapDeportistaToAthleteRow(parsed.data, activeSeason.id),
+    ...mapDeportistaToAthleteRow(parsed.data, activeSeason.id, {
+      includeEnrollmentState: !athleteId,
+    }),
+  }
+
+  if (athleteId) {
+    const { data: existingAthlete, error: existingAthleteError } = await supabase
+      .from('athletes')
+      .select('id')
+      .eq('id', athleteId)
+      .eq('guardian_id', guardian.id)
+      .maybeSingle()
+
+    if (existingAthleteError) {
+      return { success: false, message: existingAthleteError.message }
+    }
+
+    if (!existingAthlete) {
+      return { success: false, message: 'No tienes permiso para editar este deportista.' }
+    }
   }
 
   const query = athleteId
-    ? supabase.from('athletes').update(athletePayload).eq('id', athleteId).eq('guardian_id', guardian.id)
+    ? createAdminClient().from('athletes').update(athletePayload).eq('id', athleteId).eq('guardian_id', guardian.id)
     : supabase.from('athletes').insert(athletePayload)
 
   const { error } = await query
