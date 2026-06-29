@@ -2,7 +2,7 @@ import 'server-only'
 
 import { CLUB } from '@/lib/club'
 import { formatSpanishDate } from '@/lib/format'
-import type { AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow } from '@/lib/admin-app'
+import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow } from '@/lib/admin-app'
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -142,9 +142,40 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
         .order('match_time', { ascending: false, nullsFirst: false })).data
     : matchesWithStats
 
+  const matchIds = (matches ?? []).map((match) => match.id)
+  const [{ data: athletes }, { data: savedPlayerStats, error: playerStatsError }] = await Promise.all([
+    supabase
+      .from('athletes')
+      .select('id, first_name, last_name, assigned_team_id, position, status')
+      .in('assigned_team_id', teamIds)
+      .order('first_name', { ascending: true })
+      .order('last_name', { ascending: true }),
+    matchIds.length > 0
+      ? supabase
+          .from('match_player_stats')
+          .select('match_id, athlete_id, position, is_called_up, is_starter, shirt_number, minutes, goals, goal_minutes, assists, fouls_committed, fouls_received, yellow_cards, yellow_card_minutes, red_cards, red_card_minute, shots, saves, notes')
+          .in('match_id', matchIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
   const teamById = new Map((teams ?? []).map((team) => [team.id, team]))
   const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const athletesByTeamId = new Map<string, NonNullable<typeof athletes>>()
+  const playerStatsByMatchAndAthlete = new Map<string, NonNullable<typeof savedPlayerStats>[number]>()
+
+  for (const athlete of athletes ?? []) {
+    if (!athlete.assigned_team_id) continue
+    const current = athletesByTeamId.get(athlete.assigned_team_id) ?? []
+    current.push(athlete)
+    athletesByTeamId.set(athlete.assigned_team_id, current)
+  }
+
+  if (!playerStatsError) {
+    for (const stat of savedPlayerStats ?? []) {
+      playerStatsByMatchAndAthlete.set(`${stat.match_id}:${stat.athlete_id}`, stat)
+    }
+  }
 
   return (matches ?? []).map((match) => {
     const stats = match as typeof match & Record<string, number | null | undefined>
@@ -152,6 +183,31 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
     const categoryName = team ? categoryById.get(team.category_id) ?? 'Sin categoría' : 'Sin categoría'
     const sortInfo = getTeamCategorySortInfo(team?.name ?? '', categoryName)
     const weekInfo = getMatchWeekInfo(match.match_date)
+    const playerStats: AdminMatchPlayerStat[] = (athletesByTeamId.get(match.team_id) ?? []).map((athlete) => {
+      const saved = playerStatsByMatchAndAthlete.get(`${match.id}:${athlete.id}`)
+
+      return {
+        athleteId: athlete.id,
+        athleteName: `${athlete.first_name} ${athlete.last_name}`.trim(),
+        position: (saved?.position ?? athlete.position ?? null) as AdminMatchPlayerStat['position'],
+        isCalledUp: saved?.is_called_up ?? false,
+        isStarter: saved?.is_starter ?? false,
+        shirtNumber: saved?.shirt_number ?? null,
+        minutes: saved?.minutes ?? 0,
+        goals: saved?.goals ?? 0,
+        goalMinutes: saved?.goal_minutes ?? '',
+        assists: saved?.assists ?? 0,
+        foulsCommitted: saved?.fouls_committed ?? 0,
+        foulsReceived: saved?.fouls_received ?? 0,
+        yellowCards: saved?.yellow_cards ?? 0,
+        yellowCardMinutes: saved?.yellow_card_minutes ?? '',
+        redCards: saved?.red_cards ?? 0,
+        redCardMinute: saved?.red_card_minute ?? null,
+        shots: saved?.shots ?? 0,
+        saves: saved?.saves ?? 0,
+        notes: saved?.notes ?? '',
+      }
+    })
 
     return {
       id: match.id,
@@ -203,6 +259,7 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
       homeRedCards: stats.home_red_cards ?? null,
       awayRedCards: stats.away_red_cards ?? null,
       notes: match.notes ?? '',
+      playerStats,
     }
   })
 }

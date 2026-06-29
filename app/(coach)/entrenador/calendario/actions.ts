@@ -8,6 +8,41 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const matchStatusSchema = z.enum(['scheduled', 'played', 'postponed', 'cancelled'])
 const matchTypeSchema = z.enum(['league', 'friendly'])
 
+const playerStatSchema = z.object({
+  athleteId: z.string().uuid(),
+  position: z.enum(['goalkeeper', 'defender', 'midfielder', 'forward']).nullable(),
+  isCalledUp: z.boolean(),
+  isStarter: z.boolean(),
+  shirtNumber: z.number().int().min(0).max(99).nullable(),
+  minutes: z.number().int().min(0).max(100),
+  goals: z.number().int().min(0),
+  goalMinutes: z.string().trim().max(80).optional(),
+  assists: z.number().int().min(0),
+  foulsCommitted: z.number().int().min(0),
+  foulsReceived: z.number().int().min(0),
+  yellowCards: z.number().int().min(0).max(2),
+  yellowCardMinutes: z.string().trim().max(40).optional(),
+  redCards: z.number().int().min(0).max(1),
+  redCardMinute: z.number().int().min(1).max(100).nullable(),
+  shots: z.number().int().min(0),
+  saves: z.number().int().min(0),
+  notes: z.string().trim().max(300).optional(),
+}).refine((value) => !value.isStarter || value.isCalledUp, {
+  message: 'Un titular debe estar convocado.',
+  path: ['isStarter'],
+})
+
+function parseMinuteList(value?: string) {
+  const trimmed = value?.trim()
+  if (!trimmed) return []
+
+  return trimmed
+    .split(',')
+    .map((minute) => minute.trim())
+    .filter(Boolean)
+    .map(Number)
+}
+
 const matchBaseSchema = z.object({
   id: z.string().uuid().optional(),
   teamId: z.string().uuid('Selecciona un equipo.'),
@@ -50,9 +85,121 @@ const matchBaseSchema = z.object({
   homeRedCards: z.number().int().min(0).nullable().optional(),
   awayRedCards: z.number().int().min(0).nullable().optional(),
   notes: z.string().trim().max(500, 'Las notas son demasiado largas.').optional(),
+  playerStats: z.array(playerStatSchema).optional(),
 })
 
+function validatePlayerStats(playerStats: z.infer<typeof playerStatSchema>[] | undefined, ctx: z.RefinementCtx) {
+  const shirtNumbers = new Map<number, string>()
+
+  for (const stat of playerStats ?? []) {
+    if (!stat.isCalledUp) continue
+
+    if (stat.yellowCards === 2 && stat.redCards < 1) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Un jugador con 2 amarillas debe tener 1 roja.',
+        path: ['playerStats'],
+      })
+    }
+
+    const goalMinutes = parseMinuteList(stat.goalMinutes)
+    const yellowCardMinutes = parseMinuteList(stat.yellowCardMinutes)
+
+    if ([...goalMinutes, ...yellowCardMinutes].some((minute) => !Number.isInteger(minute) || minute < 1 || minute > 100)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Los minutos de goles y tarjetas deben estar entre 1 y 100.',
+        path: ['playerStats'],
+      })
+    }
+
+    if (goalMinutes.length !== stat.goals) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Debe haber un minuto por cada gol del jugador.',
+        path: ['playerStats'],
+      })
+    }
+
+    if (yellowCardMinutes.length !== stat.yellowCards) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Debe haber un minuto por cada amarilla del jugador.',
+        path: ['playerStats'],
+      })
+    }
+
+    if ((stat.redCards > 0 || stat.yellowCards >= 2) && stat.redCardMinute === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Debe indicarse el minuto de la tarjeta roja.',
+        path: ['playerStats'],
+      })
+    }
+
+    if (stat.position !== 'goalkeeper' && stat.saves > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Solo puedes asignar paradas a un portero.',
+        path: ['playerStats'],
+      })
+    }
+
+    if (stat.shirtNumber === null) continue
+
+    if (shirtNumbers.has(stat.shirtNumber)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Hay más de un jugador con el dorsal ${stat.shirtNumber}.`,
+        path: ['playerStats'],
+      })
+    }
+
+    shirtNumbers.set(stat.shirtNumber, stat.athleteId)
+  }
+}
+
+function validateMatchStats(value: z.infer<typeof matchBaseSchema>, ctx: z.RefinementCtx) {
+  const homePossession = value.homePossession ?? null
+  const awayPossession = value.awayPossession ?? null
+  const hasPossession = homePossession !== null || awayPossession !== null
+
+  if (hasPossession) {
+    if (homePossession === null || awayPossession === null || homePossession + awayPossession !== 100) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'La posesión de ambos equipos debe sumar exactamente 100.',
+        path: ['homePossession'],
+      })
+    }
+  }
+
+  const homeAutoTotalShots =
+    (value.homeShots ?? 0) + (value.homeShotsOnTarget ?? 0) + (value.homeBlockedShots ?? 0)
+  const awayAutoTotalShots =
+    (value.awayShots ?? 0) + (value.awayShotsOnTarget ?? 0) + (value.awayBlockedShots ?? 0)
+
+  if (value.homeTotalShots !== undefined && value.homeTotalShots !== null && value.homeTotalShots !== homeAutoTotalShots) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Los disparos totales del equipo local deben coincidir con la suma de tiros, tiros a puerta y bloqueados.',
+      path: ['homeTotalShots'],
+    })
+  }
+
+  if (value.awayTotalShots !== undefined && value.awayTotalShots !== null && value.awayTotalShots !== awayAutoTotalShots) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Los disparos totales del equipo visitante deben coincidir con la suma de tiros, tiros a puerta y bloqueados.',
+      path: ['awayTotalShots'],
+    })
+  }
+
+  validatePlayerStats(value.playerStats, ctx)
+}
+
 const matchSchema = matchBaseSchema
+  .superRefine(validateMatchStats)
   .refine(
     (value) => value.status !== 'played' || (value.homeScore !== null && value.awayScore !== null),
     {
@@ -68,7 +215,7 @@ const matchSchema = matchBaseSchema
     },
   )
 
-const createMatchSchema = matchBaseSchema.omit({ id: true })
+const createMatchSchema = matchBaseSchema.omit({ id: true }).superRefine(validateMatchStats)
   .refine(
     (value) => value.status !== 'played' || (value.homeScore !== null && value.awayScore !== null),
     {
@@ -135,6 +282,60 @@ async function getTeamSeasonId(teamId: string) {
   if (!data) throw new Error('No se ha encontrado el equipo seleccionado.')
 
   return data.season_id
+}
+
+async function saveMatchPlayerStats(matchId: string, teamId: string, seasonId: string, playerStats: z.infer<typeof playerStatSchema>[]) {
+  const supabase = createAdminClient()
+  const athleteIds = playerStats.map((stat) => stat.athleteId)
+
+  if (athleteIds.length === 0) return
+
+  const { data: athletes, error: athletesError } = await supabase
+    .from('athletes')
+    .select('id, assigned_team_id')
+    .in('id', athleteIds)
+
+  if (athletesError) throw new Error(athletesError.message)
+
+  const validAthleteIds = new Set(
+    (athletes ?? [])
+      .filter((athlete) => athlete.assigned_team_id === teamId)
+      .map((athlete) => athlete.id),
+  )
+
+  if (validAthleteIds.size !== athleteIds.length) {
+    throw new Error('Solo puedes guardar estadísticas de jugadores de ese equipo.')
+  }
+
+  const rows = playerStats.map((stat) => ({
+    match_id: matchId,
+    team_id: teamId,
+    season_id: seasonId,
+    athlete_id: stat.athleteId,
+    is_called_up: stat.isCalledUp,
+    is_starter: stat.isCalledUp ? stat.isStarter : false,
+    position: stat.isCalledUp ? stat.position : null,
+    shirt_number: stat.isCalledUp ? stat.shirtNumber : null,
+    minutes: stat.isCalledUp ? stat.minutes : 0,
+    goals: stat.isCalledUp ? stat.goals : 0,
+    goal_minutes: stat.isCalledUp ? stat.goalMinutes?.trim() || null : null,
+    assists: stat.isCalledUp ? stat.assists : 0,
+    fouls_committed: stat.isCalledUp ? stat.foulsCommitted : 0,
+    fouls_received: stat.isCalledUp ? stat.foulsReceived : 0,
+    yellow_cards: stat.isCalledUp ? stat.yellowCards : 0,
+    yellow_card_minutes: stat.isCalledUp ? stat.yellowCardMinutes?.trim() || null : null,
+    red_cards: stat.isCalledUp ? (stat.redCards || stat.yellowCards >= 2 ? 1 : 0) : 0,
+    red_card_minute: stat.isCalledUp && (stat.redCards || stat.yellowCards >= 2) ? stat.redCardMinute : null,
+    shots: stat.isCalledUp ? stat.shots : 0,
+    saves: stat.isCalledUp && stat.position === 'goalkeeper' ? stat.saves : 0,
+    notes: stat.isCalledUp ? stat.notes?.trim() || null : null,
+  }))
+
+  const { error } = await supabase
+    .from('match_player_stats')
+    .upsert(rows, { onConflict: 'match_id,athlete_id' })
+
+  if (error) throw new Error(error.message)
 }
 
 function toMatchPayload(parsed: MatchInput, seasonId: string) {
@@ -218,6 +419,9 @@ export async function updateCoachMatchAction(input: MatchInput & { id: string })
     .eq('id', parsed.id)
 
   if (error) throw new Error(error.message)
+  if (parsed.playerStats) {
+    await saveMatchPlayerStats(parsed.id, parsed.teamId, seasonId, parsed.playerStats)
+  }
   revalidateCoachCalendarPaths()
 }
 

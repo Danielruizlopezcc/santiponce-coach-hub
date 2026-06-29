@@ -171,6 +171,28 @@ export type AdminTeamDetail = AdminTeamRow & {
 export type AdminMatchStatus = 'scheduled' | 'played' | 'postponed' | 'cancelled'
 export type AdminMatchType = 'league' | 'friendly'
 
+export type AdminMatchPlayerStat = {
+  athleteId: string
+  athleteName: string
+  position: PlayerPosition | null
+  isCalledUp: boolean
+  isStarter: boolean
+  shirtNumber: number | null
+  minutes: number
+  goals: number
+  goalMinutes: string
+  assists: number
+  foulsCommitted: number
+  foulsReceived: number
+  yellowCards: number
+  yellowCardMinutes: string
+  redCards: number
+  redCardMinute: number | null
+  shots: number
+  saves: number
+  notes: string
+}
+
 export type AdminMatchRow = {
   id: string
   teamId: string
@@ -221,6 +243,7 @@ export type AdminMatchRow = {
   homeRedCards: number | null
   awayRedCards: number | null
   notes: string
+  playerStats: AdminMatchPlayerStat[]
 }
 
 export type AdminSeasonRow = {
@@ -1006,9 +1029,75 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
         .order('match_time', { ascending: false, nullsFirst: false })).data
     : matchesWithStats
 
+  const matchIds = (matches ?? []).map((match) => match.id)
+  const teamIds = Array.from(new Set((matches ?? []).map((match) => match.team_id)))
+  const [{ data: athletes }, { data: savedPlayerStats, error: playerStatsError }] = await Promise.all([
+    teamIds.length > 0
+      ? supabase
+          .from('athletes')
+          .select('id, first_name, last_name, assigned_team_id, position, status')
+          .in('assigned_team_id', teamIds)
+          .order('first_name', { ascending: true })
+          .order('last_name', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    matchIds.length > 0
+      ? supabase
+          .from('match_player_stats')
+          .select('match_id, athlete_id, position, is_called_up, is_starter, shirt_number, minutes, goals, goal_minutes, assists, fouls_committed, fouls_received, yellow_cards, yellow_card_minutes, red_cards, red_card_minute, shots, saves, notes')
+          .in('match_id', matchIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  type MatchAthleteRow = {
+    id: string
+    first_name: string
+    last_name: string
+    assigned_team_id: string | null
+    position: string | null
+  }
+
+  type SavedMatchPlayerStatRow = {
+    match_id: string
+    athlete_id: string
+    position: string | null
+    is_called_up: boolean
+    is_starter: boolean
+    shirt_number: number | null
+    minutes: number
+    goals: number
+    goal_minutes: string | null
+    assists: number
+    fouls_committed: number
+    fouls_received: number
+    yellow_cards: number
+    yellow_card_minutes: string | null
+    red_cards: number
+    red_card_minute: number | null
+    shots: number
+    saves: number
+    notes: string | null
+  }
+
+  const athleteRows = (athletes ?? []) as MatchAthleteRow[]
+  const savedPlayerStatRows = (savedPlayerStats ?? []) as SavedMatchPlayerStatRow[]
   const teamById = new Map((teams ?? []).map((team) => [team.id, team]))
   const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const athletesByTeamId = new Map<string, MatchAthleteRow[]>()
+  const playerStatsByMatchAndAthlete = new Map<string, SavedMatchPlayerStatRow>()
+
+  for (const athlete of athleteRows) {
+    if (!athlete.assigned_team_id) continue
+    const current = athletesByTeamId.get(athlete.assigned_team_id) ?? []
+    current.push(athlete)
+    athletesByTeamId.set(athlete.assigned_team_id, current)
+  }
+
+  if (!playerStatsError) {
+    for (const stat of savedPlayerStatRows) {
+      playerStatsByMatchAndAthlete.set(`${stat.match_id}:${stat.athlete_id}`, stat)
+    }
+  }
 
   return (matches ?? []).map((match) => {
     const stats = match as typeof match & Record<string, number | null | undefined>
@@ -1016,6 +1105,31 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
     const categoryName = team ? categoryById.get(team.category_id) ?? 'Sin categoría' : 'Sin categoría'
     const sortInfo = getTeamCategorySortInfo(team?.name ?? '', categoryName)
     const weekInfo = getMatchWeekInfo(match.match_date)
+    const playerStats: AdminMatchPlayerStat[] = (athletesByTeamId.get(match.team_id) ?? []).map((athlete) => {
+      const saved = playerStatsByMatchAndAthlete.get(`${match.id}:${athlete.id}`)
+
+      return {
+        athleteId: athlete.id,
+        athleteName: `${athlete.first_name} ${athlete.last_name}`.trim(),
+        position: (saved?.position ?? athlete.position ?? null) as PlayerPosition | null,
+        isCalledUp: saved?.is_called_up ?? false,
+        isStarter: saved?.is_starter ?? false,
+        shirtNumber: saved?.shirt_number ?? null,
+        minutes: saved?.minutes ?? 0,
+        goals: saved?.goals ?? 0,
+        goalMinutes: saved?.goal_minutes ?? '',
+        assists: saved?.assists ?? 0,
+        foulsCommitted: saved?.fouls_committed ?? 0,
+        foulsReceived: saved?.fouls_received ?? 0,
+        yellowCards: saved?.yellow_cards ?? 0,
+        yellowCardMinutes: saved?.yellow_card_minutes ?? '',
+        redCards: saved?.red_cards ?? 0,
+        redCardMinute: saved?.red_card_minute ?? null,
+        shots: saved?.shots ?? 0,
+        saves: saved?.saves ?? 0,
+        notes: saved?.notes ?? '',
+      }
+    })
 
     return {
       id: match.id,
@@ -1067,6 +1181,7 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
       homeRedCards: stats.home_red_cards ?? null,
       awayRedCards: stats.away_red_cards ?? null,
       notes: match.notes ?? '',
+      playerStats,
     }
   })
 }

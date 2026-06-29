@@ -1,13 +1,13 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { CalendarDays, ClipboardList, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ClipboardList, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CLUB } from '@/lib/club'
-import type { AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow } from '@/lib/admin-app'
+import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import {
   createMatchAction as adminCreateMatchAction,
@@ -83,6 +83,51 @@ type ResultFormState = {
   opponentRedCards: string
 }
 
+type MatchPlayerPosition = 'goalkeeper' | 'defender' | 'midfielder' | 'forward'
+
+type PlayerStatFormState = {
+  athleteId: string
+  athleteName: string
+  position: MatchPlayerPosition | ''
+  isCalledUp: boolean
+  isStarter: boolean
+  shirtNumber: string
+  minutes: string
+  goals: string
+  goalMinutes: string
+  assists: string
+  foulsCommitted: string
+  foulsReceived: string
+  yellowCards: string
+  yellowCardMinutes: string
+  redCard: boolean
+  redCardMinute: string
+  shots: string
+  saves: string
+  notes: string
+}
+
+type PlayerStatActionInput = {
+  athleteId: string
+  position: MatchPlayerPosition | null
+  isCalledUp: boolean
+  isStarter: boolean
+  shirtNumber: number | null
+  minutes: number
+  goals: number
+  goalMinutes: string
+  assists: number
+  foulsCommitted: number
+  foulsReceived: number
+  yellowCards: number
+  yellowCardMinutes: string
+  redCards: number
+  redCardMinute: number | null
+  shots: number
+  saves: number
+  notes: string
+}
+
 type MatchActionInput = {
   teamId: string
   opponentName: string
@@ -123,6 +168,7 @@ type MatchActionInput = {
   awayYellowCards?: number | null
   homeRedCards?: number | null
   awayRedCards?: number | null
+  playerStats?: PlayerStatActionInput[]
   notes: string
 }
 
@@ -150,6 +196,14 @@ const MATCH_TYPE_LABELS: Record<AdminMatchType, string> = {
   league: 'Liga',
   friendly: 'Amistoso',
 }
+
+const POSITION_OPTIONS: Array<{ value: PlayerStatFormState['position']; label: string }> = [
+  { value: '', label: 'Sin posicion' },
+  { value: 'goalkeeper', label: 'Portero' },
+  { value: 'defender', label: 'Defensa' },
+  { value: 'midfielder', label: 'Medio' },
+  { value: 'forward', label: 'Delantero' },
+]
 
 function createEmptyForm(defaultTeamId = ''): MatchFormState {
   return {
@@ -182,6 +236,69 @@ function parseOptionalStat(value: string) {
   return Number(value)
 }
 
+function parseRequiredStat(value: string) {
+  if (!value.trim()) return 0
+  return Number(value)
+}
+
+function parseMinuteList(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return []
+
+  return trimmed
+    .split(',')
+    .map((minute) => minute.trim())
+    .filter(Boolean)
+    .map(Number)
+}
+
+function normalizeMinuteList(value: string) {
+  return parseMinuteList(value).join(', ')
+}
+
+function getMinuteFields(value: string, count: number) {
+  const fields = value
+    .split(',')
+    .map((minute) => minute.trim())
+
+  return Array.from({ length: count }, (_, index) => fields[index] ?? '')
+}
+
+function setMinuteField(value: string, count: number, index: number, minute: string) {
+  const fields = getMinuteFields(value, count)
+  fields[index] = minute
+
+  return fields.join(', ')
+}
+
+function clampMinuteList(value: string, count: number) {
+  return getMinuteFields(value, count).filter((field) => field.trim()).join(', ')
+}
+
+function playerStatToForm(stat: AdminMatchPlayerStat): PlayerStatFormState {
+  return {
+    athleteId: stat.athleteId,
+    athleteName: stat.athleteName,
+    position: stat.position ?? '',
+    isCalledUp: stat.isCalledUp,
+    isStarter: stat.isStarter,
+    shirtNumber: stat.shirtNumber === null ? '' : String(stat.shirtNumber),
+    minutes: stat.minutes ? String(stat.minutes) : '',
+    goals: stat.goals ? String(stat.goals) : '',
+    goalMinutes: stat.goalMinutes,
+    assists: stat.assists ? String(stat.assists) : '',
+    foulsCommitted: stat.foulsCommitted ? String(stat.foulsCommitted) : '',
+    foulsReceived: stat.foulsReceived ? String(stat.foulsReceived) : '',
+    yellowCards: stat.yellowCards ? String(stat.yellowCards) : '',
+    yellowCardMinutes: stat.yellowCardMinutes,
+    redCard: stat.redCards > 0 || stat.yellowCards >= 2,
+    redCardMinute: stat.redCardMinute === null ? '' : String(stat.redCardMinute),
+    shots: stat.shots ? String(stat.shots) : '',
+    saves: stat.position === 'goalkeeper' && stat.saves ? String(stat.saves) : '',
+    notes: stat.notes,
+  }
+}
+
 function getScoreLabel(match: AdminMatchRow) {
   if (match.status !== 'played' || match.homeScore === null || match.awayScore === null) {
     return '-'
@@ -210,6 +327,18 @@ function getStatWidths(leftValue: string, rightValue: string) {
     left: Math.max(8, Math.round((left / total) * 100)),
     right: Math.max(8, Math.round((right / total) * 100)),
   }
+}
+
+function getAutoTotalShots(form: ResultFormState, side: 'club' | 'opponent') {
+  if (side === 'club') {
+    return parseRequiredStat(form.clubShots) + parseRequiredStat(form.clubShotsOnTarget) + parseRequiredStat(form.clubBlockedShots)
+  }
+
+  return (
+    parseRequiredStat(form.opponentShots) +
+    parseRequiredStat(form.opponentShotsOnTarget) +
+    parseRequiredStat(form.opponentBlockedShots)
+  )
 }
 
 export function CalendarioClient({
@@ -265,6 +394,10 @@ export function CalendarioClient({
     clubRedCards: '',
     opponentRedCards: '',
   })
+  const [resultTab, setResultTab] = useState<'summary' | 'players'>('summary')
+  const [playerForm, setPlayerForm] = useState<PlayerStatFormState[]>([])
+  const [eventPlayerId, setEventPlayerId] = useState<string | null>(null)
+  const [statWarnings, setStatWarnings] = useState<string[]>([])
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState<MatchFormState>(() => createEmptyForm(teams[0]?.id ?? ''))
   const [formError, setFormError] = useState<string | null>(null)
@@ -375,6 +508,8 @@ export function CalendarioClient({
     setSheetOpen(false)
     setDeleteId(null)
     setResultMatch(match)
+    setResultTab('summary')
+    setPlayerForm(match.playerStats.map(playerStatToForm))
     setResultForm({
       clubScore: match.status === 'played'
         ? scoreToString(match.isHome ? match.homeScore : match.awayScore)
@@ -445,6 +580,279 @@ export function CalendarioClient({
     return null
   }
 
+  function updatePlayerStat(athleteId: string, patch: Partial<PlayerStatFormState>) {
+    setPlayerForm((current) =>
+      current.map((stat) => {
+        if (stat.athleteId !== athleteId) return stat
+        const next = { ...stat, ...patch }
+
+        if (patch.isCalledUp === false) {
+          next.isStarter = false
+        }
+
+        if (patch.isStarter === true) {
+          next.isCalledUp = true
+        }
+
+        if (
+          patch.minutes ||
+          patch.goals ||
+          patch.goalMinutes ||
+          patch.assists ||
+          patch.foulsCommitted ||
+          patch.foulsReceived ||
+          patch.yellowCards ||
+          patch.yellowCardMinutes ||
+          patch.redCard === true ||
+          patch.redCardMinute ||
+          patch.shots ||
+          patch.saves
+        ) {
+          next.isCalledUp = true
+        }
+
+        if (patch.position !== undefined && patch.position !== 'goalkeeper') {
+          next.saves = ''
+        }
+
+        if (patch.yellowCards !== undefined && parseRequiredStat(patch.yellowCards) >= 2) {
+          next.redCard = true
+        }
+
+        if (patch.goals !== undefined) {
+          next.goalMinutes = clampMinuteList(next.goalMinutes, parseRequiredStat(next.goals))
+        }
+
+        if (patch.yellowCards !== undefined) {
+          next.yellowCardMinutes = clampMinuteList(next.yellowCardMinutes, parseRequiredStat(next.yellowCards))
+        }
+
+        if (patch.redCard === false && parseRequiredStat(next.yellowCards) < 2) {
+          next.redCardMinute = ''
+        }
+
+        return next
+      }),
+    )
+  }
+
+  function buildPlayerStatsPayload(): PlayerStatActionInput[] {
+    return playerForm.map((stat) => ({
+      athleteId: stat.athleteId,
+      position: stat.position || null,
+      isCalledUp: stat.isCalledUp,
+      isStarter: stat.isCalledUp ? stat.isStarter : false,
+      shirtNumber: stat.shirtNumber.trim() ? Number(stat.shirtNumber) : null,
+      minutes: parseRequiredStat(stat.minutes),
+      goals: parseRequiredStat(stat.goals),
+      goalMinutes: normalizeMinuteList(stat.goalMinutes),
+      assists: parseRequiredStat(stat.assists),
+      foulsCommitted: parseRequiredStat(stat.foulsCommitted),
+      foulsReceived: parseRequiredStat(stat.foulsReceived),
+      yellowCards: parseRequiredStat(stat.yellowCards),
+      yellowCardMinutes: normalizeMinuteList(stat.yellowCardMinutes),
+      redCards: stat.redCard || parseRequiredStat(stat.yellowCards) >= 2 ? 1 : 0,
+      redCardMinute: stat.redCard || parseRequiredStat(stat.yellowCards) >= 2
+        ? stat.redCardMinute.trim()
+          ? Number(stat.redCardMinute)
+          : null
+        : null,
+      shots: parseRequiredStat(stat.shots),
+      saves: stat.position === 'goalkeeper' ? parseRequiredStat(stat.saves) : 0,
+      notes: stat.notes.trim(),
+    }))
+  }
+
+  function validatePlayerStats() {
+    const calledUp = playerForm.filter((stat) => stat.isCalledUp)
+    const starters = playerForm.filter((stat) => stat.isStarter)
+    const usedShirtNumbers = new Map<string, string>()
+    const errors: string[] = []
+    const numericFields: Array<keyof PlayerStatFormState> = [
+      'shirtNumber',
+      'minutes',
+      'goals',
+      'assists',
+      'foulsCommitted',
+      'foulsReceived',
+      'yellowCards',
+      'redCardMinute',
+      'shots',
+      'saves',
+    ]
+
+    for (const stat of playerForm) {
+      for (const field of numericFields) {
+        const value = stat[field]
+        if (typeof value === 'string' && value.trim() && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+          errors.push(`Revisa los números de ${stat.athleteName}.`)
+          break
+        }
+      }
+
+      if (stat.yellowCards.trim() && Number(stat.yellowCards) > 2) {
+        errors.push(`${stat.athleteName} no puede tener más de 2 amarillas.`)
+      }
+
+      if (stat.minutes.trim() && Number(stat.minutes) > 100) {
+        errors.push(`${stat.athleteName} no puede tener más de 100 minutos.`)
+      }
+
+      if (stat.position !== 'goalkeeper' && stat.saves.trim() && Number(stat.saves) > 0) {
+        errors.push(`Solo puedes asignar paradas a un portero. Revisa a ${stat.athleteName}.`)
+      }
+
+      const goalMinutes = parseMinuteList(stat.goalMinutes)
+      const yellowCardMinutes = parseMinuteList(stat.yellowCardMinutes)
+      const redCardMinute = stat.redCardMinute.trim() ? Number(stat.redCardMinute) : null
+
+      if (
+        [...goalMinutes, ...yellowCardMinutes, ...(redCardMinute === null ? [] : [redCardMinute])].some(
+          (minute) => !Number.isInteger(minute) || minute < 1 || minute > 100,
+        )
+      ) {
+        errors.push(`Los minutos de goles y tarjetas de ${stat.athleteName} deben estar entre 1 y 100.`)
+      }
+
+      if (goalMinutes.length !== parseRequiredStat(stat.goals)) {
+        errors.push(`${stat.athleteName} debe tener un minuto por cada gol.`)
+      }
+
+      if (yellowCardMinutes.length !== parseRequiredStat(stat.yellowCards)) {
+        errors.push(`${stat.athleteName} debe tener un minuto por cada amarilla.`)
+      }
+
+      if ((stat.redCard || parseRequiredStat(stat.yellowCards) >= 2) && redCardMinute === null) {
+        errors.push(`${stat.athleteName} debe tener minuto de tarjeta roja.`)
+      }
+
+      if (stat.isCalledUp && stat.shirtNumber.trim()) {
+        const previousPlayer = usedShirtNumbers.get(stat.shirtNumber.trim())
+
+        if (previousPlayer) {
+          errors.push(`${previousPlayer} y ${stat.athleteName} no pueden tener el mismo dorsal (${stat.shirtNumber.trim()}).`)
+          continue
+        }
+
+        usedShirtNumbers.set(stat.shirtNumber.trim(), stat.athleteName)
+      }
+    }
+
+    if (starters.some((stat) => !stat.isCalledUp)) {
+      errors.push('Todos los titulares deben estar convocados.')
+    }
+
+    if (starters.length > calledUp.length) {
+      errors.push('No puede haber más titulares que convocados.')
+    }
+
+    return errors
+  }
+
+  function getPlayerStatTotals() {
+    return playerForm.reduce(
+      (totals, stat) => {
+        if (!stat.isCalledUp) return totals
+
+        totals.goals += parseRequiredStat(stat.goals)
+        totals.foulsCommitted += parseRequiredStat(stat.foulsCommitted)
+        totals.foulsReceived += parseRequiredStat(stat.foulsReceived)
+        totals.yellowCards += parseRequiredStat(stat.yellowCards)
+        totals.redCards += stat.redCard || parseRequiredStat(stat.yellowCards) >= 2 ? 1 : 0
+        totals.shots += parseRequiredStat(stat.shots)
+        totals.saves += stat.position === 'goalkeeper' ? parseRequiredStat(stat.saves) : 0
+
+        return totals
+      },
+      {
+        goals: 0,
+        foulsCommitted: 0,
+        foulsReceived: 0,
+        yellowCards: 0,
+        redCards: 0,
+        shots: 0,
+        saves: 0,
+      },
+    )
+  }
+
+  function getPlayerStatConsistency() {
+    const totals = getPlayerStatTotals()
+    const comparisons = [
+      {
+        singularLabel: 'gol',
+        pluralLabel: 'goles',
+        teamLabel: CLUB.shortName,
+        general: parseOptionalStat(resultForm.clubScore),
+        players: totals.goals,
+      },
+      {
+        singularLabel: 'falta',
+        pluralLabel: 'faltas',
+        teamLabel: CLUB.shortName,
+        general: parseOptionalStat(resultForm.clubFouls),
+        players: totals.foulsCommitted,
+      },
+      {
+        singularLabel: 'falta recibida',
+        pluralLabel: 'faltas recibidas',
+        teamLabel: CLUB.shortName,
+        general: parseOptionalStat(resultForm.opponentFouls),
+        players: totals.foulsReceived,
+      },
+      {
+        singularLabel: 'amarilla',
+        pluralLabel: 'amarillas',
+        teamLabel: CLUB.shortName,
+        general: parseOptionalStat(resultForm.clubYellowCards),
+        players: totals.yellowCards,
+      },
+      {
+        singularLabel: 'roja',
+        pluralLabel: 'rojas',
+        teamLabel: CLUB.shortName,
+        general: parseOptionalStat(resultForm.clubRedCards),
+        players: totals.redCards,
+      },
+      {
+        singularLabel: 'tiro',
+        pluralLabel: 'tiros',
+        teamLabel: CLUB.shortName,
+        general: parseOptionalStat(resultForm.clubShots),
+        players: totals.shots,
+      },
+      {
+        singularLabel: 'parada',
+        pluralLabel: 'paradas',
+        teamLabel: CLUB.shortName,
+        general: parseOptionalStat(resultForm.clubGoalkeeperSaves),
+        players: totals.saves,
+      },
+    ]
+
+    const errors: string[] = []
+    const warnings: string[] = []
+
+    for (const comparison of comparisons) {
+      if (comparison.general === null) continue
+
+      const difference = comparison.general - comparison.players
+
+      if (difference < 0) {
+        errors.push(
+          `El total de ${comparison.pluralLabel} asignado a jugadores es ${comparison.players}, pero el total general de ${comparison.teamLabel} es ${comparison.general}.`,
+        )
+      } else if (difference > 0) {
+        const label = difference === 1 ? comparison.singularLabel : comparison.pluralLabel
+        warnings.push(
+          `${difference === 1 ? 'Falta' : 'Faltan'} ${difference} ${label} de ${comparison.teamLabel} por asignar a jugadores.`,
+        )
+      }
+    }
+
+    return { errors, warnings }
+  }
+
   function handleSubmit() {
     const error = validateForm()
     if (error) {
@@ -468,7 +876,7 @@ export function CalendarioClient({
     })
   }
 
-  function handleResultSubmit() {
+  function handleResultSubmit(forceSave = false) {
     if (!resultMatch) return
     const hasClubScore = Boolean(resultForm.clubScore.trim())
     const hasOpponentScore = Boolean(resultForm.opponentScore.trim())
@@ -516,6 +924,34 @@ export function CalendarioClient({
       return
     }
 
+    const hasPossession = Boolean(resultForm.clubPossession.trim() || resultForm.opponentPossession.trim())
+    if (hasPossession) {
+      const possessionTotal = parseRequiredStat(resultForm.clubPossession) + parseRequiredStat(resultForm.opponentPossession)
+
+      if (!resultForm.clubPossession.trim() || !resultForm.opponentPossession.trim() || possessionTotal !== 100) {
+        setResultTab('summary')
+        setFormError('La posesión de ambos equipos debe sumar exactamente 100.')
+        return
+      }
+    }
+
+    const playerStatsErrors = validatePlayerStats()
+    const consistency = getPlayerStatConsistency()
+    const blockingErrors = [...playerStatsErrors, ...consistency.errors]
+
+    if (blockingErrors.length > 0) {
+      setResultTab('players')
+      setFormError(blockingErrors.join('\n'))
+      return
+    }
+
+    if (!forceSave && consistency.warnings.length > 0) {
+      setResultTab('players')
+      setFormError(null)
+      setStatWarnings(consistency.warnings)
+      return
+    }
+
     const clubScore = parseOptionalStat(resultForm.clubScore)
     const opponentScore = parseOptionalStat(resultForm.opponentScore)
     const clubPossession = parseOptionalStat(resultForm.clubPossession)
@@ -524,8 +960,8 @@ export function CalendarioClient({
     const opponentOffsides = parseOptionalStat(resultForm.opponentOffsides)
     const clubCorners = parseOptionalStat(resultForm.clubCorners)
     const opponentCorners = parseOptionalStat(resultForm.opponentCorners)
-    const clubTotalShots = parseOptionalStat(resultForm.clubTotalShots)
-    const opponentTotalShots = parseOptionalStat(resultForm.opponentTotalShots)
+    const clubTotalShots = getAutoTotalShots(resultForm, 'club')
+    const opponentTotalShots = getAutoTotalShots(resultForm, 'opponent')
     const clubShots = parseOptionalStat(resultForm.clubShots)
     const opponentShots = parseOptionalStat(resultForm.opponentShots)
     const clubShotsOnTarget = parseOptionalStat(resultForm.clubShotsOnTarget)
@@ -554,6 +990,7 @@ export function CalendarioClient({
           : resultMatch.status
 
     setFormError(null)
+    setStatWarnings([])
     startTransition(async () => {
       try {
         await calendarActions.updateMatch({
@@ -597,6 +1034,7 @@ export function CalendarioClient({
           awayYellowCards: resultMatch.isHome ? opponentYellowCards : clubYellowCards,
           homeRedCards: resultMatch.isHome ? clubRedCards : opponentRedCards,
           awayRedCards: resultMatch.isHome ? opponentRedCards : clubRedCards,
+          playerStats: buildPlayerStatsPayload(),
           notes: resultMatch.notes,
         })
         setResultMatch(null)
@@ -616,6 +1054,13 @@ export function CalendarioClient({
       }
     })
   }
+
+  const eventPlayer = eventPlayerId ? playerForm.find((player) => player.athleteId === eventPlayerId) ?? null : null
+  const eventGoalCount = eventPlayer ? parseRequiredStat(eventPlayer.goals) : 0
+  const eventYellowCount = eventPlayer ? parseRequiredStat(eventPlayer.yellowCards) : 0
+  const eventHasRedCard = Boolean(eventPlayer && (eventPlayer.redCard || parseRequiredStat(eventPlayer.yellowCards) >= 2))
+  const eventGoalMinutes = eventPlayer ? getMinuteFields(eventPlayer.goalMinutes, eventGoalCount) : []
+  const eventYellowMinutes = eventPlayer ? getMinuteFields(eventPlayer.yellowCardMinutes, eventYellowCount) : []
 
   return (
     <div className="space-y-5">
@@ -767,9 +1212,17 @@ export function CalendarioClient({
       </div>
 
       {formError && !sheetOpen && !resultMatch ? (
-        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {formError}
-        </p>
+        <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {formError.includes('\n') ? (
+            <ul className="space-y-1">
+              {formError.split('\n').map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>{formError}</p>
+          )}
+        </div>
       ) : null}
 
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
@@ -1033,32 +1486,66 @@ export function CalendarioClient({
         </div>
 
         {formError ? (
-          <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {formError}
-          </p>
+          <div className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {formError.includes('\n') ? (
+              <ul className="space-y-1">
+                {formError.split('\n').map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>{formError}</p>
+            )}
+          </div>
         ) : null}
       </AdminFormDialog>
 
       <AdminFormDialog
         open={Boolean(resultMatch)}
         onOpenChange={(open) => {
-          if (!open) setResultMatch(null)
+          if (!open) {
+            setResultMatch(null)
+            setStatWarnings([])
+          }
         }}
         title="Ficha del partido"
         description={resultMatch ? `${CLUB.shortName} vs ${resultMatch.opponentName}` : 'Consulta y edita los datos básicos del partido.'}
-        maxWidth="lg"
+        maxWidth="2xl"
         footer={
           <>
             <Button variant="outline" onClick={() => setResultMatch(null)}>
               Cancelar
             </Button>
-            <Button onClick={handleResultSubmit} disabled={isPending}>
+            <Button onClick={() => handleResultSubmit()} disabled={isPending}>
               {isPending ? <Loader2 className="size-4 animate-spin" /> : <CalendarDays className="size-4" />}
               Guardar ficha
             </Button>
           </>
         }
       >
+        <div className="mb-4 inline-flex rounded-lg border border-border bg-muted/40 p-1">
+          <button
+            type="button"
+            onClick={() => setResultTab('summary')}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-bold transition-colors',
+              resultTab === 'summary' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Resumen
+          </button>
+          <button
+            type="button"
+            onClick={() => setResultTab('players')}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-bold transition-colors',
+              resultTab === 'players' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Jugadores
+          </button>
+        </div>
+
         <div className="overflow-hidden rounded-lg border border-border bg-white">
           {resultMatch ? (
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border px-4 py-4">
@@ -1080,7 +1567,7 @@ export function CalendarioClient({
             </div>
           ) : null}
 
-          {[
+          {resultTab === 'summary' ? [
             {
               title: 'Estadísticas generales',
               rows: [
@@ -1123,7 +1610,10 @@ export function CalendarioClient({
                 {section.rows.map((row, rowIndex) => {
                   const clubKey = row.clubKey as keyof ResultFormState
                   const opponentKey = row.opponentKey as keyof ResultFormState
-                  const widths = getStatWidths(resultForm[clubKey], resultForm[opponentKey])
+                  const isTotalShots = clubKey === 'clubTotalShots'
+                  const clubValue = isTotalShots ? String(getAutoTotalShots(resultForm, 'club')) : resultForm[clubKey]
+                  const opponentValue = isTotalShots ? String(getAutoTotalShots(resultForm, 'opponent')) : resultForm[opponentKey]
+                  const widths = getStatWidths(clubValue, opponentValue)
 
                   return (
                     <div key={row.label} className={cn(rowIndex > 0 && 'border-t border-border pt-3')}>
@@ -1132,11 +1622,15 @@ export function CalendarioClient({
                           id={`sheet-${row.clubKey}`}
                           type="number"
                           min="0"
-                          value={resultForm[clubKey]}
+                          value={clubValue}
+                          disabled={isTotalShots}
                           onChange={(event) =>
                             setResultForm((current) => ({ ...current, [row.clubKey]: event.target.value }))
                           }
-                          className="h-7 rounded-full bg-emerald-100 text-center text-xs font-black text-emerald-800"
+                          className={cn(
+                            'h-7 rounded-full bg-emerald-100 text-center text-xs font-black text-emerald-800',
+                            isTotalShots && 'opacity-80',
+                          )}
                           autoFocus={section.title === 'Estadísticas generales' && rowIndex === 0}
                           aria-label={`${row.label} ${CLUB.shortName}`}
                         />
@@ -1150,11 +1644,15 @@ export function CalendarioClient({
                           id={`sheet-${row.opponentKey}`}
                           type="number"
                           min="0"
-                          value={resultForm[opponentKey]}
+                          value={opponentValue}
+                          disabled={isTotalShots}
                           onChange={(event) =>
                             setResultForm((current) => ({ ...current, [row.opponentKey]: event.target.value }))
                           }
-                          className="h-7 rounded-full bg-sky-100 text-center text-xs font-black text-sky-800"
+                          className={cn(
+                            'h-7 rounded-full bg-sky-100 text-center text-xs font-black text-sky-800',
+                            isTotalShots && 'opacity-80',
+                          )}
                           aria-label={`${row.label} rival`}
                         />
                       </div>
@@ -1177,14 +1675,407 @@ export function CalendarioClient({
                 })}
               </div>
             </section>
-          ))}
+          )) : (
+            <div className="overflow-x-auto">
+              {playerForm.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm font-semibold text-muted-foreground">
+                  Este equipo no tiene jugadores asignados todavía.
+                </div>
+              ) : (
+                <table className="w-full table-fixed text-left text-[11px]">
+                  <colgroup>
+                    <col className="w-[13%]" />
+                    <col className="w-[4%]" />
+                    <col className="w-[4%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[4%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[6%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[7%]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-muted-foreground">
+                      <th className="px-2 py-2">Jugador</th>
+                      <th className="px-1 py-2 text-center">Conv.</th>
+                      <th className="px-1 py-2 text-center">Tit.</th>
+                      <th className="px-1 py-2 text-center">Pos.</th>
+                      <th className="px-1 py-2 text-center">Dorsal</th>
+                      <th className="px-1 py-2 text-center">Min</th>
+                      <th className="px-1 py-2 text-center">Goles</th>
+                      <th className="px-1 py-2 text-center">Asist.</th>
+                      <th className="px-1 py-2 text-center">Faltas</th>
+                      <th className="px-1 py-2 text-center">F. Rec.</th>
+                      <th className="px-1 py-2 text-center">Amar.</th>
+                      <th className="px-1 py-2 text-center">Roja</th>
+                      <th className="px-1 py-2 text-center">Tiros</th>
+                      <th className="px-1 py-2 text-center">Paradas</th>
+                      <th className="px-1 py-2 text-center">Eventos</th>
+                      <th className="px-2 py-2">Obs.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {playerForm.map((player) => {
+                      const disabled = !player.isCalledUp
+                      const inputClass = 'h-8 w-full min-w-0 rounded-md border border-input bg-white px-1 text-center text-[11px] font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground'
+                      const selectClass = 'h-8 w-full min-w-0 rounded-md border border-input bg-white px-1 text-[11px] font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground'
+                      const isGoalkeeper = player.position === 'goalkeeper'
+
+                      return (
+                        <tr key={player.athleteId} className={cn(disabled ? 'bg-muted/20' : 'bg-white')}>
+                          <td className="px-2 py-2">
+                            <div className="truncate font-black text-foreground" title={player.athleteName}>
+                              {player.athleteName}
+                            </div>
+                          </td>
+                          <td className="px-1 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={player.isCalledUp}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { isCalledUp: event.target.checked })}
+                              className="size-4 rounded border-border accent-primary"
+                              aria-label={`Convocar a ${player.athleteName}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={player.isStarter}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { isStarter: event.target.checked })}
+                              className="size-4 rounded border-border accent-primary"
+                              aria-label={`${player.athleteName} titular`}
+                            />
+                          </td>
+                          <td className="px-1 py-2">
+                            <select
+                              value={player.position}
+                              disabled={disabled}
+                              onChange={(event) =>
+                                updatePlayerStat(player.athleteId, {
+                                  position: event.target.value as PlayerStatFormState['position'],
+                                })
+                              }
+                              className={selectClass}
+                              aria-label={`Posicion ${player.athleteName}`}
+                            >
+                              {POSITION_OPTIONS.map((position) => (
+                                <option key={position.value} value={position.value}>
+                                  {position.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          {[
+                            ['shirtNumber', 'Dorsal'],
+                            ['minutes', 'Minutos'],
+                          ].map(([field, label]) => (
+                            <td key={field} className="px-1 py-2 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max={field === 'minutes' ? '100' : field === 'yellowCards' ? '2' : undefined}
+                                step="1"
+                                value={player[field as keyof PlayerStatFormState] as string}
+                                disabled={disabled}
+                                onChange={(event) =>
+                                  updatePlayerStat(player.athleteId, {
+                                    [field]: event.target.value,
+                                  } as Partial<PlayerStatFormState>)
+                                }
+                                className={inputClass}
+                                aria-label={`${label} ${player.athleteName}`}
+                              />
+                            </td>
+                          ))}
+                          <td className="px-1 py-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={player.goals}
+                              disabled={disabled}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { goals: event.target.value })}
+                              className={inputClass}
+                              aria-label={`Goles ${player.athleteName}`}
+                            />
+                          </td>
+                          {[
+                            ['assists', 'Asistencias'],
+                            ['foulsCommitted', 'Faltas cometidas'],
+                            ['foulsReceived', 'Faltas recibidas'],
+                          ].map(([field, label]) => (
+                            <td key={field} className="px-1 py-2 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={player[field as keyof PlayerStatFormState] as string}
+                                disabled={disabled}
+                                onChange={(event) =>
+                                  updatePlayerStat(player.athleteId, {
+                                    [field]: event.target.value,
+                                  } as Partial<PlayerStatFormState>)
+                                }
+                                className={inputClass}
+                                aria-label={`${label} ${player.athleteName}`}
+                              />
+                            </td>
+                          ))}
+                          <td className="px-1 py-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="2"
+                              step="1"
+                              value={player.yellowCards}
+                              disabled={disabled}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { yellowCards: event.target.value })}
+                              className={inputClass}
+                              aria-label={`Tarjetas amarillas ${player.athleteName}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={player.redCard}
+                              disabled={disabled}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { redCard: event.target.checked })}
+                              className="size-4 rounded border-border accent-primary disabled:opacity-50"
+                              aria-label={`Tarjeta roja ${player.athleteName}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={player.shots}
+                              disabled={disabled}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { shots: event.target.value })}
+                              className={inputClass}
+                              aria-label={`Tiros ${player.athleteName}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={player.saves}
+                              disabled={disabled || !isGoalkeeper}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { saves: event.target.value })}
+                              className={inputClass}
+                              aria-label={`Paradas ${player.athleteName}`}
+                            />
+                          </td>
+                          <td className="px-1 py-2 text-center">
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              disabled={disabled}
+                              onClick={() => setEventPlayerId(player.athleteId)}
+                              className="h-8 w-full gap-1 px-1 text-[10px]"
+                              aria-label={`Eventos de ${player.athleteName}`}
+                            >
+                              <ClipboardList className="size-3" aria-hidden="true" />
+                              <span>
+                                {parseRequiredStat(player.goals) +
+                                  parseRequiredStat(player.yellowCards) +
+                                  (player.redCard || parseRequiredStat(player.yellowCards) >= 2 ? 1 : 0)}
+                              </span>
+                            </Button>
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="text"
+                              value={player.notes}
+                              disabled={disabled}
+                              onChange={(event) => updatePlayerStat(player.athleteId, { notes: event.target.value })}
+                              className="h-8 w-full min-w-0 rounded-md border border-input bg-white px-2 text-[11px] font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground"
+                              aria-label={`Observaciones ${player.athleteName}`}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </div>
 
         {formError ? (
-          <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {formError}
-          </p>
+          <div className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {formError.includes('\n') ? (
+              <ul className="space-y-1">
+                {formError.split('\n').map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>{formError}</p>
+            )}
+          </div>
         ) : null}
+      </AdminFormDialog>
+
+      <AdminFormDialog
+        open={Boolean(eventPlayer)}
+        onOpenChange={(open) => {
+          if (!open) setEventPlayerId(null)
+        }}
+        title={eventPlayer ? `Eventos de ${eventPlayer.athleteName}` : 'Eventos'}
+        description={resultMatch ? `${CLUB.shortName} vs ${resultMatch.opponentName}` : undefined}
+        maxWidth="md"
+        footer={
+          <Button onClick={() => setEventPlayerId(null)}>
+            Cerrar
+          </Button>
+        }
+      >
+        {eventPlayer ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-foreground">Goles</p>
+                  <p className="text-xs font-semibold text-muted-foreground">{eventGoalCount}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                  {eventGoalCount > 0 ? (
+                    eventGoalMinutes.map((minute, index) => (
+                      <Input
+                        key={`goal-${index}`}
+                        type="number"
+                        min="1"
+                        max="100"
+                        step="1"
+                        value={minute}
+                        onChange={(event) =>
+                          updatePlayerStat(eventPlayer.athleteId, {
+                            goalMinutes: setMinuteField(eventPlayer.goalMinutes, eventGoalCount, index, event.target.value),
+                          })
+                        }
+                        className="h-9 w-16 text-center font-bold"
+                        aria-label={`Minuto gol ${index + 1} ${eventPlayer.athleteName}`}
+                        placeholder={`${index + 1}`}
+                      />
+                    ))
+                  ) : (
+                    <span className="col-span-3 text-sm font-semibold text-muted-foreground sm:col-span-5">Sin goles</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-foreground">Amarillas</p>
+                  <p className="text-xs font-semibold text-muted-foreground">{eventYellowCount}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                  {eventYellowCount > 0 ? (
+                    eventYellowMinutes.map((minute, index) => (
+                      <Input
+                        key={`yellow-${index}`}
+                        type="number"
+                        min="1"
+                        max="100"
+                        step="1"
+                        value={minute}
+                        onChange={(event) =>
+                          updatePlayerStat(eventPlayer.athleteId, {
+                            yellowCardMinutes: setMinuteField(eventPlayer.yellowCardMinutes, eventYellowCount, index, event.target.value),
+                          })
+                        }
+                        className="h-9 w-16 text-center font-bold"
+                        aria-label={`Minuto amarilla ${index + 1} ${eventPlayer.athleteName}`}
+                        placeholder={`${index + 1}`}
+                      />
+                    ))
+                  ) : (
+                    <span className="col-span-3 text-sm font-semibold text-muted-foreground sm:col-span-5">Sin amarillas</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-foreground">Roja</p>
+                  <p className="text-xs font-semibold text-muted-foreground">{eventHasRedCard ? 'Sí' : 'No'}</p>
+                </div>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={eventPlayer.redCardMinute}
+                  disabled={!eventHasRedCard}
+                  onChange={(event) => updatePlayerStat(eventPlayer.athleteId, { redCardMinute: event.target.value })}
+                  className="h-9 w-20 text-center font-bold"
+                  aria-label={`Minuto roja ${eventPlayer.athleteName}`}
+                  placeholder="Min."
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </AdminFormDialog>
+
+      <AdminFormDialog
+        open={statWarnings.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setStatWarnings([])
+        }}
+        title="Estadísticas incompletas"
+        description="Las estadísticas generales tienen más datos que los asignados a jugadores."
+        maxWidth="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setStatWarnings([])} disabled={isPending}>
+              Revisar jugadores
+            </Button>
+            <Button onClick={() => handleResultSubmit(true)} disabled={isPending}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : <CalendarDays className="size-4" />}
+              Guardar de todas formas
+            </Button>
+          </>
+        }
+      >
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
+              <AlertTriangle className="size-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-foreground">
+                No has puesto todas las estadísticas de los jugadores.
+              </p>
+              <p className="mt-1 text-sm font-medium text-amber-900">
+                Puedes revisarlas ahora o guardar la ficha igualmente.
+              </p>
+            </div>
+          </div>
+
+          <ul className="mt-4 space-y-2">
+            {statWarnings.map((warning) => (
+              <li key={warning} className="rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-amber-950 ring-1 ring-amber-200">
+                {warning}
+              </li>
+            ))}
+          </ul>
+        </div>
       </AdminFormDialog>
     </div>
   )

@@ -878,3 +878,354 @@ Creating turbopack project {
  GET /entrenador/estadisticas 200 in 2.9s (next.js: 1222ms, proxy.ts: 946ms, application-code: 774ms)
  GET /entrenador/estadisticas 200 in 472ms (next.js: 140ms, proxy.ts: 174ms, application-code: 158ms)
  GET /entrenador/estadisticas 200 in 476ms (next.js: 12ms, proxy.ts: 172ms, application-code: 292ms)
+ GET /entrenador/estadisticas 200 in 328ms (next.js: 97ms, proxy.ts: 99ms, application-code: 132ms)
+ GET /entrenador/estadisticas 200 in 4.4s (next.js: 20ms, proxy.ts: 14ms, application-code: 4.3s)
+ GET /entrenador/calendario 200 in 4.5s (next.js: 1776ms, proxy.ts: 23ms, application-code: 2.7s)
+✓ Compiled in 650ms
+✓ Compiled in 377ms
+ GET /entrenador/calendario 200 in 4.5s (next.js: 1778ms, proxy.ts: 808ms, application-code: 1962ms)
+ GET /entrenador/calendario 200 in 1198ms (next.js: 9ms, proxy.ts: 11ms, application-code: 1178ms)
+ GET /entrenador/calendario 200 in 1456ms (next.js: 71ms, proxy.ts: 21ms, application-code: 1364ms)
+ GET /entrenador/calendario 200 in 1460ms (next.js: 22ms, proxy.ts: 21ms, application-code: 1417ms)
+ GET /entrenador/calendario 200 in 1471ms (next.js: 170ms, proxy.ts: 23ms, application-code: 1277ms)
+ GET /entrenador/calendario 200 in 1475ms (next.js: 128ms, proxy.ts: 22ms, application-code: 1326ms)
+ GET /entrenador/calendario 200 in 1270ms (next.js: 11ms, proxy.ts: 26ms, application-code: 1234ms)
+ GET /entrenador/calendario 200 in 1489ms (next.js: 7ms, proxy.ts: 231ms, application-code: 1250ms)
+ GET /entrenador/calendario 200 in 1240ms (next.js: 23ms, proxy.ts: 26ms, application-code: 1191ms)
+ GET /entrenador/calendario 200 in 1239ms (next.js: 62ms, proxy.ts: 27ms, application-code: 1150ms)
+ GET /entrenador/calendario 200 in 1208ms (next.js: 11ms, proxy.ts: 558ms, application-code: 639ms)
+ GET /entrenador/calendario 200 in 1207ms (next.js: 163ms, proxy.ts: 558ms, application-code: 486ms)
+ GET /entrenador/calendario 200 in 332ms (next.js: 8ms, proxy.ts: 11ms, application-code: 312ms)
+✓ Compiled in 201ms
+ GET /entrenador/calendario 200 in 5.8s (next.js: 328ms, proxy.ts: 190ms, application-code: 5.3s)
+ GET /entrenador/calendario 200 in 5.0s (next.js: 9ms, proxy.ts: 8ms, application-code: 4.9s)
+ GET /entrenador/calendario 200 in 4.7s (next.js: 899ms, proxy.ts: 410ms, application-code: 3.4s)
+ GET /entrenador/calendario 200 in 4.7s (next.js: 554ms, proxy.ts: 403ms, application-code: 3.7s)
+✓ Compiled in 161ms
+ GET /entrenador/calendario 200 in 1196ms (next.js: 389ms, proxy.ts: 188ms, application-code: 618ms)
+ GET /entrenador/calendario 200 in 409ms (next.js: 6ms, proxy.ts: 7ms, application-code: 396ms)
+ GET /entrenador/calendario 200 in 3.7s (next.js: 867ms, proxy.ts: 7ms, application-code: 2.8s)
+ GET /entrenador/calendario 200 in 1486ms (next.js: 192ms, proxy.ts: 154ms, application-code: 1139ms)
+ GET /entrenador/calendario 200 in 891ms (next.js: 355ms, proxy.ts: 19ms, application-code: 517ms)
+ GET /entrenador/calendario 200 in 1354ms (next.js: 399ms, proxy.ts: 18ms, application-code: 936ms)
+ GET /entrenador/calendario 200 in 1358ms (next.js: 39ms, proxy.ts: 18ms, application-code: 1301ms)
+ GET /entrenador/calendario 200 in 1361ms (next.js: 11ms, proxy.ts: 18ms, application-code: 1332ms)
+ GET /entrenador/calendario 200 in 483ms (next.js: 9ms, proxy.ts: 10ms, application-code: 465ms)
+ GET /entrenador/calendario 200 in 482ms (next.js: 42ms, proxy.ts: 10ms, application-code: 430ms)
+✓ Compiled in 172ms
+ GET /entrenador/calendario 200 in 1050ms (next.js: 291ms, proxy.ts: 153ms, application-code: 607ms)
+ GET /entrenador/calendario 200 in 391ms (next.js: 6ms, proxy.ts: 7ms, application-code: 378ms)
+✓ Compiled in 183ms
+ GET /entrenador/calendario 200 in 1205ms (next.js: 302ms, proxy.ts: 151ms, application-code: 752ms)
+ GET /entrenador/calendario 200 in 480ms (next.js: 6ms, proxy.ts: 6ms, application-code: 468ms)
+✓ Compiled in 200ms
+ GET /entrenador/calendario 200 in 1090ms (next.js: 297ms, proxy.ts: 173ms, application-code: 619ms)
+ GET /entrenador/calendario 200 in 341ms (next.js: 5ms, proxy.ts: 6ms, application-code: 330ms)
+✓ Compiled in 189ms
+ GET /entrenador/calendario 200 in 1083ms (next.js: 292ms, proxy.ts: 169ms, application-code: 621ms)
+ GET /entrenador/calendario 200 in 346ms (next.js: 5ms, proxy.ts: 6ms, application-code: 335ms)
+✓ Compiled in 190ms
+ GET /entrenador/calendario 200 in 1110ms (next.js: 309ms, proxy.ts: 165ms, application-code: 636ms)
+ GET /entrenador/calendario 200 in 354ms (next.js: 6ms, proxy.ts: 6ms, application-code: 342ms)
+✓ Compiled in 155ms
+ GET /entrenador/calendario 200 in 336ms (next.js: 4ms, proxy.ts: 6ms, application-code: 325ms)
+ GET /entrenador/calendario 200 in 1128ms (next.js: 296ms, proxy.ts: 156ms, application-code: 675ms)
+✓ Compiled in 352ms
+ GET /entrenador/calendario 200 in 1084ms (next.js: 293ms, proxy.ts: 168ms, application-code: 622ms)
+ GET /entrenador/calendario 200 in 417ms (next.js: 4ms, proxy.ts: 7ms, application-code: 406ms)
+✓ Compiled in 236ms
+ GET /entrenador/calendario 200 in 1211ms (next.js: 333ms, proxy.ts: 179ms, application-code: 700ms)
+ GET /entrenador/calendario 200 in 453ms (next.js: 5ms, proxy.ts: 18ms, application-code: 430ms)
+✓ Compiled in 192ms
+ GET /entrenador/calendario 200 in 1906ms (next.js: 419ms, proxy.ts: 8ms, application-code: 1480ms)
+ GET /entrenador/calendario 200 in 1196ms (next.js: 7ms, proxy.ts: 150ms, application-code: 1039ms)
+ GET /entrenador/calendario 200 in 1237ms (next.js: 15ms, proxy.ts: 24ms, application-code: 1198ms)
+ GET /entrenador/calendario 200 in 1227ms (next.js: 584ms, proxy.ts: 20ms, application-code: 624ms)
+ GET /entrenador/calendario 200 in 1236ms (next.js: 100ms, proxy.ts: 25ms, application-code: 1111ms)
+ GET /entrenador/calendario 200 in 1238ms (next.js: 54ms, proxy.ts: 25ms, application-code: 1160ms)
+ GET /entrenador/calendario 200 in 370ms (next.js: 4ms, proxy.ts: 6ms, application-code: 360ms)
+ GET /entrenador/calendario 200 in 3.4s (next.js: 6ms, proxy.ts: 6ms, application-code: 3.4s)
+ GET /iniciar-sesion 200 in 701ms (next.js: 360ms, proxy.ts: 5ms, application-code: 336ms)
+ GET /iniciar-sesion 200 in 261ms (next.js: 5ms, proxy.ts: 7ms, application-code: 249ms)
+ GET /admin 200 in 2.2s (next.js: 492ms, proxy.ts: 131ms, application-code: 1619ms)
+ GET /admin 200 in 1195ms (next.js: 13ms, proxy.ts: 584ms, application-code: 598ms)
+ GET /admin/deportistas 200 in 1754ms (next.js: 368ms, proxy.ts: 8ms, application-code: 1378ms)
+ POST /admin/deportistas 200 in 1787ms (next.js: 4ms, proxy.ts: 9ms, application-code: 1774ms)
+  └─ ƒ updateAthleteAdminAction({"assignedTeamId":"e760b334-d2e5-4454-ae68-496f4788bce9","athleteId":"5d3a1381-43b1-4961-8c2f-b2cd9347641b","categoryId":"cccdf7de-7b05-485f-bd70-e350166c3209","...":"3 items not stringified"}) in 892ms app/(admin)/admin/deportistas/actions.ts
+ POST /admin/deportistas 200 in 1319ms (next.js: 5ms, proxy.ts: 10ms, application-code: 1304ms)
+  └─ ƒ updateAthleteAdminAction({"assignedTeamId":"e760b334-d2e5-4454-ae68-496f4788bce9","athleteId":"021c5474-b554-451a-8067-03ad80d43291","categoryId":"cccdf7de-7b05-485f-bd70-e350166c3209","...":"3 items not stringified"}) in 397ms app/(admin)/admin/deportistas/actions.ts
+ GET /iniciar-sesion 200 in 148ms (next.js: 3ms, proxy.ts: 4ms, application-code: 141ms)
+ GET /iniciar-sesion 200 in 174ms (next.js: 4ms, proxy.ts: 6ms, application-code: 164ms)
+ GET /entrenador/calendario 200 in 812ms (next.js: 5ms, proxy.ts: 6ms, application-code: 801ms)
+ GET /entrenador/calendario 200 in 791ms (next.js: 4ms, proxy.ts: 6ms, application-code: 782ms)
+✓ Compiled in 273ms
+ GET /entrenador/calendario 200 in 2.4s (next.js: 311ms, proxy.ts: 281ms, application-code: 1815ms)
+ GET /entrenador/calendario 200 in 1429ms (next.js: 6ms, proxy.ts: 9ms, application-code: 1413ms)
+ GET /entrenador/calendario 200 in 1397ms (next.js: 18ms, proxy.ts: 26ms, application-code: 1354ms)
+ GET /entrenador/calendario 200 in 1396ms (next.js: 286ms, proxy.ts: 26ms, application-code: 1085ms)
+ GET /entrenador/calendario 200 in 1395ms (next.js: 367ms, proxy.ts: 26ms, application-code: 1002ms)
+ GET /entrenador/calendario 200 in 1393ms (next.js: 459ms, proxy.ts: 26ms, application-code: 909ms)
+ GET /entrenador/calendario 200 in 236ms (next.js: 12ms, proxy.ts: 11ms, application-code: 214ms)
+✓ Compiled in 324ms
+ GET /entrenador/calendario 200 in 703ms (next.js: 12ms, proxy.ts: 17ms, application-code: 674ms)
+ GET /entrenador/calendario 200 in 702ms (next.js: 192ms, proxy.ts: 18ms, application-code: 492ms)
+ GET /entrenador/calendario 200 in 906ms (next.js: 7ms, proxy.ts: 9ms, application-code: 890ms)
+ GET /entrenador/calendario 200 in 1918ms (next.js: 423ms, proxy.ts: 242ms, application-code: 1253ms)
+✓ Compiled in 454ms
+ GET /entrenador/calendario 200 in 6.0s (next.js: 1081ms, proxy.ts: 9ms, application-code: 4.9s)
+ GET /entrenador/calendario 200 in 2.0s (next.js: 280ms, proxy.ts: 204ms, application-code: 1518ms)
+ GET /entrenador/calendario 200 in 1221ms (next.js: 16ms, proxy.ts: 41ms, application-code: 1164ms)
+ GET /entrenador/calendario 200 in 1221ms (next.js: 205ms, proxy.ts: 41ms, application-code: 975ms)
+ GET /entrenador/calendario 200 in 1221ms (next.js: 256ms, proxy.ts: 42ms, application-code: 923ms)
+ GET /entrenador/calendario 200 in 1387ms (next.js: 306ms, proxy.ts: 43ms, application-code: 1038ms)
+ GET /entrenador/calendario 200 in 419ms (next.js: 10ms, proxy.ts: 11ms, application-code: 398ms)
+ GET /entrenador/calendario 200 in 204ms (next.js: 12ms, proxy.ts: 17ms, application-code: 175ms)
+✓ Compiled in 200ms
+ GET /entrenador/calendario 200 in 1195ms (next.js: 430ms, proxy.ts: 204ms, application-code: 561ms)
+ GET /entrenador/calendario 200 in 205ms (next.js: 6ms, proxy.ts: 9ms, application-code: 190ms)
+✓ Compiled in 232ms
+ GET /entrenador/calendario 200 in 1415ms (next.js: 444ms, proxy.ts: 235ms, application-code: 736ms)
+ GET /entrenador/calendario 200 in 272ms (next.js: 12ms, proxy.ts: 9ms, application-code: 251ms)
+✓ Compiled in 348ms
+ GET /entrenador/calendario 200 in 1458ms (next.js: 528ms, proxy.ts: 310ms, application-code: 620ms)
+ GET /entrenador/calendario 200 in 225ms (next.js: 7ms, proxy.ts: 8ms, application-code: 210ms)
+✓ Compiled in 269ms
+ GET /entrenador/calendario 200 in 1395ms (next.js: 434ms, proxy.ts: 246ms, application-code: 715ms)
+ GET /entrenador/calendario 200 in 288ms (next.js: 6ms, proxy.ts: 10ms, application-code: 273ms)
+✓ Compiled in 292ms
+ GET /entrenador/calendario 200 in 2.6s (next.js: 10ms, proxy.ts: 12ms, application-code: 2.6s)
+ GET /entrenador/calendario 200 in 1991ms (next.js: 310ms, proxy.ts: 268ms, application-code: 1414ms)
+ GET /entrenador/calendario 200 in 1197ms (next.js: 32ms, proxy.ts: 22ms, application-code: 1143ms)
+ GET /entrenador/calendario 200 in 1197ms (next.js: 208ms, proxy.ts: 22ms, application-code: 967ms)
+ GET /entrenador/calendario 200 in 1196ms (next.js: 266ms, proxy.ts: 23ms, application-code: 907ms)
+ GET /entrenador/calendario 200 in 1195ms (next.js: 313ms, proxy.ts: 24ms, application-code: 858ms)
+ GET /entrenador/calendario 200 in 210ms (next.js: 9ms, proxy.ts: 12ms, application-code: 190ms)
+✓ Compiled in 200ms
+ GET /entrenador/calendario 200 in 600ms (next.js: 12ms, proxy.ts: 10ms, application-code: 578ms)
+ GET /entrenador/calendario 200 in 2.8s (next.js: 1373ms, proxy.ts: 208ms, application-code: 1225ms)
+ GET /entrenador/calendario 200 in 769ms (next.js: 6ms, proxy.ts: 7ms, application-code: 756ms)
+ GET /entrenador/calendario 200 in 603ms (next.js: 177ms, proxy.ts: 11ms, application-code: 416ms)
+✓ Compiled in 424ms
+ GET /entrenador/calendario 200 in 3.6s (next.js: 343ms, proxy.ts: 2.3s, application-code: 993ms)
+ GET /entrenador/calendario 200 in 1195ms (next.js: 5ms, proxy.ts: 7ms, application-code: 1183ms)
+ GET /entrenador/calendario 200 in 1050ms (next.js: 21ms, proxy.ts: 20ms, application-code: 1009ms)
+ GET /entrenador/calendario 200 in 1049ms (next.js: 69ms, proxy.ts: 19ms, application-code: 961ms)
+ GET /entrenador/calendario 200 in 1049ms (next.js: 385ms, proxy.ts: 19ms, application-code: 645ms)
+ GET /entrenador/calendario 200 in 1049ms (next.js: 446ms, proxy.ts: 20ms, application-code: 583ms)
+ GET /entrenador/calendario 200 in 410ms (next.js: 9ms, proxy.ts: 12ms, application-code: 388ms)
+ GET /entrenador/calendario 200 in 211ms (next.js: 12ms, proxy.ts: 9ms, application-code: 190ms)
+✓ Compiled in 213ms
+ GET /entrenador/calendario 200 in 1208ms (next.js: 389ms, proxy.ts: 197ms, application-code: 622ms)
+ GET /entrenador/calendario 200 in 257ms (next.js: 8ms, proxy.ts: 10ms, application-code: 240ms)
+✓ Compiled in 301ms
+ GET /entrenador/calendario 200 in 1148ms (next.js: 383ms, proxy.ts: 202ms, application-code: 563ms)
+ GET /entrenador/calendario 200 in 190ms (next.js: 5ms, proxy.ts: 7ms, application-code: 178ms)
+✓ Compiled in 237ms
+ GET /entrenador/calendario 200 in 2.2s (next.js: 408ms, proxy.ts: 186ms, application-code: 1643ms)
+ GET /entrenador/calendario 200 in 1199ms (next.js: 37ms, proxy.ts: 33ms, application-code: 1129ms)
+✓ Compiled in 279ms
+ GET /entrenador/calendario 200 in 1108ms (next.js: 401ms, proxy.ts: 250ms, application-code: 457ms)
+ GET /entrenador/calendario 200 in 167ms (next.js: 5ms, proxy.ts: 8ms, application-code: 155ms)
+ GET /entrenador/calendario 200 in 1965ms (next.js: 256ms, proxy.ts: 169ms, application-code: 1540ms)
+ GET /entrenador/calendario 200 in 4.2s (next.js: 1448ms, proxy.ts: 11ms, application-code: 2.8s)
+ GET /entrenador/calendario 200 in 1187ms (next.js: 17ms, proxy.ts: 37ms, application-code: 1134ms)
+ GET /entrenador/calendario 200 in 1189ms (next.js: 218ms, proxy.ts: 37ms, application-code: 935ms)
+ GET /entrenador/calendario 200 in 1189ms (next.js: 271ms, proxy.ts: 38ms, application-code: 880ms)
+ GET /entrenador/calendario 200 in 1355ms (next.js: 324ms, proxy.ts: 39ms, application-code: 992ms)
+ GET /entrenador/calendario 200 in 376ms (next.js: 15ms, proxy.ts: 11ms, application-code: 350ms)
+ GET /entrenador/calendario 200 in 375ms (next.js: 174ms, proxy.ts: 13ms, application-code: 187ms)
+✓ Compiled in 189ms
+ GET /entrenador/calendario 200 in 1204ms (next.js: 423ms, proxy.ts: 177ms, application-code: 604ms)
+ GET /entrenador/calendario 200 in 211ms (next.js: 6ms, proxy.ts: 8ms, application-code: 197ms)
+✓ Compiled in 268ms
+ GET /entrenador/calendario 200 in 3.3s (next.js: 6ms, proxy.ts: 11ms, application-code: 3.2s)
+ GET /entrenador/calendario 200 in 2.7s (next.js: 260ms, proxy.ts: 165ms, application-code: 2.3s)
+ GET /entrenador/calendario 200 in 2.0s (next.js: 1396ms, proxy.ts: 82ms, application-code: 555ms)
+ GET /entrenador/calendario 200 in 2.0s (next.js: 143ms, proxy.ts: 45ms, application-code: 1850ms)
+ GET /entrenador/calendario 200 in 2.0s (next.js: 535ms, proxy.ts: 64ms, application-code: 1439ms)
+ GET /entrenador/calendario 200 in 2.0s (next.js: 1412ms, proxy.ts: 116ms, application-code: 506ms)
+ GET /entrenador/calendario 200 in 196ms (next.js: 7ms, proxy.ts: 9ms, application-code: 181ms)
+✓ Compiled in 252ms
+ GET /entrenador/calendario 200 in 1483ms (next.js: 6ms, proxy.ts: 7ms, application-code: 1470ms)
+ GET /entrenador/calendario 200 in 1308ms (next.js: 8ms, proxy.ts: 11ms, application-code: 1288ms)
+ GET /entrenador/calendario 200 in 2.4s (next.js: 382ms, proxy.ts: 155ms, application-code: 1883ms)
+ GET /entrenador/calendario 200 in 1364ms (next.js: 164ms, proxy.ts: 12ms, application-code: 1188ms)
+✓ Compiled in 538ms
+ GET /entrenador/calendario 200 in 1156ms (next.js: 407ms, proxy.ts: 209ms, application-code: 540ms)
+ GET /entrenador/calendario 200 in 211ms (next.js: 5ms, proxy.ts: 7ms, application-code: 198ms)
+✓ Compiled in 264ms
+ GET /entrenador/calendario 200 in 1178ms (next.js: 401ms, proxy.ts: 193ms, application-code: 584ms)
+ GET /entrenador/calendario 200 in 210ms (next.js: 6ms, proxy.ts: 8ms, application-code: 196ms)
+✓ Compiled in 228ms
+ GET /entrenador/calendario 200 in 1224ms (next.js: 379ms, proxy.ts: 177ms, application-code: 668ms)
+ GET /entrenador/calendario 200 in 252ms (next.js: 5ms, proxy.ts: 9ms, application-code: 238ms)
+✓ Compiled in 208ms
+ GET /entrenador/calendario 200 in 1291ms (next.js: 462ms, proxy.ts: 256ms, application-code: 574ms)
+ GET /entrenador/calendario 200 in 211ms (next.js: 7ms, proxy.ts: 9ms, application-code: 195ms)
+✓ Compiled in 213ms
+ GET /entrenador/calendario 200 in 1064ms (next.js: 458ms, proxy.ts: 192ms, application-code: 413ms)
+ GET /entrenador/calendario 200 in 1183ms (next.js: 10ms, proxy.ts: 9ms, application-code: 1165ms)
+ GET /entrenador/calendario 307 in 323ms (next.js: 5ms, proxy.ts: 6ms, application-code: 312ms)
+ POST /entrenador/calendario 200 in 2.8s (next.js: 4ms, proxy.ts: 16ms, application-code: 2.8s)
+  └─ ƒ updateCoachMatchAction({"awayBlockedShots":null,"awayCompletedPasses":null,"awayCorners":null,"...":"39 items not stringified"}) in 1993ms app/(coach)/entrenador/calendario/actions.ts
+ POST /entrenador/calendario 200 in 1396ms (next.js: 5ms, proxy.ts: 6ms, application-code: 1385ms)
+  └─ ƒ updateCoachMatchAction({"awayBlockedShots":null,"awayCompletedPasses":null,"awayCorners":null,"...":"39 items not stringified"}) in 765ms app/(coach)/entrenador/calendario/actions.ts
+ GET /entrenador/estadisticas 200 in 1114ms (next.js: 432ms, proxy.ts: 4ms, application-code: 677ms)
+ GET /entrenador/calendario 200 in 683ms (next.js: 4ms, proxy.ts: 4ms, application-code: 675ms)
+✓ Compiled in 288ms
+ GET /entrenador/calendario 200 in 1363ms (next.js: 405ms, proxy.ts: 307ms, application-code: 651ms)
+ GET /entrenador/calendario 200 in 171ms (next.js: 6ms, proxy.ts: 6ms, application-code: 160ms)
+✓ Compiled in 286ms
+ GET /entrenador/calendario 200 in 1310ms (next.js: 396ms, proxy.ts: 196ms, application-code: 717ms)
+ GET /entrenador/calendario 200 in 210ms (next.js: 6ms, proxy.ts: 9ms, application-code: 195ms)
+✓ Compiled in 299ms
+ GET /entrenador/calendario 200 in 1268ms (next.js: 424ms, proxy.ts: 184ms, application-code: 660ms)
+ GET /entrenador/calendario 200 in 214ms (next.js: 7ms, proxy.ts: 10ms, application-code: 197ms)
+✓ Compiled in 716ms
+ GET /entrenador/calendario 200 in 3.7s (next.js: 355ms, proxy.ts: 178ms, application-code: 3.2s)
+ GET /entrenador/calendario 200 in 2.5s (next.js: 42ms, proxy.ts: 44ms, application-code: 2.4s)
+ GET /entrenador/calendario 200 in 840ms (next.js: 260ms, proxy.ts: 35ms, application-code: 545ms)
+ GET /entrenador/calendario 200 in 844ms (next.js: 216ms, proxy.ts: 35ms, application-code: 593ms)
+ GET /entrenador/calendario 200 in 840ms (next.js: 303ms, proxy.ts: 36ms, application-code: 501ms)
+ GET /entrenador/calendario 200 in 849ms (next.js: 21ms, proxy.ts: 35ms, application-code: 793ms)
+✓ Compiled in 240ms
+ GET /entrenador/calendario 200 in 1220ms (next.js: 458ms, proxy.ts: 224ms, application-code: 538ms)
+ GET /entrenador/calendario 200 in 199ms (next.js: 6ms, proxy.ts: 7ms, application-code: 186ms)
+✓ Compiled in 292ms
+ GET /entrenador/calendario 200 in 2.1s (next.js: 411ms, proxy.ts: 196ms, application-code: 1448ms)
+ GET /entrenador/calendario 200 in 1243ms (next.js: 5ms, proxy.ts: 7ms, application-code: 1231ms)
+✓ Compiled in 321ms
+ GET /entrenador/calendario 200 in 1149ms (next.js: 392ms, proxy.ts: 174ms, application-code: 583ms)
+ GET /entrenador/calendario 200 in 220ms (next.js: 11ms, proxy.ts: 9ms, application-code: 201ms)
+✓ Compiled in 457ms
+ GET /entrenador/calendario 200 in 1120ms (next.js: 402ms, proxy.ts: 160ms, application-code: 558ms)
+ GET /entrenador/calendario 200 in 193ms (next.js: 6ms, proxy.ts: 7ms, application-code: 180ms)
+✓ Compiled in 178ms
+ GET /entrenador/calendario 200 in 1247ms (next.js: 364ms, proxy.ts: 183ms, application-code: 700ms)
+ GET /entrenador/calendario 200 in 339ms (next.js: 5ms, proxy.ts: 7ms, application-code: 327ms)
+✓ Compiled in 321ms
+ GET /entrenador/calendario 200 in 949ms (next.js: 327ms, proxy.ts: 168ms, application-code: 454ms)
+ GET /entrenador/calendario 200 in 162ms (next.js: 5ms, proxy.ts: 6ms, application-code: 151ms)
+✓ Compiled in 596ms
+ GET /entrenador/calendario 200 in 4.1s (next.js: 2.7s, proxy.ts: 32ms, application-code: 1321ms)
+ GET /entrenador/calendario 200 in 1022ms (next.js: 5ms, proxy.ts: 168ms, application-code: 849ms)
+ GET /entrenador/calendario 200 in 855ms (next.js: 16ms, proxy.ts: 19ms, application-code: 820ms)
+ GET /entrenador/calendario 200 in 856ms (next.js: 56ms, proxy.ts: 20ms, application-code: 780ms)
+ GET /entrenador/calendario 200 in 854ms (next.js: 469ms, proxy.ts: 21ms, application-code: 364ms)
+ GET /entrenador/calendario 200 in 857ms (next.js: 91ms, proxy.ts: 20ms, application-code: 746ms)
+ GET /entrenador/calendario 200 in 355ms (next.js: 8ms, proxy.ts: 8ms, application-code: 340ms)
+ GET /entrenador/calendario 200 in 194ms (next.js: 15ms, proxy.ts: 9ms, application-code: 170ms)
+✓ Compiled in 165ms
+ GET /entrenador/calendario 200 in 1220ms (next.js: 430ms, proxy.ts: 183ms, application-code: 606ms)
+ GET /entrenador/calendario 200 in 206ms (next.js: 5ms, proxy.ts: 8ms, application-code: 194ms)
+✓ Compiled in 224ms
+ GET /entrenador/calendario 200 in 1135ms (next.js: 409ms, proxy.ts: 168ms, application-code: 558ms)
+ GET /entrenador/calendario 200 in 209ms (next.js: 6ms, proxy.ts: 8ms, application-code: 195ms)
+✓ Compiled in 309ms
+ GET /entrenador/calendario 200 in 1340ms (next.js: 531ms, proxy.ts: 240ms, application-code: 569ms)
+ GET /entrenador/calendario 200 in 193ms (next.js: 5ms, proxy.ts: 7ms, application-code: 180ms)
+✓ Compiled in 323ms
+ GET /entrenador/calendario 200 in 1294ms (next.js: 418ms, proxy.ts: 193ms, application-code: 683ms)
+ GET /entrenador/calendario 200 in 296ms (next.js: 7ms, proxy.ts: 9ms, application-code: 281ms)
+✓ Compiled in 231ms
+ GET /entrenador/calendario 200 in 1148ms (next.js: 384ms, proxy.ts: 190ms, application-code: 574ms)
+ GET /entrenador/calendario 200 in 218ms (next.js: 5ms, proxy.ts: 9ms, application-code: 204ms)
+✓ Compiled in 0ms
+ GET /entrenador/calendario 200 in 1494ms (next.js: 499ms, proxy.ts: 291ms, application-code: 703ms)
+ GET /entrenador/calendario 200 in 220ms (next.js: 6ms, proxy.ts: 9ms, application-code: 206ms)
+✓ Compiled in 502ms
+ GET /entrenador/calendario 200 in 1182ms (next.js: 406ms, proxy.ts: 187ms, application-code: 589ms)
+ GET /entrenador/calendario 200 in 206ms (next.js: 6ms, proxy.ts: 10ms, application-code: 191ms)
+✓ Compiled in 397ms
+ GET /entrenador/calendario 200 in 1264ms (next.js: 437ms, proxy.ts: 200ms, application-code: 627ms)
+ GET /entrenador/calendario 200 in 223ms (next.js: 7ms, proxy.ts: 10ms, application-code: 206ms)
+✓ Compiled in 364ms
+ GET /entrenador/calendario 200 in 1732ms (next.js: 377ms, proxy.ts: 168ms, application-code: 1187ms)
+ GET /entrenador/calendario 200 in 1051ms (next.js: 5ms, proxy.ts: 8ms, application-code: 1038ms)
+ GET /entrenador/calendario 200 in 886ms (next.js: 11ms, proxy.ts: 17ms, application-code: 858ms)
+ GET /entrenador/calendario 200 in 885ms (next.js: 46ms, proxy.ts: 16ms, application-code: 823ms)
+ GET /entrenador/calendario 200 in 887ms (next.js: 334ms, proxy.ts: 16ms, application-code: 537ms)
+ GET /entrenador/calendario 200 in 887ms (next.js: 377ms, proxy.ts: 17ms, application-code: 493ms)
+ GET /entrenador/calendario 200 in 360ms (next.js: 5ms, proxy.ts: 7ms, application-code: 348ms)
+ GET /entrenador/calendario 200 in 189ms (next.js: 11ms, proxy.ts: 8ms, application-code: 169ms)
+✓ Compiled in 218ms
+ GET /entrenador/calendario 200 in 1236ms (next.js: 419ms, proxy.ts: 159ms, application-code: 659ms)
+ GET /entrenador/calendario 200 in 236ms (next.js: 8ms, proxy.ts: 9ms, application-code: 220ms)
+✓ Compiled in 258ms
+ GET /entrenador/calendario 200 in 1435ms (next.js: 551ms, proxy.ts: 215ms, application-code: 669ms)
+ GET /entrenador/calendario 200 in 265ms (next.js: 6ms, proxy.ts: 9ms, application-code: 249ms)
+✓ Compiled in 240ms
+ GET /entrenador/calendario 200 in 2.2s (next.js: 432ms, proxy.ts: 217ms, application-code: 1595ms)
+ GET /entrenador/calendario 200 in 1196ms (next.js: 11ms, proxy.ts: 12ms, application-code: 1172ms)
+ GET /entrenador/calendario 200 in 1202ms (next.js: 78ms, proxy.ts: 27ms, application-code: 1096ms)
+ GET /entrenador/calendario 200 in 1205ms (next.js: 18ms, proxy.ts: 27ms, application-code: 1161ms)
+ GET /entrenador/calendario 200 in 1203ms (next.js: 126ms, proxy.ts: 29ms, application-code: 1049ms)
+ GET /entrenador/calendario 200 in 1203ms (next.js: 652ms, proxy.ts: 29ms, application-code: 522ms)
+ GET /entrenador/calendario 200 in 271ms (next.js: 7ms, proxy.ts: 12ms, application-code: 252ms)
+✓ Compiled in 320ms
+ GET /entrenador/calendario 200 in 1127ms (next.js: 6ms, proxy.ts: 10ms, application-code: 1111ms)
+ GET /entrenador/calendario 200 in 2.1s (next.js: 436ms, proxy.ts: 170ms, application-code: 1501ms)
+ GET /entrenador/calendario 200 in 914ms (next.js: 62ms, proxy.ts: 39ms, application-code: 814ms)
+ GET /entrenador/calendario 200 in 918ms (next.js: 11ms, proxy.ts: 38ms, application-code: 869ms)
+✓ Compiled in 336ms
+ GET /entrenador/calendario 200 in 384ms (next.js: 7ms, proxy.ts: 9ms, application-code: 368ms)
+ GET /entrenador/calendario 200 in 1448ms (next.js: 418ms, proxy.ts: 201ms, application-code: 829ms)
+✓ Compiled in 293ms
+ GET /entrenador/calendario 200 in 370ms (next.js: 7ms, proxy.ts: 11ms, application-code: 353ms)
+ GET /entrenador/calendario 200 in 1425ms (next.js: 448ms, proxy.ts: 209ms, application-code: 768ms)
+✓ Compiled in 342ms
+ GET /entrenador/calendario 200 in 1365ms (next.js: 442ms, proxy.ts: 185ms, application-code: 738ms)
+ GET /entrenador/calendario 200 in 353ms (next.js: 6ms, proxy.ts: 10ms, application-code: 337ms)
+✓ Compiled in 248ms
+ GET /entrenador/calendario 200 in 2.4s (next.js: 413ms, proxy.ts: 195ms, application-code: 1836ms)
+ GET /entrenador/calendario 200 in 1459ms (next.js: 37ms, proxy.ts: 42ms, application-code: 1380ms)
+✓ Compiled in 299ms
+ GET /entrenador/calendario 200 in 1473ms (next.js: 461ms, proxy.ts: 217ms, application-code: 795ms)
+ GET /entrenador/calendario 200 in 417ms (next.js: 8ms, proxy.ts: 10ms, application-code: 399ms)
+ GET /entrenador/calendario 200 in 4.6s (next.js: 1988ms, proxy.ts: 11ms, application-code: 2.6s)
+ GET /entrenador/calendario 200 in 1585ms (next.js: 233ms, proxy.ts: 156ms, application-code: 1195ms)
+ GET /entrenador/calendario 200 in 970ms (next.js: 15ms, proxy.ts: 19ms, application-code: 935ms)
+ GET /entrenador/calendario 200 in 969ms (next.js: 60ms, proxy.ts: 19ms, application-code: 890ms)
+ GET /entrenador/calendario 200 in 1153ms (next.js: 379ms, proxy.ts: 21ms, application-code: 752ms)
+ GET /entrenador/calendario 200 in 1155ms (next.js: 340ms, proxy.ts: 19ms, application-code: 796ms)
+ GET /entrenador/calendario 200 in 363ms (next.js: 10ms, proxy.ts: 47ms, application-code: 305ms)
+ GET /entrenador/calendario 200 in 405ms (next.js: 156ms, proxy.ts: 28ms, application-code: 220ms)
+✓ Compiled in 166ms
+ GET /entrenador/calendario 200 in 1405ms (next.js: 434ms, proxy.ts: 198ms, application-code: 772ms)
+ GET /entrenador/calendario 200 in 391ms (next.js: 8ms, proxy.ts: 10ms, application-code: 373ms)
+ GET /entrenador/calendario 200 in 3.4s (next.js: 81ms, proxy.ts: 25ms, application-code: 3.2s)
+ POST /entrenador/calendario 200 in 3.0s (next.js: 18ms, proxy.ts: 14ms, application-code: 3.0s)
+  └─ ƒ updateCoachMatchAction({"awayBlockedShots":null,"awayCompletedPasses":null,"awayCorners":null,"...":"39 items not stringified"}) in 1868ms app/(coach)/entrenador/calendario/actions.ts
+✓ Compiled in 541ms
+ GET /entrenador/calendario 200 in 5.8s (next.js: 2.2s, proxy.ts: 917ms, application-code: 2.6s)
+ GET /entrenador/calendario 200 in 1961ms (next.js: 37ms, proxy.ts: 44ms, application-code: 1879ms)
+✓ Compiled in 697ms
+ GET /entrenador/calendario 200 in 2.9s (next.js: 1293ms, proxy.ts: 1032ms, application-code: 616ms)
+ GET /entrenador/calendario 200 in 189ms (next.js: 5ms, proxy.ts: 8ms, application-code: 176ms)
+✓ Compiled in 280ms
+ GET /entrenador/calendario 200 in 1302ms (next.js: 509ms, proxy.ts: 216ms, application-code: 577ms)
+ GET /entrenador/calendario 200 in 197ms (next.js: 5ms, proxy.ts: 7ms, application-code: 184ms)
+✓ Compiled in 383ms
+ GET /entrenador/calendario 200 in 1348ms (next.js: 515ms, proxy.ts: 206ms, application-code: 627ms)
+ GET /entrenador/calendario 200 in 225ms (next.js: 6ms, proxy.ts: 9ms, application-code: 210ms)
+✓ Compiled in 309ms
+ GET /entrenador/calendario 200 in 1233ms (next.js: 438ms, proxy.ts: 177ms, application-code: 618ms)
+ GET /entrenador/calendario 200 in 231ms (next.js: 6ms, proxy.ts: 8ms, application-code: 217ms)
+✓ Compiled in 278ms
+ GET /entrenador/calendario 200 in 1296ms (next.js: 417ms, proxy.ts: 195ms, application-code: 684ms)
+ GET /entrenador/calendario 200 in 199ms (next.js: 5ms, proxy.ts: 22ms, application-code: 172ms)
+✓ Compiled in 227ms
+ GET /entrenador/calendario 200 in 1186ms (next.js: 413ms, proxy.ts: 198ms, application-code: 574ms)
+ GET /entrenador/calendario 200 in 221ms (next.js: 7ms, proxy.ts: 9ms, application-code: 205ms)
+✓ Compiled in 318ms
+ GET /entrenador/calendario 200 in 2.7s (next.js: 434ms, proxy.ts: 216ms, application-code: 2.1s)
+ GET /entrenador/calendario 200 in 1470ms (next.js: 42ms, proxy.ts: 44ms, application-code: 1385ms)
+✓ Compiled in 611ms
+ GET /entrenador/calendario 200 in 1436ms (next.js: 553ms, proxy.ts: 275ms, application-code: 609ms)
+ GET /entrenador/calendario 200 in 211ms (next.js: 7ms, proxy.ts: 9ms, application-code: 195ms)
+✓ Compiled in 354ms
+ GET /entrenador/calendario 200 in 1203ms (next.js: 445ms, proxy.ts: 195ms, application-code: 562ms)
+ GET /entrenador/calendario 200 in 203ms (next.js: 6ms, proxy.ts: 8ms, application-code: 188ms)
+✓ Compiled in 284ms
+ GET /entrenador/calendario 200 in 1183ms (next.js: 478ms, proxy.ts: 192ms, application-code: 512ms)
+ GET /entrenador/calendario 200 in 190ms (next.js: 6ms, proxy.ts: 8ms, application-code: 176ms)
