@@ -18,7 +18,11 @@ import { MatriculasClient } from '../matriculas/matriculas-client'
 import {
   createFinanceMovementAction,
   createFeeTemplateAction,
+  cancelPaymentAction,
+  deleteFeeTemplateAction,
   deleteFinanceMovementAction,
+  markPaymentPendingAction,
+  refundStripePaymentAction,
   type FeeTemplateActionState,
   type FinanceMovementActionState,
 } from './actions'
@@ -215,10 +219,31 @@ function sumMovements(movements: AdminFinanceMovementRow[]) {
     .reduce((sum, movement) => sum + movement.importe, 0)
 }
 
+function csvEscape(value: string | number) {
+  return `"${String(value).replaceAll('"', '""')}"`
+}
+
+function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number>>) {
+  const csv = [
+    headers.map(csvEscape).join(','),
+    ...rows.map((row) => row.map(csvEscape).join(',')),
+  ].join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments }: AdminPaymentsClientProps) {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'pendientes' | 'ingresos' | 'gastos' | 'informes'>('resumen')
   const [editingMovement, setEditingMovement] = useState<AdminFinanceMovementRow | null>(null)
+  const [editingFee, setEditingFee] = useState<AdminFeeTemplateRow | null>(null)
   const [movementFormType, setMovementFormType] = useState<'ingreso' | 'gasto'>('ingreso')
   const [splitFee, setSplitFee] = useState(false)
   const [movementSearch, setMovementSearch] = useState('')
@@ -235,8 +260,12 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   const [reportSearch, setReportSearch] = useState('')
   const [reportSeasonFilter, setReportSeasonFilter] = useState('todos')
   const [confirmDeleteMovementId, setConfirmDeleteMovementId] = useState<string | null>(null)
+  const [confirmDeleteFeeId, setConfirmDeleteFeeId] = useState<string | null>(null)
   const [deletePendingId, setDeletePendingId] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<FinanceMovementActionState | null>(null)
+  const [paymentActionId, setPaymentActionId] = useState<string | null>(null)
+  const [paymentMessage, setPaymentMessage] = useState<FinanceMovementActionState | null>(null)
+  const [feeDeleteMessage, setFeeDeleteMessage] = useState<FeeTemplateActionState | null>(null)
   const [movementState, movementAction, movementPending] = useActionState(
     createFinanceMovementAction,
     initialMovementState,
@@ -427,6 +456,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   useEffect(() => {
     if (feeState.ok) {
       feeFormRef.current?.reset()
+      setEditingFee(null)
       setSplitFee(false)
     }
   }, [feeState.ok, feeState.message])
@@ -446,6 +476,65 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   function simulateLoading() {
     setLoading(true)
     setTimeout(() => setLoading(false), 900)
+  }
+
+  async function handleDeleteFee(fee: AdminFeeTemplateRow) {
+    setDeletePendingId(fee.id)
+    setFeeDeleteMessage(null)
+    const result = await deleteFeeTemplateAction(fee.id)
+    setDeletePendingId(null)
+    setConfirmDeleteFeeId(null)
+    setFeeDeleteMessage(result)
+    if (editingFee?.id === fee.id) {
+      setEditingFee(null)
+      setSplitFee(false)
+    }
+  }
+
+  async function handlePaymentAction(payment: AdminPaymentRow, action: 'pending' | 'cancel' | 'refund') {
+    setPaymentActionId(`${payment.id}:${action}`)
+    setPaymentMessage(null)
+    const result =
+      action === 'pending'
+        ? await markPaymentPendingAction(payment.id)
+        : action === 'cancel'
+          ? await cancelPaymentAction(payment.id)
+          : await refundStripePaymentAction(payment.id)
+    setPaymentActionId(null)
+    setPaymentMessage(result)
+  }
+
+  function exportPaymentsCsv() {
+    downloadCsv(
+      `cobros-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Operación', 'Deportista', 'Tutor', 'Importe', 'Estado', 'Proveedor', 'Fecha'],
+      payments.map((payment) => [
+        payment.operacion,
+        payment.deportista,
+        payment.tutor,
+        payment.importe.toFixed(2),
+        payment.estado,
+        payment.proveedor,
+        payment.fecha,
+      ]),
+    )
+  }
+
+  function exportReportCsv() {
+    downloadCsv(
+      `informe-contable-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Tipo', 'Concepto', 'Categoría', 'Método', 'Estado', 'Temporada', 'Importe', 'Fecha'],
+      reportMovements.map((movement) => [
+        movement.tipo,
+        movement.concepto,
+        movement.categoria,
+        METHOD_LABELS[movement.metodoPago],
+        MOVEMENT_STATUS_LABELS[movement.estado],
+        movement.temporada,
+        movement.importe.toFixed(2),
+        movement.fecha,
+      ]),
+    )
   }
 
   const currentMovementType: 'ingreso' | 'gasto' = activeTab === 'gastos' ? 'gasto' : 'ingreso'
@@ -610,15 +699,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={simulateLoading} disabled={loading}>
-              {loading ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <ShieldAlert className="size-4" aria-hidden="true" />
-              )}
-              Simular carga
-            </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={exportPaymentsCsv}>
               <Download className="size-4" aria-hidden="true" />
               Exportar
             </Button>
@@ -644,6 +725,70 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             emptyTitle="Sin pagos"
             emptyDescription="No hay pagos que coincidan con los filtros aplicados."
           />
+          {paymentMessage?.message ? (
+            <p
+              className={cn(
+                'mt-4 rounded-lg px-3 py-2 text-sm font-semibold',
+                paymentMessage.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+              )}
+            >
+              {paymentMessage.message}
+            </p>
+          ) : null}
+          <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                  <th className="px-4 py-2.5">Operación</th>
+                  <th className="hidden px-4 py-2.5 md:table-cell">Tutor</th>
+                  <th className="px-4 py-2.5">Estado</th>
+                  <th className="px-4 py-2.5">Importe</th>
+                  <th className="px-4 py-2.5 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {payments.map((payment) => {
+                  const canRefund = payment.estado === 'pagado' && payment.proveedor === 'Stripe' && Boolean(payment.stripePaymentIntentId)
+                  const canRetry = payment.estado === 'fallido'
+                  const canCancel = payment.estado === 'pendiente' || payment.estado === 'fallido'
+
+                  return (
+                    <tr key={payment.id} className="transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3 font-semibold text-foreground">{payment.operacion}</td>
+                      <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{payment.tutor}</td>
+                      <td className="px-4 py-3">{payment.estado}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">{formatEuro(payment.importe)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          {canRetry ? (
+                            <Button type="button" size="sm" variant="outline" disabled={paymentActionId === `${payment.id}:pending`} onClick={() => handlePaymentAction(payment, 'pending')}>
+                              {paymentActionId === `${payment.id}:pending` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                              Reintentar
+                            </Button>
+                          ) : null}
+                          {canCancel ? (
+                            <Button type="button" size="sm" variant="destructive" disabled={paymentActionId === `${payment.id}:cancel`} onClick={() => handlePaymentAction(payment, 'cancel')}>
+                              {paymentActionId === `${payment.id}:cancel` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                              Cancelar
+                            </Button>
+                          ) : null}
+                          {canRefund ? (
+                            <Button type="button" size="sm" variant="outline" disabled={paymentActionId === `${payment.id}:refund`} onClick={() => handlePaymentAction(payment, 'refund')}>
+                              {paymentActionId === `${payment.id}:refund` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                              Reembolsar
+                            </Button>
+                          ) : null}
+                          {!canRetry && !canCancel && !canRefund ? (
+                            <span className="text-xs text-muted-foreground">Sin acciones</span>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
       ) : null}
@@ -668,33 +813,34 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
             <Card className="bg-white/88 shadow-sm backdrop-blur">
               <CardHeader>
-                <CardTitle className="text-lg font-black">Nueva cuota</CardTitle>
+                <CardTitle className="text-lg font-black">{editingFee ? 'Editar cuota' : 'Nueva cuota'}</CardTitle>
               </CardHeader>
               <CardContent>
-                <form ref={feeFormRef} action={feeAction} className="space-y-4">
+                <form key={editingFee?.id ?? 'new-fee'} ref={feeFormRef} action={feeAction} className="space-y-4">
+                  <input type="hidden" name="id" value={editingFee?.id ?? ''} />
                   <div>
                     <label htmlFor="fee-name" className="text-sm font-black text-foreground">
                       Nombre
                     </label>
-                    <Input id="fee-name" name="nombre" className="mt-2" placeholder="Ej. Cuota mensual, campus, equipación..." required />
+                    <Input id="fee-name" name="nombre" className="mt-2" placeholder="Ej. Cuota mensual, campus, equipación..." defaultValue={editingFee?.nombre ?? ''} required />
                   </div>
 
                   <div>
                     <label htmlFor="fee-type" className="text-sm font-black text-foreground">
                       Tipo
                     </label>
-                    <Input id="fee-type" name="tipo" className="mt-2" placeholder="Ej. Socio, deportista, campaña..." required />
+                    <Input id="fee-type" name="tipo" className="mt-2" placeholder="Ej. Socio, deportista, campaña..." defaultValue={editingFee?.tipo ?? ''} required />
                   </div>
 
                   <div>
                     <label htmlFor="fee-amount" className="text-sm font-black text-foreground">
                       Precio total
                     </label>
-                    <Input id="fee-amount" name="importe" type="number" min="0.01" step="0.01" className="mt-2" placeholder="0,00" required />
+                    <Input id="fee-amount" name="importe" type="number" min="0.01" step="0.01" className="mt-2" placeholder="0,00" defaultValue={editingFee ? String(editingFee.importe) : ''} required />
                   </div>
 
                   <label className="flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                    <input type="checkbox" name="isPublic" className="size-4 accent-primary" defaultChecked />
+                    <input type="checkbox" name="isPublic" className="size-4 accent-primary" defaultChecked={editingFee?.isPublic ?? true} />
                     Esta cuota es pública
                   </label>
 
@@ -719,7 +865,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                           id="fee-frequency"
                           name="chargeFrequency"
                           className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                          defaultValue="cada_mes"
+                          defaultValue={editingFee?.chargeFrequency || 'cada_mes'}
                           required
                         >
                           <option value="cada_mes">Cada mes</option>
@@ -732,7 +878,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                         <label htmlFor="fee-count" className="text-sm font-black text-foreground">
                           Número total de cargos
                         </label>
-                        <Input id="fee-count" name="chargeCount" type="number" min="2" step="1" className="mt-2" placeholder="12" required />
+                        <Input id="fee-count" name="chargeCount" type="number" min="2" step="1" className="mt-2" placeholder="12" defaultValue={editingFee?.chargeCount ?? ''} required />
                       </div>
                     </div>
                   ) : null}
@@ -748,10 +894,26 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                     </p>
                   ) : null}
 
-                  <Button type="submit" className="w-full" disabled={feePending}>
-                    {feePending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
-                    Guardar cuota
-                  </Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {editingFee ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={feePending}
+                        onClick={() => {
+                          setEditingFee(null)
+                          setSplitFee(false)
+                        }}
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                        Cancelar
+                      </Button>
+                    ) : null}
+                    <Button type="submit" className={editingFee ? '' : 'sm:col-span-2'} disabled={feePending}>
+                      {feePending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : editingFee ? <Pencil className="size-4" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
+                      {editingFee ? 'Guardar cambios' : 'Guardar cuota'}
+                    </Button>
+                  </div>
                 </form>
               </CardContent>
             </Card>
@@ -799,6 +961,16 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               </div>
 
               <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+                {feeDeleteMessage?.message ? (
+                  <p
+                    className={cn(
+                      'mb-3 rounded-lg px-3 py-2 text-sm font-semibold',
+                      feeDeleteMessage.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+                    )}
+                  >
+                    {feeDeleteMessage.message}
+                  </p>
+                ) : null}
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
@@ -807,12 +979,13 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                       <th className="px-4 py-2.5">Importe</th>
                       <th className="hidden px-4 py-2.5 md:table-cell">Reparto</th>
                       <th className="hidden px-4 py-2.5 lg:table-cell">Estado</th>
+                      <th className="px-4 py-2.5 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-card">
                     {visibleFeeTemplates.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                          <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
                           No hay cuotas que coincidan con los filtros.
                         </td>
                       </tr>
@@ -829,6 +1002,52 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                             <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', fee.isPublic ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
                               {fee.isPublic ? 'Pública' : 'Privada'}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {confirmDeleteFeeId === fee.id ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  disabled={deletePendingId === fee.id}
+                                  onClick={() => handleDeleteFee(fee)}
+                                >
+                                  {deletePendingId === fee.id ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                                  Sí, eliminar
+                                </Button>
+                                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDeleteFeeId(null)}>
+                                  Cancelar
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Editar ${fee.nombre}`}
+                                  onClick={() => {
+                                    setEditingFee(fee)
+                                    setSplitFee(fee.splitPayment)
+                                    setConfirmDeleteFeeId(null)
+                                  }}
+                                >
+                                  <Pencil className="size-4" aria-hidden="true" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon-sm"
+                                  aria-label={`Eliminar ${fee.nombre}`}
+                                  disabled={deletePendingId === fee.id}
+                                  onClick={() => setConfirmDeleteFeeId(fee.id)}
+                                >
+                                  {deletePendingId === fee.id ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />}
+                                </Button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -972,13 +1191,19 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
       {activeTab === 'informes' ? (
         <section aria-labelledby="pagos-informes" className="space-y-5" role="tabpanel">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-              Revisión de directiva
-            </p>
-            <h2 id="pagos-informes" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-              Informes
-            </h2>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+                Revisión de directiva
+              </p>
+              <h2 id="pagos-informes" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+                Informes
+              </h2>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={exportReportCsv}>
+              <Download className="size-4" aria-hidden="true" />
+              Exportar informe
+            </Button>
           </div>
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Loader2, ShieldAlert } from 'lucide-react'
+import { Download } from 'lucide-react'
 import {
   AdminTable,
   type AdminTableRow,
@@ -40,9 +40,26 @@ export function AdminPageShell({
 }: AdminPageShellProps) {
   const [loading, setLoading] = useState(false)
 
-  function simulateLoading() {
+  function exportCsv() {
     setLoading(true)
-    setTimeout(() => setLoading(false), 900)
+    const headers = columns.map((column) => column.label)
+    const rows = data.map((row) =>
+      columns.map((column) => String(row[column.key] ?? '')),
+    )
+    const csv = [
+      headers.map((value) => `"${value.replaceAll('"', '""')}"`).join(','),
+      ...rows.map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(',')),
+    ].join('\n')
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    setLoading(false)
   }
 
   return (
@@ -58,15 +75,7 @@ export function AdminPageShell({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={simulateLoading} disabled={loading}>
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <ShieldAlert className="size-4" aria-hidden="true" />
-            )}
-            Simular carga
-          </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || data.length === 0}>
             <Download className="size-4" aria-hidden="true" />
             Exportar
           </Button>

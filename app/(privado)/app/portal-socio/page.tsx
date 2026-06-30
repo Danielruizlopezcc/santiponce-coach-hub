@@ -4,12 +4,15 @@ import { MembershipPaymentButton } from '@/components/membership-payment-button'
 import { PrivatePageContainer } from '@/components/private-page-container'
 import { Button } from '@/components/ui/button'
 import { requireUser } from '@/lib/auth'
-import { MEMBERSHIP_IMPORTE } from '@/lib/club'
+import { getAdminSettings } from '@/lib/admin-app'
 import { getPrivateUserStatus } from '@/lib/private-app'
 
 export default async function PortalSocioPage() {
   const user = await requireUser()
-  const status = await getPrivateUserStatus(user.id)
+  const [status, settings] = await Promise.all([
+    getPrivateUserStatus(user.id),
+    getAdminSettings(),
+  ])
 
   return (
     <PrivatePageContainer
@@ -35,7 +38,7 @@ export default async function PortalSocioPage() {
             <p className="mt-2 text-sm text-pretty text-muted-foreground">
               {status.isPaidSocio
                 ? 'Tu membresía ya está confirmada para esta temporada.'
-                : `Realiza el pago de ${MEMBERSHIP_IMPORTE}€ para activar tu membresía de socio.`}
+                : `Realiza el pago de ${settings.membershipFeeEuros}€ para activar tu membresía de socio.`}
             </p>
           </div>
 

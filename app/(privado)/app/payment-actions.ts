@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth'
-import { MATRICULA_IMPORTE, MEMBERSHIP_IMPORTE } from '@/lib/club'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import {
@@ -113,6 +112,17 @@ async function attachStripeSession(paymentId: string, sessionId: string, metadat
 }
 
 async function findOrCreateStripeCustomer(userId: string, email: string, name: string) {
+  const supabase = createAdminClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (profile?.stripe_customer_id) {
+    return profile.stripe_customer_id
+  }
+
   const stripe = getStripeClient()
   const customer = await stripe.customers.create({
     email,
@@ -121,6 +131,11 @@ async function findOrCreateStripeCustomer(userId: string, email: string, name: s
       userId,
     },
   })
+
+  await supabase
+    .from('profiles')
+    .update({ stripe_customer_id: customer.id })
+    .eq('id', userId)
 
   return customer.id
 }
@@ -146,14 +161,16 @@ export async function createMembershipCheckoutAction(): Promise<CheckoutResult> 
       return { success: false, message: 'La cuota de socio ya está pagada.' }
     }
 
+    const membershipAmountCents = await getMembershipAmountCents()
+    const membershipAmountEuros = membershipAmountCents / 100
     const paymentId = await findOrCreatePendingPayment({
       userId: user.id,
       guardianId: guardian?.id ?? null,
       athleteId: null,
       seasonId: null,
       paymentType: 'membership',
-      description: `Cuota de socio ${MEMBERSHIP_IMPORTE}€`,
-      amountCents: getMembershipAmountCents(),
+      description: `Cuota de socio ${membershipAmountEuros.toFixed(2).replace('.', ',')}€`,
+      amountCents: membershipAmountCents,
     })
 
     const stripe = getStripeClient()
@@ -171,7 +188,7 @@ export async function createMembershipCheckoutAction(): Promise<CheckoutResult> 
               name: 'Cuota de socio',
               description: 'Acceso como socio del Club Deportivo Santiponce',
             },
-            unit_amount: getMembershipAmountCents(),
+            unit_amount: membershipAmountCents,
           },
           quantity: 1,
         },
@@ -234,6 +251,7 @@ export async function createEnrollmentCheckoutAction(athleteId: string): Promise
     ])
 
     const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim()
+    const enrollmentAmountCents = await getEnrollmentAmountCents()
     const paymentId = await findOrCreatePendingPayment({
       userId: user.id,
       guardianId: guardian.id,
@@ -241,7 +259,7 @@ export async function createEnrollmentCheckoutAction(athleteId: string): Promise
       seasonId: athlete.season_id,
       paymentType: 'enrollment',
       description: `Matrícula ${season?.name ?? athlete.season_id} - ${athleteName}`,
-      amountCents: getEnrollmentAmountCents(),
+      amountCents: enrollmentAmountCents,
     })
 
     const stripe = getStripeClient()
@@ -259,7 +277,7 @@ export async function createEnrollmentCheckoutAction(athleteId: string): Promise
               name: 'Matrícula de deportista',
               description: athleteName,
             },
-            unit_amount: getEnrollmentAmountCents(),
+            unit_amount: enrollmentAmountCents,
           },
           quantity: 1,
         },

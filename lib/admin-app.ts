@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { CLUB, MATRICULA_IMPORTE } from '@/lib/club'
+import { CLUB, MATRICULA_IMPORTE, MEMBERSHIP_IMPORTE } from '@/lib/club'
 import { formatSpanishDate, formatSpanishDateTime } from '@/lib/format'
 import { getPrivateViewer } from '@/lib/private-app'
 import type { PlayerPosition, PrivateViewer } from '@/lib/private-app-shared'
@@ -276,6 +276,7 @@ export type AdminPaymentRow = {
   estado: 'pagado' | 'pendiente' | 'fallido' | 'reembolsado'
   proveedor: 'Stripe' | 'Manual'
   fecha: string
+  stripePaymentIntentId: string
 }
 
 export type AdminFinanceMovementRow = {
@@ -337,6 +338,7 @@ export type AdminManagerRow = {
   email: string
   rol: string
   estado: 'Activo'
+  fechaAlta: string
 }
 
 export type AdminSponsorRow = {
@@ -375,6 +377,24 @@ export type AdminConfigRow = {
   descripcion: string
 }
 
+export type AdminSettings = {
+  clubShortName: string
+  clubLegalName: string
+  seasonLabel: string
+  membershipFeeEuros: number
+  enrollmentFeeEuros: number
+  registrationOpen: boolean
+  contactEmail: string
+  contactPhone: string
+}
+
+export type AdminConfigData = {
+  summary: AdminConfigRow[]
+  settings: AdminSettings
+  seasons: AdminSeasonRow[]
+  activeSeasonId: string
+}
+
 export type AdminDashboardData = {
   summary: AdminSummary
   athletesByCategory: AdminCategoryBreakdown[]
@@ -396,9 +416,10 @@ type AdminPaymentRecord = {
   season_id: string | null
   payment_type: 'membership' | 'enrollment'
   provider: 'stripe' | 'manual'
-  status: 'pending' | 'paid' | 'canceled' | 'failed'
+  status: 'pending' | 'paid' | 'canceled' | 'failed' | 'refunded'
   amount_cents: number
   description: string
+  stripe_payment_intent_id: string | null
   paid_at: string | null
   created_at: string
 }
@@ -496,7 +517,7 @@ async function getAdminCollections() {
     supabase
       .from('payments')
       .select(
-        'id, user_id, guardian_id, athlete_id, season_id, payment_type, provider, status, amount_cents, description, paid_at, created_at',
+        'id, user_id, guardian_id, athlete_id, season_id, payment_type, provider, status, amount_cents, description, stripe_payment_intent_id, paid_at, created_at',
       )
       .order('created_at', { ascending: false }),
     supabase.from('sponsors').select('id, is_active'),
@@ -567,6 +588,7 @@ function mapPaymentStatusLabel(
 ): AdminPaymentRow['estado'] {
   if (status === 'paid') return 'pagado'
   if (status === 'pending') return 'pendiente'
+  if (status === 'refunded') return 'reembolsado'
   if (status === 'canceled') return 'fallido'
   return 'fallido'
 }
@@ -1329,6 +1351,7 @@ export async function getAdminSeasons(): Promise<AdminSeasonRow[]> {
 
 export async function getAdminEnrollments(): Promise<AdminEnrollmentRow[]> {
   const { payments } = await getAdminCollections()
+  const settings = await getAdminSettings()
   const latestEnrollmentPaymentByAthlete = createLatestEnrollmentPaymentByAthlete(payments)
 
   const athleteRows = await getAdminAthletes()
@@ -1343,7 +1366,7 @@ export async function getAdminEnrollments(): Promise<AdminEnrollmentRow[]> {
       latestEnrollmentPaymentByAthlete.get(athlete.id)?.status === 'paid'
         ? 'Pagado'
         : 'Pendiente',
-    importe: MATRICULA_IMPORTE,
+    importe: settings.enrollmentFeeEuros,
   }))
 }
 
@@ -1374,6 +1397,7 @@ export async function getAdminPayments(): Promise<AdminPaymentRow[]> {
     estado: mapPaymentStatusLabel(payment.status),
     proveedor: mapPaymentProviderLabel(payment.provider),
     fecha: formatSpanishDate(payment.paid_at ?? payment.created_at),
+    stripePaymentIntentId: payment.stripe_payment_intent_id ?? '',
   }))
 }
 
@@ -1513,6 +1537,7 @@ export async function getAdminManagers(): Promise<AdminManagerRow[]> {
       email: user.email,
       rol: 'Administrador',
       estado: 'Activo',
+      fechaAlta: user.fechaAlta,
     }))
 }
 
@@ -1553,11 +1578,47 @@ export async function getAdminCoachTeamOptions(): Promise<AdminCoachTeamOption[]
     }))
 }
 
-export async function getAdminConfig(): Promise<AdminConfigRow[]> {
+export async function getAdminSettings(): Promise<AdminSettings> {
+  const fallback: AdminSettings = {
+    clubShortName: CLUB.shortName,
+    clubLegalName: CLUB.legalName,
+    seasonLabel: CLUB.season,
+    membershipFeeEuros: MEMBERSHIP_IMPORTE,
+    enrollmentFeeEuros: MATRICULA_IMPORTE,
+    registrationOpen: true,
+    contactEmail: '',
+    contactPhone: '',
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('app_settings').select('key, value')
+
+  if (error) return fallback
+
+  const settings = new Map((data ?? []).map((item) => [item.key, item.value]))
+  const readNumber = (key: string, defaultValue: number) => {
+    const value = Number(settings.get(key))
+    return Number.isFinite(value) ? value : defaultValue
+  }
+
+  return {
+    clubShortName: settings.get('club_short_name') || fallback.clubShortName,
+    clubLegalName: settings.get('club_legal_name') || fallback.clubLegalName,
+    seasonLabel: settings.get('season_label') || fallback.seasonLabel,
+    membershipFeeEuros: readNumber('membership_fee_euros', fallback.membershipFeeEuros),
+    enrollmentFeeEuros: readNumber('enrollment_fee_euros', fallback.enrollmentFeeEuros),
+    registrationOpen: (settings.get('registration_open') ?? String(fallback.registrationOpen)) === 'true',
+    contactEmail: settings.get('contact_email') || '',
+    contactPhone: settings.get('contact_phone') || '',
+  }
+}
+
+export async function getAdminConfig(): Promise<AdminConfigData> {
   const { seasons, teams, categories } = await getAdminCollections()
   const activeSeason = seasons.find((season) => season.is_active)
+  const settings = await getAdminSettings()
 
-  return [
+  const summary = [
     {
       id: 'cfg-season',
       titulo: 'Temporada activa',
@@ -1567,8 +1628,14 @@ export async function getAdminConfig(): Promise<AdminConfigRow[]> {
     {
       id: 'cfg-fee',
       titulo: 'Importe matrícula',
-      valor: `${MATRICULA_IMPORTE.toFixed(2).replace('.', ',')} €`,
+      valor: `${settings.enrollmentFeeEuros.toFixed(2).replace('.', ',')} €`,
       descripcion: 'Importe aplicado actualmente por la app al resumen de matrículas.',
+    },
+    {
+      id: 'cfg-member-fee',
+      titulo: 'Cuota de socio',
+      valor: `${settings.membershipFeeEuros.toFixed(2).replace('.', ',')} €`,
+      descripcion: 'Importe base configurado para el alta como socio.',
     },
     {
       id: 'cfg-categories',
@@ -1589,4 +1656,11 @@ export async function getAdminConfig(): Promise<AdminConfigRow[]> {
       descripcion: 'Los pagos están disponibles y su estado se actualiza automáticamente.',
     },
   ]
+
+  return {
+    summary,
+    settings,
+    seasons: await getAdminSeasons(),
+    activeSeasonId: activeSeason?.id ?? '',
+  }
 }

@@ -25,6 +25,20 @@ function buildSponsorImagePath(file: File) {
   return `patrocinadores/${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}`
 }
 
+function getStoragePathFromPublicUrl(url: string | null | undefined) {
+  if (!url) return null
+  const marker = `/storage/v1/object/public/${BUCKET_NAME}/`
+  const index = url.indexOf(marker)
+  if (index === -1) return null
+  return decodeURIComponent(url.slice(index + marker.length).split('?')[0] ?? '')
+}
+
+async function removeSponsorImage(supabase: ReturnType<typeof createAdminClient>, imageUrl: string | null | undefined) {
+  const path = getStoragePathFromPublicUrl(imageUrl)
+  if (!path) return
+  await supabase.storage.from(BUCKET_NAME).remove([path])
+}
+
 async function uploadSponsorImage(supabase: ReturnType<typeof createAdminClient>, image: File) {
   if (!image || !(image instanceof File) || !image.type.startsWith('image/')) {
     throw new Error('Debes subir una imagen válida para el patrocinador.')
@@ -122,8 +136,11 @@ export async function updateSponsor(formData: FormData) {
     is_active: isActive,
     sort_order: sortOrder,
   }
+  let previousImageUrl: string | null | undefined
 
   if (image) {
+    const { data: current } = await supabase.from('sponsors').select('image_url').eq('id', id).maybeSingle()
+    previousImageUrl = current?.image_url
     updates.image_url = await uploadSponsorImage(supabase, image)
   }
 
@@ -131,6 +148,7 @@ export async function updateSponsor(formData: FormData) {
   if (error) {
     throw new Error(error.message)
   }
+  await removeSponsorImage(supabase, previousImageUrl)
 
   revalidatePath('/admin/patrocinadores')
   revalidatePath('/patrocinadores')
@@ -139,8 +157,10 @@ export async function updateSponsor(formData: FormData) {
 
 export async function deleteSponsor(id: string) {
   const supabase = await getAdminSupabase()
+  const { data: current } = await supabase.from('sponsors').select('image_url').eq('id', id).maybeSingle()
   const { error } = await supabase.from('sponsors').delete().eq('id', id)
   if (error) throw new Error(error.message)
+  await removeSponsorImage(supabase, current?.image_url)
 
   revalidatePath('/admin/patrocinadores')
   revalidatePath('/patrocinadores')

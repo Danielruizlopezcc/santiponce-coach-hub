@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:backend": "node scripts/backend-smoke-test.mjs",
+    "test:backend:write": "node scripts/backend-smoke-test.mjs --write",
+    "test:app:audit": "node scripts/full-app-audit.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

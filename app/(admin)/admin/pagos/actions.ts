@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getStripeClient } from '@/lib/stripe'
 
 export type FinanceMovementActionState = {
   ok: boolean
@@ -41,6 +42,7 @@ const financeMovementSchema = z.object({
 })
 
 const feeTemplateSchema = z.object({
+  id: z.string().uuid().optional(),
   nombre: z.string().trim().min(2, 'Escribe el nombre de la cuota.').max(120),
   tipo: z.string().trim().min(2, 'Escribe el tipo de cuota.').max(80),
   importe: z.coerce
@@ -159,6 +161,7 @@ export async function createFeeTemplateAction(
   const admin = await requireAdminAction()
   const splitPayment = formData.get('splitPayment') === 'on'
   const parsed = feeTemplateSchema.safeParse({
+    id: formData.get('id') || undefined,
     nombre: formData.get('nombre'),
     tipo: formData.get('tipo'),
     importe: formData.get('importe'),
@@ -177,7 +180,7 @@ export async function createFeeTemplateAction(
 
   const values = parsed.data
   const supabase = createAdminClient()
-  const { error } = await supabase.from('admin_fee_templates').insert({
+  const payload = {
     name: values.nombre,
     fee_type: values.tipo,
     total_amount_cents: Math.round(values.importe * 100),
@@ -186,11 +189,126 @@ export async function createFeeTemplateAction(
     split_payment: values.splitPayment,
     charge_frequency: values.splitPayment ? values.chargeFrequency : null,
     charge_count: values.splitPayment ? values.chargeCount : null,
-    created_by: admin.id,
-  })
+  }
+  const { error } = values.id
+    ? await supabase.from('admin_fee_templates').update(payload).eq('id', values.id)
+    : await supabase.from('admin_fee_templates').insert({
+        ...payload,
+        created_by: admin.id,
+      })
 
   if (error) return { ok: false, message: error.message }
 
   revalidatePath('/admin/pagos')
-  return { ok: true, message: 'Cuota guardada correctamente.' }
+  return { ok: true, message: values.id ? 'Cuota actualizada correctamente.' : 'Cuota guardada correctamente.' }
+}
+
+export async function deleteFeeTemplateAction(id: string): Promise<FeeTemplateActionState> {
+  await requireAdminAction()
+
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar la cuota.' }
+
+  const supabase = createAdminClient()
+  const { count, error: assignmentError } = await supabase
+    .from('tutor_fee_assignments')
+    .select('id', { count: 'exact', head: true })
+    .eq('fee_template_id', parsed.data)
+    .neq('status', 'canceled')
+
+  if (assignmentError) return { ok: false, message: assignmentError.message }
+  if ((count ?? 0) > 0) {
+    return { ok: false, message: 'No se puede eliminar una cuota con asignaciones activas.' }
+  }
+
+  const { error } = await supabase.from('admin_fee_templates').delete().eq('id', parsed.data)
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Cuota eliminada correctamente.' }
+}
+
+export async function markPaymentPendingAction(id: string): Promise<FinanceMovementActionState> {
+  await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el pago.' }
+
+  const { error } = await createAdminClient()
+    .from('payments')
+    .update({ status: 'pending' })
+    .eq('id', parsed.data)
+    .in('status', ['failed', 'canceled'])
+
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Pago marcado como pendiente.' }
+}
+
+export async function cancelPaymentAction(id: string): Promise<FinanceMovementActionState> {
+  await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el pago.' }
+
+  const { error } = await createAdminClient()
+    .from('payments')
+    .update({ status: 'canceled' })
+    .eq('id', parsed.data)
+    .in('status', ['pending', 'failed'])
+
+  if (error) return { ok: false, message: error.message }
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Pago cancelado correctamente.' }
+}
+
+export async function refundStripePaymentAction(id: string): Promise<FinanceMovementActionState> {
+  await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el pago.' }
+
+  const supabase = createAdminClient()
+  const { data: payment, error: lookupError } = await supabase
+    .from('payments')
+    .select('id, provider, status, metadata, stripe_payment_intent_id')
+    .eq('id', parsed.data)
+    .maybeSingle()
+
+  if (lookupError) return { ok: false, message: lookupError.message }
+  if (!payment) return { ok: false, message: 'No se ha encontrado el pago.' }
+  if (payment.provider !== 'stripe' || payment.status !== 'paid' || !payment.stripe_payment_intent_id) {
+    return { ok: false, message: 'Solo se pueden reembolsar pagos de Stripe ya cobrados.' }
+  }
+
+  try {
+    const refund = await getStripeClient().refunds.create({
+      payment_intent: payment.stripe_payment_intent_id,
+      metadata: {
+        paymentId: payment.id,
+        source: 'admin-panel',
+      },
+    })
+
+    const { error } = await supabase
+      .from('payments')
+      .update({
+        status: 'refunded',
+        metadata: {
+          ...(typeof payment.metadata === 'object' && payment.metadata ? payment.metadata : {}),
+          refund_id: refund.id,
+          refund_status: refund.status,
+          refunded_from_admin: true,
+        },
+      })
+      .eq('id', payment.id)
+
+    if (error) return { ok: false, message: error.message }
+
+    revalidatePath('/admin/pagos')
+    revalidatePath('/admin/matriculas')
+    return { ok: true, message: 'Reembolso creado en Stripe correctamente.' }
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'No se ha podido crear el reembolso en Stripe.',
+    }
+  }
 }

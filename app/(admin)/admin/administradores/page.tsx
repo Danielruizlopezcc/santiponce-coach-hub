@@ -1,26 +1,16 @@
-import { AdminPageShell } from '@/components/admin/admin-page-shell'
-import { type Column } from '@/components/admin/admin-table'
+import { PageContainer } from '@/components/page-container'
 import { getAdminManagers } from '@/lib/admin-app'
-
-const columns: Column[] = [
-  { key: 'nombre', label: 'Nombre' },
-  { key: 'email', label: 'Email', responsive: 'md' },
-  { key: 'rol', label: 'Rol' },
-  { key: 'estado', label: 'Estado' },
-]
+import { AdministradoresClient } from './administradores-client'
 
 export default async function AdminAdministradoresPage() {
   const data = await getAdminManagers()
   return (
-    <AdminPageShell
+    <PageContainer
       title="Gestión de administradores"
       description="Usuarios con permisos de administración."
-      data={data}
-      columns={columns}
-      searchPlaceholder="Buscar por nombre o rol"
-      emptyTitle="Sin administradores"
-      emptyDescription="No hay perfiles de administración disponibles."
-      counterLabel="administradores"
-    />
+      className="max-w-7xl"
+    >
+      <AdministradoresClient admins={data} />
+    </PageContainer>
   )
 }

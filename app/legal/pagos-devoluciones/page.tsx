@@ -14,42 +14,50 @@ export default function PagosDevolucionesPage() {
     <PublicShell>
       <LegalPage
         title="Pagos y devoluciones"
-        updatedAt="—"
+        updatedAt="30 de junio de 2026"
         current="/legal/pagos-devoluciones"
       >
         <p>
-          Esta política describe las condiciones de pago y devolución aplicables
-          a las matrículas y servicios del {CLUB.legalName}. Este documento es
-          una plantilla provisional y deberá completarse con las condiciones
-          definitivas. No incluye ningún sistema de pago real.
+          Esta política describe las condiciones aplicables a los pagos de
+          matrículas, cuotas de socio y otros servicios gestionados por el
+          {CLUB.legalName} a través de su plataforma.
         </p>
 
         <LegalSection title="1. Medios de pago">
           <p>
-            Los medios de pago aceptados por el Club se detallarán en la versión
-            definitiva. Actualmente la plataforma no procesa pagos reales.
+            La plataforma puede procesar pagos mediante Stripe, tarjeta bancaria
+            u otros métodos habilitados por el Club. En determinados casos, el
+            Club podrá registrar pagos manuales realizados por transferencia,
+            efectivo, Bizum u otro medio aceptado administrativamente.
           </p>
         </LegalSection>
 
         <LegalSection title="2. Plazos y cuotas">
           <p>
-            Los plazos de pago de las cuotas de la temporada {CLUB.season} se
-            comunicarán a las familias a través de la plataforma.
+            Las matrículas y cuotas de la temporada {CLUB.season} deberán
+            abonarse dentro de los plazos comunicados por el Club. Las cuotas
+            recurrentes o fraccionadas solo se cargarán cuando hayan sido
+            configuradas y autorizadas previamente.
           </p>
         </LegalSection>
 
         <LegalSection title="3. Política de devoluciones">
           <p>
-            Las condiciones y plazos para solicitar devoluciones se incluirán en
-            la versión definitiva, conforme a la normativa aplicable.
+            Las solicitudes de devolución se revisarán caso por caso. Podrán
+            aceptarse devoluciones por cobros duplicados, errores administrativos
+            o servicios no prestados por causa imputable al Club. Una vez
+            aprobado el reembolso, se realizará preferentemente al mismo método
+            de pago utilizado en la operación original.
           </p>
         </LegalSection>
 
         <LegalSection title="4. Reclamaciones">
           <p>
-            Las personas usuarias podrán presentar reclamaciones relacionadas
-            con los pagos a través de los canales de contacto que el Club ponga
-            a su disposición.
+            Las reclamaciones relacionadas con pagos, cargos fallidos o
+            devoluciones podrán dirigirse al Club indicando nombre completo,
+            correo electrónico, concepto del pago y fecha aproximada de la
+            operación. El Club revisará la solicitud y responderá por sus canales
+            oficiales de contacto.
           </p>
         </LegalSection>
       </LegalPage>

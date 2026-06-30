@@ -3,17 +3,20 @@ import { MembershipPaymentButton } from '@/components/membership-payment-button'
 import { Button } from '@/components/ui/button'
 import { PrivatePageContainer } from '@/components/private-page-container'
 import { requireUser } from '@/lib/auth'
-import { MEMBERSHIP_IMPORTE } from '@/lib/club'
+import { getAdminSettings } from '@/lib/admin-app'
 import { getPrivateUserStatus } from '@/lib/private-app'
 
 export default async function PagoSocioPage() {
   const user = await requireUser()
-  const status = await getPrivateUserStatus(user.id)
+  const [status, settings] = await Promise.all([
+    getPrivateUserStatus(user.id),
+    getAdminSettings(),
+  ])
 
   return (
     <PrivatePageContainer
       title="Pago de membresía"
-      description={`Activa tu cuenta de socio con el pago de ${MEMBERSHIP_IMPORTE}€.`}
+      description={`Activa tu cuenta de socio con el pago de ${settings.membershipFeeEuros}€.`}
     >
       <div className="space-y-6 rounded-3xl border border-border bg-card/80 p-8 shadow-sm backdrop-blur">
         <div className="space-y-3">
@@ -23,7 +26,7 @@ export default async function PagoSocioPage() {
           <p className="text-sm text-muted-foreground">
             {status.isPaidSocio
               ? 'Tu membresía ya está confirmada. Si acabas de pagar, el panel puede tardar unos segundos en refrescarse.'
-              : `Para hacerte socio y completar la cuota de ${MEMBERSHIP_IMPORTE}€, finaliza el pago de membresía.`}
+              : `Para hacerte socio y completar la cuota de ${settings.membershipFeeEuros}€, finaliza el pago de membresía.`}
           </p>
         </div>
 

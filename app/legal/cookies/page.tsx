@@ -14,14 +14,13 @@ export default function CookiesPage() {
     <PublicShell>
       <LegalPage
         title="Política de cookies"
-        updatedAt="—"
+        updatedAt="30 de junio de 2026"
         current="/legal/cookies"
       >
         <p>
           Esta política explica cómo el {CLUB.legalName} utiliza cookies y
-          tecnologías similares en su plataforma. Este documento es una
-          plantilla provisional y deberá completarse con el detalle definitivo
-          de las cookies utilizadas.
+          tecnologías similares en su plataforma para garantizar el acceso,
+          mantener la sesión y mejorar la seguridad del servicio.
         </p>
 
         <LegalSection title="1. ¿Qué son las cookies?">
@@ -34,9 +33,10 @@ export default function CookiesPage() {
 
         <LegalSection title="2. Tipos de cookies">
           <p>
-            Utilizamos cookies técnicas necesarias para el funcionamiento de la
-            plataforma y, en su caso, cookies analíticas para mejorar la
-            experiencia de uso.
+            Utilizamos cookies técnicas necesarias para iniciar sesión, recordar
+            preferencias básicas y proteger formularios o zonas privadas. Si en
+            el futuro se incorporan cookies analíticas o de terceros no
+            imprescindibles, se solicitará el consentimiento correspondiente.
           </p>
         </LegalSection>
 
@@ -44,7 +44,8 @@ export default function CookiesPage() {
           <p>
             Las personas usuarias pueden configurar o deshabilitar las cookies
             desde la configuración de su navegador. La desactivación de algunas
-            cookies puede afectar al funcionamiento de la plataforma.
+            cookies técnicas puede impedir el acceso a la zona privada, pagos,
+            recuperación de contraseña o gestión de matrículas.
           </p>
         </LegalSection>
       </LegalPage>

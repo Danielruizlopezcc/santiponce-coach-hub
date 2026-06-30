@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
-import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2, CreditCard, Loader2, X } from 'lucide-react'
 import { createEnrollmentCheckoutAction } from '@/app/(privado)/app/payment-actions'
 import { Button } from '@/components/ui/button'
@@ -31,7 +30,6 @@ export function MatriculacionPanel({
   importe,
   deportistas,
 }: MatriculacionPanelProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -82,9 +80,6 @@ export function MatriculacionPanel({
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Button onClick={() => setOpen(true)}>Matricular deportista</Button>
-          <Button variant="outline" onClick={() => router.push('/app/matriculacion/cancelada')}>
-            Ver cancelación
-          </Button>
         </div>
       </section>
 

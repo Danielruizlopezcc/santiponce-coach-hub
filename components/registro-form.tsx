@@ -128,36 +128,8 @@ export function RegistroForm() {
       return
     }
 
-    try {
-      const result = await registerGuardianAccount(values)
-
-      if (!result.success) {
-        setServerError(result.message)
-        return
-      }
-
-      const supabase = createClient()
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: values.email,
-        password: values.password,
-      })
-
-      if (signInError) {
-        setServerError(
-          'La cuenta se ha creado, pero no se ha podido iniciar sesión automáticamente.',
-        )
-        return
-      }
-
-      setSubmitted(true)
-      router.push('/app/configurar-pago')
-    } catch (err) {
-      setServerError(
-        err instanceof Error
-          ? err.message
-          : 'No se ha podido completar el registro real. Inténtalo de nuevo.',
-      )
-    }
+    setFormDataCache(values)
+    setStep('pago')
   })
 
   const onConfirmPayment = async () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
@@ -8,7 +8,25 @@ import { SiteFooter } from '@/components/site-footer'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
-export default function CompletarRegistroPage() {
+function CompletingRegistrationCard() {
+  return (
+    <div className="space-y-4 text-center">
+      <div className="flex justify-center">
+        <Loader2 className="size-12 animate-spin text-primary" />
+      </div>
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">
+          Completando tu registro...
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Estamos finalizando la creación de tu cuenta y guardando tu tarjeta.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function CompletarRegistroContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
@@ -18,47 +36,26 @@ export default function CompletarRegistroPage() {
     const completeRegistration = async () => {
       try {
         const sessionId = searchParams.get('session_id')
-        const formDataStr = sessionStorage.getItem('registroFormData')
-
-        if (!sessionId || !formDataStr) {
-          throw new Error('Faltan datos del registro')
+        if (!sessionId) {
+          throw new Error('Falta la sesión de Stripe.')
         }
 
-        const formData = JSON.parse(formDataStr)
-
-        // Crear la cuenta con los datos del formulario
-        const response = await fetch('/app/registro/actions', {
+        const response = await fetch('/api/complete-registration', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({ sessionId }),
         })
 
         if (!response.ok) {
-          throw new Error('No se pudo crear la cuenta')
-        }
-
-        // Limpiar sessionStorage
-        sessionStorage.removeItem('registroFormData')
-
-        // Hacer login automático
-        const supabaseModule = await import('@/lib/supabase/client')
-        const supabase = supabaseModule.createClient()
-        
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        })
-
-        if (signInError) {
-          throw new Error('No se pudo iniciar sesión automáticamente')
+          const data = await response.json().catch(() => null)
+          throw new Error(data?.message ?? 'No se pudo completar la cuenta.')
         }
 
         setStatus('success')
         setMessage('Tu cuenta se ha creado y tu tarjeta está guardada.')
 
-        // Redirigir al panel después de 2 segundos
         setTimeout(() => {
-          router.replace('/app')
+          router.replace('/iniciar-sesion')
         }, 2000)
       } catch (error) {
         setStatus('error')
@@ -79,19 +76,7 @@ export default function CompletarRegistroPage() {
       <Card className="w-full max-w-md border-border/70 bg-card/90 backdrop-blur">
         <CardContent className="pt-8">
           {status === 'loading' && (
-            <div className="space-y-4 text-center">
-              <div className="flex justify-center">
-                <Loader2 className="size-12 animate-spin text-primary" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-foreground">
-                  Completando tu registro...
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Estamos finalizando la creación de tu cuenta y guardando tu tarjeta.
-                </p>
-              </div>
-            </div>
+            <CompletingRegistrationCard />
           )}
 
           {status === 'success' && (
@@ -108,7 +93,7 @@ export default function CompletarRegistroPage() {
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">
-                Te redirigiremos al panel en unos momentos...
+                Te redirigiremos al inicio de sesión en unos momentos...
               </p>
             </div>
           )}
@@ -138,5 +123,26 @@ export default function CompletarRegistroPage() {
       </main>
       <SiteFooter />
     </div>
+  )
+}
+
+export default function CompletarRegistroPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col">
+          <main className="flex flex-1 items-center justify-center px-4 py-10 sm:py-14">
+            <Card className="w-full max-w-md border-border/70 bg-card/90 backdrop-blur">
+              <CardContent className="pt-8">
+                <CompletingRegistrationCard />
+              </CardContent>
+            </Card>
+          </main>
+          <SiteFooter />
+        </div>
+      }
+    >
+      <CompletarRegistroContent />
+    </Suspense>
   )
 }

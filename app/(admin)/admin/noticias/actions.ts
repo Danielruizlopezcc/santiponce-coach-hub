@@ -24,6 +24,20 @@ function buildNewsImagePath(file: File) {
   return `noticias/${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}`
 }
 
+function getStoragePathFromPublicUrl(url: string | null | undefined) {
+  if (!url) return null
+  const marker = `/storage/v1/object/public/${BUCKET_NAME}/`
+  const index = url.indexOf(marker)
+  if (index === -1) return null
+  return decodeURIComponent(url.slice(index + marker.length).split('?')[0] ?? '')
+}
+
+async function removeNewsImage(supabase: ReturnType<typeof createAdminClient>, imageUrl: string | null | undefined) {
+  const path = getStoragePathFromPublicUrl(imageUrl)
+  if (!path) return
+  await supabase.storage.from(BUCKET_NAME).remove([path])
+}
+
 async function uploadNewsImage(supabase: ReturnType<typeof createAdminClient>, image: File) {
   if (!image || !(image instanceof File) || !image.type.startsWith('image/')) {
     throw new Error('Debes subir una imagen válida para la noticia.')
@@ -128,13 +142,17 @@ export async function updateNews(formData: FormData) {
     body: body.trim(),
     section_id: sectionId,
   }
+  let previousImageUrl: string | null | undefined
 
   if (image) {
+    const { data: current } = await supabase.from('news').select('image_url').eq('id', id).maybeSingle()
+    previousImageUrl = current?.image_url
     updates.image_url = await uploadNewsImage(supabase, image)
   }
 
   const { error } = await supabase.from('news').update(updates).eq('id', id)
   if (error) throw new Error(error.message)
+  await removeNewsImage(supabase, previousImageUrl)
 
   revalidatePath('/admin/noticias')
   revalidatePath('/noticias')
@@ -216,8 +234,12 @@ export async function deleteNewsSection(id: string) {
 
 export async function deleteNews(id: string) {
   const supabase = await getAdminSupabase()
+  const { data: current } = await supabase.from('news').select('image_url').eq('id', id).maybeSingle()
   const { error } = await supabase.from('news').delete().eq('id', id)
   if (error) throw new Error(error.message)
+  await removeNewsImage(supabase, current?.image_url)
 
   revalidatePath('/admin/noticias')
+  revalidatePath('/noticias')
+  revalidatePath('/app/noticias')
 }

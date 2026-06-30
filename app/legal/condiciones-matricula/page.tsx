@@ -14,14 +14,14 @@ export default function CondicionesMatriculaPage() {
     <PublicShell>
       <LegalPage
         title="Condiciones de matrícula"
-        updatedAt="—"
+        updatedAt="30 de junio de 2026"
         current="/legal/condiciones-matricula"
       >
         <p>
           Las presentes condiciones regulan el proceso de matrícula en el{' '}
-          {CLUB.legalName} para la temporada {CLUB.season}. Este documento es
-          una plantilla provisional y deberá completarse con las condiciones
-          definitivas del Club.
+          {CLUB.legalName} para la temporada {CLUB.season}. La solicitud de
+          matrícula implica la aceptación de estas condiciones por parte de la
+          familia o persona responsable.
         </p>
 
         <LegalSection title="1. Proceso de inscripción">
@@ -35,8 +35,9 @@ export default function CondicionesMatriculaPage() {
         <LegalSection title="2. Cuotas y temporada">
           <p>
             Las cuotas, plazos y categorías correspondientes a la temporada{' '}
-            {CLUB.season} se publicarán en la versión definitiva de este
-            documento.
+            {CLUB.season} se mostrarán en la plataforma o serán comunicadas por
+            el Club. La matrícula quedará confirmada cuando el Club valide los
+            datos y el pago asociado conste como realizado.
           </p>
         </LegalSection>
 
@@ -49,9 +50,10 @@ export default function CondicionesMatriculaPage() {
 
         <LegalSection title="4. Baja y modificaciones">
           <p>
-            Las condiciones para solicitar la baja o modificar una matrícula se
-            detallarán en la versión definitiva, junto con la política de pagos
-            y devoluciones.
+            Cualquier baja, modificación de datos o cambio de equipo/categoría
+            deberá solicitarse al Club. Las devoluciones o ajustes económicos se
+            tramitarán conforme a la política de pagos y devoluciones publicada
+            en esta plataforma.
           </p>
         </LegalSection>
       </LegalPage>

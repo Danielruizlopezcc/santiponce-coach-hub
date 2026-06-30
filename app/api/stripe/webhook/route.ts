@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { confirmStripeSetupSessionPaymentMethod } from '@/lib/payment-method-confirmation'
 import { confirmStripeCheckoutSessionPayment } from '@/lib/payment-confirmation'
+import { completePendingRegistration } from '@/app/registro/actions'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripeClient, getStripeWebhookSecret } from '@/lib/stripe'
 import {
@@ -62,6 +63,10 @@ export async function POST(request: Request) {
             .eq('id', session.metadata.userId)
         }
       }
+    }
+
+    if (flowType === 'registration_payment_method_setup') {
+      await completePendingRegistration(session.id)
     }
 
     await confirmStripeSetupSessionPaymentMethod(session)

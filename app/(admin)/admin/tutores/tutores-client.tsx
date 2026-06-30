@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, CheckCircle2, CreditCard, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CreditCard, KeyRound, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X, XCircle } from 'lucide-react'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,7 @@ import {
   deleteMemberAction,
   deleteTutorAction,
   rejectTutorAction,
+  sendPasswordRecoveryAction,
   toggleTutorMemberAction,
   type TutorSocioActionState,
   type TutorFeeAssignmentActionState,
@@ -124,6 +125,7 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
   const [toggleMessage, setToggleMessage] = useState<TutorSocioActionState | null>(null)
   const [approvePendingId, setApprovePendingId] = useState<string | null>(null)
   const [rejectPendingId, setRejectPendingId] = useState<string | null>(null)
+  const [recoveryPendingId, setRecoveryPendingId] = useState<string | null>(null)
   const [showTutorForm, setShowTutorForm] = useState(false)
   const [showMemberForm, setShowMemberForm] = useState(false)
   const [editingTutor, setEditingTutor] = useState<AdminTutorRow | null>(null)
@@ -215,6 +217,16 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
     startTransition(async () => {
       const result = await deleteMemberAction(member.id)
       setToggleMessage(result)
+    })
+  }
+
+  function handleSendRecovery(target: { id: string; email: string }) {
+    setRecoveryPendingId(target.id)
+    setToggleMessage(null)
+    startTransition(async () => {
+      const result = await sendPasswordRecoveryAction(target.email)
+      setToggleMessage(result)
+      setRecoveryPendingId(null)
     })
   }
 
@@ -569,6 +581,15 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                             <Button size="icon-sm" variant="ghost" aria-label="Asignar cuota" onClick={() => setAssigningTutor(tutor)}>
                               <CreditCard className="size-4" />
                             </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label="Enviar recuperación de contraseña"
+                              disabled={recoveryPendingId === tutor.id}
+                              onClick={() => handleSendRecovery(tutor)}
+                            >
+                              {recoveryPendingId === tutor.id ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+                            </Button>
                             <Button size="icon-sm" variant="destructive" aria-label="Eliminar tutor" onClick={() => setConfirmDeleteTutorId(tutor.id)}>
                               <Trash2 className="size-4" />
                             </Button>
@@ -807,6 +828,15 @@ export function TutorsMembersClient({ tutors, members, feeTemplates, feeAssignme
                           <div className="flex justify-end gap-1">
                             <Button size="icon-sm" variant="ghost" aria-label="Editar socio" onClick={() => { setEditingMember(member); setShowMemberForm(true) }}>
                               <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label="Enviar recuperación de contraseña"
+                              disabled={recoveryPendingId === member.id}
+                              onClick={() => handleSendRecovery(member)}
+                            >
+                              {recoveryPendingId === member.id ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
                             </Button>
                             <Button size="icon-sm" variant="destructive" aria-label="Eliminar socio" onClick={() => setConfirmDeleteMemberId(member.id)}>
                               <Trash2 className="size-4" />

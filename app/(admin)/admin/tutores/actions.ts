@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeDocument, normalizeEmail, normalizePhone } from '@/lib/private-app-shared'
+import { getSiteUrl } from '@/lib/stripe'
 import {
   cancelTutorFeeStripeSchedule,
   createTutorFeeStripeSchedule,
@@ -74,15 +75,21 @@ async function createAuthProfile(values: z.infer<typeof basePersonSchema>, passw
   const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle()
   if (existing) throw new Error('Ya existe una cuenta con ese correo.')
 
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password: password ?? crypto.randomUUID(),
-    email_confirm: true,
-    user_metadata: {
+  const userMetadata = {
       first_name: values.nombre,
       last_name: values.apellidos,
-    },
-  })
+  }
+  const { data, error } = password
+    ? await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: userMetadata,
+      })
+    : await supabase.auth.admin.inviteUserByEmail(email, {
+        data: userMetadata,
+        redirectTo: `${getSiteUrl()}/restablecer-contrasena`,
+      })
 
   if (error || !data.user) throw new Error(error?.message ?? 'No se ha podido crear el usuario.')
 
@@ -97,6 +104,22 @@ async function createAuthProfile(values: z.infer<typeof basePersonSchema>, passw
 
   if (profileError) throw new Error(profileError.message)
   return data.user.id
+}
+
+export async function sendPasswordRecoveryAction(email: string): Promise<TutorSocioActionState> {
+  await requireAdminAction()
+  const parsed = z.string().trim().email('Correo no válido.').safeParse(email)
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Correo no válido.' }
+  }
+
+  const { error } = await createAdminClient().auth.resetPasswordForEmail(normalizeEmail(parsed.data), {
+    redirectTo: `${getSiteUrl()}/restablecer-contrasena`,
+  })
+
+  if (error) return { ok: false, message: error.message }
+  return { ok: true, message: 'Email de recuperación enviado correctamente.' }
 }
 
 export async function createTutorAction(
@@ -268,7 +291,7 @@ export async function createMemberAction(
     const userId = await createAuthProfile(parsed.data)
     await setUserMembership(userId, true)
     revalidatePath('/admin/tutores')
-    return { ok: true, message: 'Socio creado correctamente.' }
+    return { ok: true, message: 'Socio creado correctamente. Se ha enviado una invitación por email.' }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'No se ha podido crear el socio.' }
   }

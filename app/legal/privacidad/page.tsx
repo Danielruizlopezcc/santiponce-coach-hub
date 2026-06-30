@@ -14,21 +14,22 @@ export default function PrivacidadPage() {
     <PublicShell>
       <LegalPage
         title="Política de privacidad"
-        updatedAt="—"
+        updatedAt="30 de junio de 2026"
         current="/legal/privacidad"
       >
         <p>
           En el {CLUB.legalName} (en adelante, «el Club») nos comprometemos a
           proteger la privacidad de las familias, deportistas y personas
-          usuarias de esta plataforma. Este documento es una plantilla
-          provisional y deberá completarse con los datos definitivos del Club.
+          usuarias de esta plataforma. Esta política explica qué datos se
+          tratan, con qué finalidad y cómo pueden ejercerse los derechos de las
+          personas interesadas.
         </p>
 
         <LegalSection title="1. Responsable del tratamiento">
           <p>
             El responsable del tratamiento de los datos personales es el{' '}
-            {CLUB.legalName}. Los datos de contacto, dirección y CIF se
-            incluirán en la versión definitiva de este documento.
+            {CLUB.legalName}. Las solicitudes relacionadas con privacidad se
+            atenderán a través de los canales oficiales de contacto del Club.
           </p>
         </LegalSection>
 

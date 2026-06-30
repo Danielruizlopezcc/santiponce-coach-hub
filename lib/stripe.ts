@@ -1,7 +1,7 @@
 import 'server-only'
 
 import Stripe from 'stripe'
-import { MATRICULA_IMPORTE, MEMBERSHIP_IMPORTE } from '@/lib/club'
+import { getAdminSettings } from '@/lib/admin-app'
 
 function readEnv(name: string) {
   const value = process.env[name]
@@ -23,10 +23,12 @@ export function getSiteUrl() {
   return readEnv('NEXT_PUBLIC_SITE_URL').replace(/\/$/, '')
 }
 
-export function getMembershipAmountCents() {
-  return MEMBERSHIP_IMPORTE * 100
+export async function getMembershipAmountCents() {
+  const settings = await getAdminSettings()
+  return Math.round(settings.membershipFeeEuros * 100)
 }
 
-export function getEnrollmentAmountCents() {
-  return MATRICULA_IMPORTE * 100
+export async function getEnrollmentAmountCents() {
+  const settings = await getAdminSettings()
+  return Math.round(settings.enrollmentFeeEuros * 100)
 }

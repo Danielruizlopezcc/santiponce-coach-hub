@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdminAction } from '@/lib/auth'
-import { MATRICULA_IMPORTE } from '@/lib/club'
+import { getAdminSettings } from '@/lib/admin-app'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 async function getAdminSupabase() {
@@ -34,6 +34,8 @@ export async function confirmPaymentAction(athleteId: string): Promise<void> {
     .eq('id', athleteId)
   if (error) throw new Error(error.message)
 
+  const settings = await getAdminSettings()
+
   await supabase.from('payments').insert({
     user_id: guardian.user_id,
     guardian_id: athlete.guardian_id,
@@ -42,7 +44,7 @@ export async function confirmPaymentAction(athleteId: string): Promise<void> {
     payment_type: 'enrollment',
     provider: 'manual',
     status: 'paid',
-    amount_cents: MATRICULA_IMPORTE * 100,
+    amount_cents: Math.round(settings.enrollmentFeeEuros * 100),
     currency: 'eur',
     description: 'Confirmación manual de matrícula',
     metadata: { source: 'admin-manual-confirmation' },

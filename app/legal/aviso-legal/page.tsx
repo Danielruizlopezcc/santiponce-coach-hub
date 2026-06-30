@@ -14,20 +14,21 @@ export default function AvisoLegalPage() {
     <PublicShell>
       <LegalPage
         title="Aviso legal"
-        updatedAt="—"
+        updatedAt="30 de junio de 2026"
         current="/legal/aviso-legal"
       >
         <p>
           El presente aviso legal regula el uso de la plataforma oficial del{' '}
-          {CLUB.legalName}. Este documento es una plantilla provisional y deberá
-          completarse con los datos identificativos definitivos del Club.
+          {CLUB.legalName}, destinada a información pública, gestión de
+          matrículas, socios, tutores, deportistas, pagos y comunicaciones del
+          Club.
         </p>
 
         <LegalSection title="1. Titularidad">
           <p>
             La titularidad de esta plataforma corresponde al {CLUB.legalName}.
-            Los datos de identificación, domicilio social y de contacto se
-            incluirán en la versión definitiva.
+            Las comunicaciones relacionadas con la plataforma deberán dirigirse
+            a los canales oficiales habilitados por el Club.
           </p>
         </LegalSection>
 

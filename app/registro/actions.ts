@@ -10,6 +10,7 @@ type RegistroActionResult =
 
 type RegistroActionOptions = {
   stripeSetupSessionId?: string
+  existingUserId?: string
 }
 
 function findFirstDuplicate(values: string[]) {
@@ -299,7 +300,7 @@ export async function registerGuardianAccount(
           .or(guardianConflictFilters.join(',')),
         supabase
           .from('profiles')
-          .select('email')
+          .select('id, email')
           .in('email', guardianAndAthleteEmails),
         supabase
           .from('athletes')
@@ -340,7 +341,7 @@ export async function registerGuardianAccount(
       }
     }
 
-    if (existingGuardianEmail) {
+    if (existingGuardianEmail && existingGuardianEmail.id !== options.existingUserId) {
       return {
         success: false,
         message: 'Ya existe una cuenta con ese correo electrónico.',
@@ -348,7 +349,7 @@ export async function registerGuardianAccount(
     }
 
     if (
-      existingProfiles?.some((profile) => normalizeEmail(profile.email) === guardianEmail)
+      existingProfiles?.some((profile) => normalizeEmail(profile.email) === guardianEmail && profile.id !== options.existingUserId)
     ) {
       return {
         success: false,
@@ -490,32 +491,37 @@ export async function registerGuardianAccount(
       }
     }
 
-    const { data: authResult, error: authError } =
-      await supabase.auth.admin.createUser({
-        email: guardianEmail,
-        password: values.password,
-        email_confirm: true,
-        user_metadata: {
-          first_name: values.nombre,
-          last_name: values.apellidos,
-        },
-      })
+    let userId = options.existingUserId ?? null
 
-    if (authError || !authResult.user) {
-      return {
-        success: false,
-        message:
-          authError?.message ??
-          'No se ha podido crear el usuario en Supabase Auth.',
+    if (!userId) {
+      const { data: authResult, error: authError } =
+        await supabase.auth.admin.createUser({
+          email: guardianEmail,
+          password: values.password,
+          email_confirm: true,
+          user_metadata: {
+            first_name: values.nombre,
+            last_name: values.apellidos,
+          },
+        })
+
+      if (authError || !authResult.user) {
+        return {
+          success: false,
+          message:
+            authError?.message ??
+            'No se ha podido crear el usuario en Supabase Auth.',
+        }
       }
-    }
 
-    createdUserId = authResult.user.id
+      userId = authResult.user.id
+      createdUserId = authResult.user.id
+    }
 
     const { data: guardian, error: guardianError } = await supabase
       .from('guardians')
       .insert({
-        user_id: authResult.user.id,
+        user_id: userId,
         first_name: values.nombre,
         last_name: values.apellidos,
         phone: guardianPhone,
@@ -634,7 +640,7 @@ export async function registerGuardianAccount(
     if (options.stripeSetupSessionId) {
       await saveStripePaymentMethodFromSetupSession({
         supabase,
-        userId: authResult.user.id,
+        userId,
         sessionId: options.stripeSetupSessionId,
         expectedEmail: guardianEmail,
       })
@@ -653,5 +659,76 @@ export async function registerGuardianAccount(
           ? error.message
           : 'No se ha podido completar el registro real en Supabase.',
     }
+  }
+}
+
+export async function completePendingRegistration(sessionId: string): Promise<RegistroActionResult> {
+  const supabase = createAdminClient()
+  const stripe = getStripeClient()
+
+  const { data: pending, error: pendingError } = await supabase
+    .from('pending_registrations')
+    .select('id, user_id, form_data, status')
+    .eq('stripe_setup_session_id', sessionId)
+    .maybeSingle()
+
+  if (pendingError) {
+    return { success: false, message: pendingError.message }
+  }
+
+  if (!pending) {
+    return { success: false, message: 'No se ha encontrado el registro pendiente.' }
+  }
+
+  if (pending.status === 'completed') {
+    return { success: true }
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId)
+
+    if (session.mode !== 'setup' || session.status !== 'complete') {
+      return { success: false, message: 'La configuración del método de pago no se ha completado.' }
+    }
+
+    const validationOnlyPassword = `Aa1-${crypto.randomUUID()}`
+    const formData = {
+      ...(pending.form_data as Record<string, unknown>),
+      password: validationOnlyPassword,
+      confirmPassword: validationOnlyPassword,
+    }
+
+    const result = await registerGuardianAccount(formData, {
+      existingUserId: pending.user_id,
+      stripeSetupSessionId: sessionId,
+    })
+
+    if (!result.success) {
+      await supabase
+        .from('pending_registrations')
+        .update({ status: 'failed', error_message: result.message })
+        .eq('id', pending.id)
+
+      return result
+    }
+
+    await supabase
+      .from('pending_registrations')
+      .update({
+        status: 'completed',
+        error_message: null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', pending.id)
+
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se ha podido completar el registro.'
+    await supabase
+      .from('pending_registrations')
+      .update({ status: 'failed', error_message: message })
+      .eq('id', pending.id)
+
+    return { success: false, message }
   }
 }
