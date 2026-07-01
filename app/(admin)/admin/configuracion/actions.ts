@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAdminAuditLog } from '@/lib/audit'
 import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -42,7 +43,7 @@ export async function updateAdminSettingsAction(
   _prev: AdminSettingsActionState,
   formData: FormData,
 ): Promise<AdminSettingsActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const parsed = settingsSchema.safeParse({
     clubShortName: formData.get('clubShortName'),
@@ -79,6 +80,21 @@ export async function updateAdminSettingsAction(
     return { ok: false, message: `No se han podido guardar los ajustes: ${error.message}` }
   }
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'settings.update',
+    entityType: 'app_settings',
+    summary: 'Actualizó la configuración general del club.',
+    metadata: {
+      clubShortName: values.clubShortName,
+      clubLegalName: values.clubLegalName,
+      seasonLabel: values.seasonLabel,
+      membershipFeeEuros: values.membershipFeeEuros,
+      enrollmentFeeEuros: values.enrollmentFeeEuros,
+      registrationOpen: values.registrationOpen,
+    },
+  })
+
   revalidatePath('/admin/configuracion')
   revalidatePath('/admin')
   revalidatePath('/')
@@ -86,7 +102,7 @@ export async function updateAdminSettingsAction(
 }
 
 export async function updateActiveSeasonAction(input: unknown): Promise<void> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const { seasonId } = activeSeasonSchema.parse(input)
   const supabase = createAdminClient()
 
@@ -104,6 +120,14 @@ export async function updateActiveSeasonAction(input: unknown): Promise<void> {
 
   const { error } = await supabase.from('seasons').update({ is_active: true }).eq('id', seasonId)
   if (error) throw new Error(error.message)
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'season.activate',
+    entityType: 'season',
+    entityId: seasonId,
+    summary: 'Cambió la temporada activa.',
+  })
 
   revalidatePath('/admin/configuracion')
   revalidatePath('/admin/temporadas')

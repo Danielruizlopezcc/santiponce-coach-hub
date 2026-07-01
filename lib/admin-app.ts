@@ -370,6 +370,17 @@ export type AdminNewsRow = {
   createdAt: string
 }
 
+export type AdminAuditLogRow = {
+  id: string
+  actorName: string
+  actorEmail: string
+  action: string
+  entityType: string
+  entityId: string
+  summary: string
+  createdAt: string
+}
+
 export type AdminConfigRow = {
   id: string
   titulo: string
@@ -1273,6 +1284,43 @@ export async function getAdminNewsSections(): Promise<AdminNewsSectionRow[]> {
     newsCount: newsCountBySection.get(section.id) ?? 0,
     createdAt: formatSpanishDateTime(section.created_at),
   }))
+}
+
+export async function getAdminAuditLogs(): Promise<AdminAuditLogRow[]> {
+  const supabase = await createClient()
+  const [{ data: logs }, { data: profiles }] = await Promise.all([
+    supabase
+      .from('admin_audit_logs')
+      .select('id, actor_user_id, action, entity_type, entity_id, summary, created_at')
+      .order('created_at', { ascending: false })
+      .limit(300),
+    supabase.from('profiles').select('id, email, first_name, last_name'),
+  ])
+
+  const profileById = new Map(
+    (profiles ?? []).map((profile) => [
+      profile.id,
+      {
+        email: profile.email ?? '',
+        name: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || profile.email || 'Administrador',
+      },
+    ]),
+  )
+
+  return (logs ?? []).map((log) => {
+    const actor = log.actor_user_id ? profileById.get(log.actor_user_id) : null
+
+    return {
+      id: log.id,
+      actorName: actor?.name ?? 'Administrador no disponible',
+      actorEmail: actor?.email ?? '',
+      action: log.action,
+      entityType: log.entity_type,
+      entityId: log.entity_id ?? '',
+      summary: log.summary,
+      createdAt: formatSpanishDateTime(log.created_at),
+    }
+  })
 }
 
 export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetail | null> {

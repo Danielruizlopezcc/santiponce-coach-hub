@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAdminAuditLog } from '@/lib/audit'
 import { requireAdminAction } from '@/lib/auth'
 import { normalizeEmail } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -36,7 +37,7 @@ export async function createAdminManagerAction(
   _prev: AdminManagerActionState,
   formData: FormData,
 ): Promise<AdminManagerActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const parsed = createManagerSchema.safeParse({
     nombre: formData.get('nombre'),
@@ -92,6 +93,15 @@ export async function createAdminManagerAction(
       .upsert({ user_id: createdUserId, role: 'admin' }, { onConflict: 'user_id,role' })
     if (roleError) throw new Error(roleError.message)
 
+    await createAdminAuditLog({
+      actor: admin,
+      action: 'admin.create',
+      entityType: 'profile',
+      entityId: createdUserId,
+      summary: `Creó el administrador ${values.nombre} ${values.apellidos}.`,
+      metadata: { email },
+    })
+
     revalidatePath('/admin/administradores')
     revalidatePath('/admin')
     return { ok: true, message: 'Administrador creado correctamente.' }
@@ -108,7 +118,7 @@ export async function createAdminManagerAction(
 }
 
 export async function updateAdminManagerAction(input: unknown): Promise<void> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const parsed = updateManagerSchema.parse(input)
   const email = normalizeEmail(parsed.email)
   const supabase = createAdminClient()
@@ -150,6 +160,15 @@ export async function updateAdminManagerAction(input: unknown): Promise<void> {
   })
   if (profileError) throw new Error(profileError.message)
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'admin.update',
+    entityType: 'profile',
+    entityId: parsed.adminId,
+    summary: `Actualizó el administrador ${parsed.nombre} ${parsed.apellidos}.`,
+    metadata: { email },
+  })
+
   revalidatePath('/admin/administradores')
   revalidatePath('/admin')
 }
@@ -180,6 +199,14 @@ export async function deleteAdminManagerAction(adminId: string): Promise<void> {
 
   const { error } = await supabase.auth.admin.deleteUser(parsedAdminId)
   if (error) throw new Error(error.message)
+
+  await createAdminAuditLog({
+    actor: currentUser,
+    action: 'admin.delete',
+    entityType: 'profile',
+    entityId: parsedAdminId,
+    summary: 'Eliminó un usuario administrador.',
+  })
 
   revalidatePath('/admin/administradores')
   revalidatePath('/admin')

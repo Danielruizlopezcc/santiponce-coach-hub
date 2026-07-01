@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAdminAuditLog } from '@/lib/audit'
 import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripeClient } from '@/lib/stripe'
@@ -116,6 +117,22 @@ export async function createFinanceMovementAction(
     }
   }
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'finance_movement.upsert',
+    entityType: 'admin_finance_movement',
+    entityId: id ?? null,
+    summary: id ? 'Actualizó un movimiento manual de contabilidad.' : 'Creó un movimiento manual de contabilidad.',
+    metadata: {
+      tipo,
+      concepto,
+      categoria,
+      metodoPago,
+      estado,
+      importe,
+    },
+  })
+
   revalidatePath('/admin/pagos')
   return {
     ok: true,
@@ -124,7 +141,7 @@ export async function createFinanceMovementAction(
 }
 
 export async function deleteFinanceMovementAction(id: string): Promise<FinanceMovementActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const parsed = z.string().uuid().safeParse(id)
   if (!parsed.success) {
@@ -146,6 +163,14 @@ export async function deleteFinanceMovementAction(id: string): Promise<FinanceMo
       message: error.message,
     }
   }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'finance_movement.delete',
+    entityType: 'admin_finance_movement',
+    entityId: parsed.data,
+    summary: 'Eliminó un movimiento manual de contabilidad.',
+  })
 
   revalidatePath('/admin/pagos')
   return {
@@ -199,12 +224,27 @@ export async function createFeeTemplateAction(
 
   if (error) return { ok: false, message: error.message }
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'fee_template.upsert',
+    entityType: 'admin_fee_template',
+    entityId: values.id ?? null,
+    summary: values.id ? 'Actualizó una plantilla de cuota.' : 'Creó una plantilla de cuota.',
+    metadata: {
+      nombre: values.nombre,
+      tipo: values.tipo,
+      importe: values.importe,
+      splitPayment: values.splitPayment,
+      chargeCount: values.chargeCount ?? null,
+    },
+  })
+
   revalidatePath('/admin/pagos')
   return { ok: true, message: values.id ? 'Cuota actualizada correctamente.' : 'Cuota guardada correctamente.' }
 }
 
 export async function deleteFeeTemplateAction(id: string): Promise<FeeTemplateActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const parsed = z.string().uuid().safeParse(id)
   if (!parsed.success) return { ok: false, message: 'No se ha podido identificar la cuota.' }
@@ -224,12 +264,20 @@ export async function deleteFeeTemplateAction(id: string): Promise<FeeTemplateAc
   const { error } = await supabase.from('admin_fee_templates').delete().eq('id', parsed.data)
   if (error) return { ok: false, message: error.message }
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'fee_template.delete',
+    entityType: 'admin_fee_template',
+    entityId: parsed.data,
+    summary: 'Eliminó una plantilla de cuota.',
+  })
+
   revalidatePath('/admin/pagos')
   return { ok: true, message: 'Cuota eliminada correctamente.' }
 }
 
 export async function markPaymentPendingAction(id: string): Promise<FinanceMovementActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const parsed = z.string().uuid().safeParse(id)
   if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el pago.' }
 
@@ -240,12 +288,19 @@ export async function markPaymentPendingAction(id: string): Promise<FinanceMovem
     .in('status', ['failed', 'canceled'])
 
   if (error) return { ok: false, message: error.message }
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'payment.pending',
+    entityType: 'payment',
+    entityId: parsed.data,
+    summary: 'Marcó un pago como pendiente.',
+  })
   revalidatePath('/admin/pagos')
   return { ok: true, message: 'Pago marcado como pendiente.' }
 }
 
 export async function cancelPaymentAction(id: string): Promise<FinanceMovementActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const parsed = z.string().uuid().safeParse(id)
   if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el pago.' }
 
@@ -256,12 +311,19 @@ export async function cancelPaymentAction(id: string): Promise<FinanceMovementAc
     .in('status', ['pending', 'failed'])
 
   if (error) return { ok: false, message: error.message }
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'payment.cancel',
+    entityType: 'payment',
+    entityId: parsed.data,
+    summary: 'Canceló un pago desde contabilidad.',
+  })
   revalidatePath('/admin/pagos')
   return { ok: true, message: 'Pago cancelado correctamente.' }
 }
 
 export async function refundStripePaymentAction(id: string): Promise<FinanceMovementActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const parsed = z.string().uuid().safeParse(id)
   if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el pago.' }
 
@@ -301,6 +363,19 @@ export async function refundStripePaymentAction(id: string): Promise<FinanceMove
       .eq('id', payment.id)
 
     if (error) return { ok: false, message: error.message }
+
+    await createAdminAuditLog({
+      actor: admin,
+      action: 'payment.refund',
+      entityType: 'payment',
+      entityId: payment.id,
+      summary: 'Creó un reembolso de Stripe desde el panel.',
+      metadata: {
+        refundId: refund.id,
+        refundStatus: refund.status,
+        stripePaymentIntentId: payment.stripe_payment_intent_id,
+      },
+    })
 
     revalidatePath('/admin/pagos')
     revalidatePath('/admin/matriculas')

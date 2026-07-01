@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAdminAuditLog } from '@/lib/audit'
 import { requireAdminAction } from '@/lib/auth'
 import { normalizeEmail } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -31,7 +32,7 @@ export async function createCoachAction(
   _prev: CoachActionState,
   formData: FormData,
 ): Promise<CoachActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const parsed = coachSchema.safeParse({
     nombre: formData.get('nombre'),
@@ -112,6 +113,15 @@ export async function createCoachAction(
       if (assignmentError) throw new Error(assignmentError.message)
     }
 
+    await createAdminAuditLog({
+      actor: admin,
+      action: 'coach.create',
+      entityType: 'profile',
+      entityId: createdUserId,
+      summary: `Creó el entrenador ${values.nombre} ${values.apellidos}.`,
+      metadata: { email, teamId: values.teamId ?? null },
+    })
+
     revalidatePath('/admin/entrenadores')
     return { ok: true, message: 'Entrenador creado correctamente.' }
   } catch (error) {
@@ -127,7 +137,7 @@ export async function createCoachAction(
 }
 
 export async function updateCoachAction(input: unknown): Promise<void> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const parsed = updateCoachSchema.safeParse(input)
   if (!parsed.success) {
@@ -208,11 +218,20 @@ export async function updateCoachAction(input: unknown): Promise<void> {
     if (assignmentError) throw new Error(assignmentError.message)
   }
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'coach.update',
+    entityType: 'profile',
+    entityId: values.coachId,
+    summary: `Actualizó el entrenador ${values.nombre} ${values.apellidos}.`,
+    metadata: { email, teamId: values.teamId ?? null },
+  })
+
   revalidatePath('/admin/entrenadores')
 }
 
 export async function deleteCoachAction(coachId: string): Promise<void> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const parsedCoachId = z.string().uuid('No se ha podido identificar el entrenador.').parse(coachId)
   const supabase = createAdminClient()
@@ -229,6 +248,14 @@ export async function deleteCoachAction(coachId: string): Promise<void> {
 
   const { error } = await supabase.auth.admin.deleteUser(parsedCoachId)
   if (error) throw new Error(error.message)
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'coach.delete',
+    entityType: 'profile',
+    entityId: parsedCoachId,
+    summary: 'Eliminó un entrenador.',
+  })
 
   revalidatePath('/admin/entrenadores')
 }

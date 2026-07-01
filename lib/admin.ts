@@ -3,6 +3,7 @@ import {
   BarChart3,
   Calendar,
   CreditCard,
+  History,
   FileCheck,
   LayoutDashboard,
   Newspaper,
@@ -34,5 +35,6 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: 'Contabilidad', href: '/admin/pagos', icon: CreditCard },
   { label: 'Consentimientos', href: '/admin/consentimientos', icon: FileCheck },
   { label: 'Gestión de administradores', href: '/admin/administradores', icon: ShieldCheck },
+  { label: 'Auditoría', href: '/admin/auditoria', icon: History },
   { label: 'Configuración', href: '/admin/configuracion', icon: Settings },
 ]

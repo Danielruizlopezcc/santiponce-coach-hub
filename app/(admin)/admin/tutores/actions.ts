@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAdminAuditLog } from '@/lib/audit'
 import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeDocument, normalizeEmail, normalizePhone } from '@/lib/private-app-shared'
@@ -126,7 +127,7 @@ export async function createTutorAction(
   _prev: TutorSocioActionState,
   formData: FormData,
 ): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const parsed = tutorSchema.safeParse({
     id: formData.get('id') || undefined,
     userId: formData.get('userId') || undefined,
@@ -181,6 +182,14 @@ export async function createTutorAction(
       if (guardianError) throw new Error(guardianError.message)
 
       await setUserMembership(values.userId, Boolean(values.isSocio))
+      await createAdminAuditLog({
+        actor: admin,
+        action: 'tutor.update',
+        entityType: 'guardian',
+        entityId: values.id,
+        summary: `Actualizó el tutor ${values.nombre} ${values.apellidos}.`,
+        metadata: { userId: values.userId, email },
+      })
       revalidatePath('/admin/tutores')
       return { ok: true, message: 'Tutor actualizado correctamente.' }
     }
@@ -237,6 +246,15 @@ export async function createTutorAction(
       await setUserMembership(userId, true)
     }
 
+    await createAdminAuditLog({
+      actor: admin,
+      action: 'tutor.create',
+      entityType: 'guardian',
+      entityId: guardian.id,
+      summary: `Creó el tutor ${values.nombre} ${values.apellidos}.`,
+      metadata: { userId, email: normalizeEmail(values.email), isSocio: Boolean(values.isSocio) },
+    })
+
     revalidatePath('/admin/tutores')
     return { ok: true, message: 'Tutor creado correctamente.' }
   } catch (error) {
@@ -248,7 +266,7 @@ export async function createMemberAction(
   _prev: TutorSocioActionState,
   formData: FormData,
 ): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const parsed = memberSchema.safeParse({
     id: formData.get('id') || undefined,
     nombre: formData.get('nombre'),
@@ -284,12 +302,28 @@ export async function createMemberAction(
         .eq('id', parsed.data.id)
       if (error) throw new Error(error.message)
       await setUserMembership(parsed.data.id, true)
+      await createAdminAuditLog({
+        actor: admin,
+        action: 'member.update',
+        entityType: 'profile',
+        entityId: parsed.data.id,
+        summary: `Actualizó el socio ${parsed.data.nombre} ${parsed.data.apellidos}.`,
+        metadata: { email },
+      })
       revalidatePath('/admin/tutores')
       return { ok: true, message: 'Socio actualizado correctamente.' }
     }
 
     const userId = await createAuthProfile(parsed.data)
     await setUserMembership(userId, true)
+    await createAdminAuditLog({
+      actor: admin,
+      action: 'member.create',
+      entityType: 'profile',
+      entityId: userId,
+      summary: `Creó el socio ${parsed.data.nombre} ${parsed.data.apellidos}.`,
+      metadata: { email: normalizeEmail(parsed.data.email) },
+    })
     revalidatePath('/admin/tutores')
     return { ok: true, message: 'Socio creado correctamente. Se ha enviado una invitación por email.' }
   } catch (error) {
@@ -298,10 +332,18 @@ export async function createMemberAction(
 }
 
 export async function toggleTutorMemberAction(userId: string, isSocio: boolean): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   try {
     await setUserMembership(userId, isSocio)
+    await createAdminAuditLog({
+      actor: admin,
+      action: 'member.toggle',
+      entityType: 'profile',
+      entityId: userId,
+      summary: isSocio ? 'Marcó un tutor como socio.' : 'Desmarcó un tutor como socio.',
+      metadata: { isSocio },
+    })
     revalidatePath('/admin/tutores')
     return { ok: true, message: isSocio ? 'Tutor marcado como socio.' : 'Tutor desmarcado como socio.' }
   } catch (error) {
@@ -310,7 +352,7 @@ export async function toggleTutorMemberAction(userId: string, isSocio: boolean):
 }
 
 export async function approveTutorAction(guardianId: string): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const supabase = createAdminClient()
   const { error } = await supabase
@@ -322,12 +364,20 @@ export async function approveTutorAction(guardianId: string): Promise<TutorSocio
     return { ok: false, message: error.message }
   }
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'tutor.approve',
+    entityType: 'guardian',
+    entityId: guardianId,
+    summary: 'Aprobó un tutor.',
+  })
+
   revalidatePath('/admin/tutores')
   return { ok: true, message: 'Tutor aprobado correctamente.' }
 }
 
 export async function rejectTutorAction(guardianId: string): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
 
   const supabase = createAdminClient()
   const { error } = await supabase
@@ -336,24 +386,46 @@ export async function rejectTutorAction(guardianId: string): Promise<TutorSocioA
     .eq('id', guardianId)
 
   if (error) return { ok: false, message: error.message }
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'tutor.reject',
+    entityType: 'guardian',
+    entityId: guardianId,
+    summary: 'Rechazó un tutor.',
+  })
   revalidatePath('/admin/tutores')
   return { ok: true, message: 'Tutor rechazado correctamente.' }
 }
 
 export async function deleteTutorAction(guardianId: string, userId: string): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const supabase = createAdminClient()
   const { error } = await supabase.auth.admin.deleteUser(userId)
   if (error) return { ok: false, message: error.message }
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'tutor.delete',
+    entityType: 'guardian',
+    entityId: guardianId,
+    summary: 'Eliminó un tutor y su usuario asociado.',
+    metadata: { userId },
+  })
   revalidatePath('/admin/tutores')
   return { ok: true, message: 'Tutor eliminado correctamente.' }
 }
 
 export async function deleteMemberAction(userId: string): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const supabase = createAdminClient()
   const { error } = await supabase.auth.admin.deleteUser(userId)
   if (error) return { ok: false, message: error.message }
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'member.delete',
+    entityType: 'profile',
+    entityId: userId,
+    summary: 'Eliminó un socio.',
+  })
   revalidatePath('/admin/tutores')
   return { ok: true, message: 'Socio eliminado correctamente.' }
 }
@@ -466,13 +538,27 @@ export async function assignTutorFeeAction(
     }
   }
 
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'tutor_fee.assign',
+    entityType: 'tutor_fee_assignment',
+    entityId: assignment.id,
+    summary: 'Asignó una cuota a un tutor y programó sus cobros.',
+    metadata: {
+      guardianId: values.guardianId,
+      feeTemplateId: values.feeTemplateId,
+      chargeDay: values.chargeDay,
+      startMonth: values.startMonth,
+    },
+  })
+
   revalidatePath('/admin/tutores')
   revalidatePath('/admin/pagos')
   return { ok: true, message: 'Cuota asignada y cobros programados en Stripe correctamente.' }
 }
 
 export async function cancelTutorFeeAssignmentAction(assignmentId: string): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  const admin = await requireAdminAction()
   const parsed = z.string().uuid().safeParse(assignmentId)
   if (!parsed.success) {
     return { ok: false, message: 'No se ha podido identificar la cuota asignada.' }
@@ -505,6 +591,14 @@ export async function cancelTutorFeeAssignmentAction(assignmentId: string): Prom
     .eq('id', parsed.data)
 
   if (error) return { ok: false, message: error.message }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'tutor_fee.cancel',
+    entityType: 'tutor_fee_assignment',
+    entityId: parsed.data,
+    summary: 'Canceló una cuota asignada a un tutor.',
+  })
 
   revalidatePath('/admin/tutores')
   revalidatePath('/admin/pagos')
