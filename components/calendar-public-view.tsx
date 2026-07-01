@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarDays, Clock, Filter, MapPin, Trophy } from 'lucide-react'
+import { CalendarDays, Filter, MapPin, Trophy } from 'lucide-react'
 import { BrandedPageHero } from '@/components/branded-page-hero'
 import { MatchCountdown } from '@/components/match-countdown'
 import { CLUB } from '@/lib/club'

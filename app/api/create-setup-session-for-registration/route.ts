@@ -8,7 +8,9 @@ function normalizeEmail(value: string) {
 }
 
 function sanitizeRegistrationData(values: Record<string, unknown>) {
-  const { password: _password, confirmPassword: _confirmPassword, ...safeValues } = values
+  const safeValues = { ...values }
+  delete safeValues.password
+  delete safeValues.confirmPassword
   return safeValues
 }
 

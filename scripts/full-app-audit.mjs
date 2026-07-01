@@ -293,7 +293,6 @@ async function main() {
   let testGuardianId
   let testAthleteId
   let testMatchId
-  let testFeeTemplateId
 
   await check('Login and role rows exist for user/admin/member/coach', async () => {
     const { data, error } = await admin
@@ -660,7 +659,6 @@ async function main() {
       charge_frequency: 'monthly',
       charge_count: 3,
     })
-    testFeeTemplateId = template.id
     cleanup.feeTemplateIds.push(template.id)
 
     const assignment = await insertOne(admin, 'tutor_fee_assignments', {

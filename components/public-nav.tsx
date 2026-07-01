@@ -199,56 +199,6 @@ function NavLinks({
   )
 }
 
-function ClubIdentity() {
-  return (
-    <Link
-      href="/"
-      className="flex min-w-0 items-center gap-4 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:gap-5"
-      aria-label={`${CLUB.shortName} - Inicio`}
-    >
-      <span className="grid size-16 shrink-0 place-items-center rounded-md shadow-sm ring-1 ring-white/20 md:size-20">
-        <Image
-          src={CLUB.crest}
-          alt={`Escudo del ${CLUB.legalName}`}
-          width={74}
-          height={74}
-          priority
-          className="size-12 rounded-md object-contain md:size-16"
-        />
-      </span>
-      <span className="flex min-w-0 flex-col leading-tight">
-        <span className="truncate text-2xl font-black text-white md:text-3xl">
-          {CLUB.shortName}
-        </span>
-        <span className="mt-1 text-sm font-black uppercase text-white/72 md:text-base">
-          Temporada {CLUB.season}
-        </span>
-      </span>
-    </Link>
-  )
-}
-
-function AuthActions() {
-  return (
-    <div className="hidden items-center gap-2 md:flex">
-      <Link
-        href="/registro"
-        className="flex h-10 items-center gap-2 rounded-md bg-white/10 px-3 text-xs font-black uppercase text-white outline-none ring-1 ring-white/24 transition-colors hover:bg-white hover:text-primary focus-visible:ring-2 focus-visible:ring-white/80"
-      >
-        <UserPlus className="size-4" aria-hidden="true" />
-        Registrarse
-      </Link>
-      <Link
-        href="/iniciar-sesion"
-        className="flex h-10 items-center gap-2 rounded-md bg-white px-3 text-xs font-black uppercase text-primary shadow-sm outline-none transition-colors hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/80"
-      >
-        <LogIn className="size-4" aria-hidden="true" />
-        Iniciar sesión
-      </Link>
-    </div>
-  )
-}
-
 function MenuDrawer({
   open,
   setOpen,

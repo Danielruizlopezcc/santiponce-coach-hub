@@ -63,7 +63,6 @@ export const PRIVATE_NAV: PrivateNavItem[] = [
 
 export function getPrivateNavItems({
   hasGuardian = false,
-  isPaidSocio = false,
 }: {
   hasGuardian?: boolean
   isPaidSocio?: boolean

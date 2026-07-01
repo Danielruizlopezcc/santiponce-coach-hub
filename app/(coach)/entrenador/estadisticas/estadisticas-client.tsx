@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 import { BarChart3 } from 'lucide-react'
 import { CLUB } from '@/lib/club'
 import type { AdminMatchRow } from '@/lib/admin-app'
-import { cn } from '@/lib/utils'
 
 type Props = {
   matches: AdminMatchRow[]

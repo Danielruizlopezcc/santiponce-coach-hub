@@ -17,7 +17,6 @@ import type {
   PrivateViewer,
   PlayerPosition,
 } from '@/lib/private-app-shared'
-import { normalizeDocument, normalizeEmail, normalizeOptionalEmail, normalizeOptionalPhone, normalizePhone } from '@/lib/private-app-shared'
 import { getSavedStripeCardByEmail } from '@/lib/stripe-payment-methods'
 import { getSponsorTierFromSortOrder } from '@/lib/sponsors'
 import { createAdminClient } from '@/lib/supabase/admin'

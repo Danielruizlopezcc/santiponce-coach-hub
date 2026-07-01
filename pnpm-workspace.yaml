@@ -1,5 +1,6 @@
 allowBuilds:
   msw: true
   sharp: true
+  unrs-resolver: true
 minimumReleaseAgeExclude:
   - stripe@22.2.1

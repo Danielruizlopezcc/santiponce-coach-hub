@@ -240,7 +240,6 @@ function downloadCsv(filename: string, headers: string[], rows: Array<Array<stri
 }
 
 export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments }: AdminPaymentsClientProps) {
-  const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'pendientes' | 'ingresos' | 'gastos' | 'informes'>('resumen')
   const [editingMovement, setEditingMovement] = useState<AdminFinanceMovementRow | null>(null)
   const [editingFee, setEditingFee] = useState<AdminFeeTemplateRow | null>(null)
@@ -331,21 +330,6 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
       })),
     [payments],
   )
-
-  const movementSummary = useMemo(() => {
-    const incomes = financeMovements.filter((movement) => movement.tipo === 'ingreso')
-    const expenses = financeMovements.filter((movement) => movement.tipo === 'gasto')
-    const incomeTotal = sumMovements(incomes)
-    const expenseTotal = sumMovements(expenses)
-
-    return {
-      incomes,
-      expenses,
-      incomeTotal,
-      expenseTotal,
-      balance: incomeTotal - expenseTotal,
-    }
-  }, [financeMovements])
 
   const visibleMovements = useMemo(() => {
     const q = movementSearch.trim().toLowerCase()
@@ -471,11 +455,6 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
     if (editingMovement?.id === movement.id) {
       setEditingMovement(null)
     }
-  }
-
-  function simulateLoading() {
-    setLoading(true)
-    setTimeout(() => setLoading(false), 900)
   }
 
   async function handleDeleteFee(fee: AdminFeeTemplateRow) {
@@ -721,7 +700,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             columns={columns}
             searchPlaceholder="Buscar por operación, tutor, deportista, proveedor o fecha"
             filters={filters}
-            isLoading={loading}
+            isLoading={false}
             emptyTitle="Sin pagos"
             emptyDescription="No hay pagos que coincidan con los filtros aplicados."
           />

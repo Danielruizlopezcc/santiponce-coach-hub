@@ -19,6 +19,8 @@ import {
 import { DeportistasSection } from '@/components/deportistas-section'
 
 type FieldErrorProps = { id: string; message?: string }
+type FormErrorMap = Record<string, { message?: string } | undefined>
+
 function FieldError({ id, message }: FieldErrorProps) {
   if (!message) return null
   return (
@@ -79,7 +81,7 @@ export function RegistroForm() {
   })
 
   const accountType = watch('accountType')
-  const errors = rawErrors as Record<string, any>
+  const errors = rawErrors as FormErrorMap
 
   const {
     fields: deportistaFields,

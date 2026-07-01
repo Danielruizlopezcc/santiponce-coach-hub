@@ -70,7 +70,11 @@ export function ConsentimientosClient({ consents }: { consents: AdminConsentRow[
   function toggleUser(usuario: string) {
     setExpanded((prev) => {
       const next = new Set(prev)
-      next.has(usuario) ? next.delete(usuario) : next.add(usuario)
+      if (next.has(usuario)) {
+        next.delete(usuario)
+      } else {
+        next.add(usuario)
+      }
       return next
     })
   }
