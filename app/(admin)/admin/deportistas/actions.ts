@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  createTutorFeeStripeSchedule,
+  validateFirstDueDate,
+  type TutorFeeChargeDraft,
+} from '@/lib/tutor-fee-billing'
 
 async function getAdminSupabase() {
   await requireAdminAction()
@@ -139,6 +144,50 @@ export type CreateAthleteState = {
   message: string
 }
 
+export type AthleteFeeAssignmentState = {
+  ok: boolean
+  message: string
+}
+
+const athleteFeeAssignmentSchema = z.object({
+  athleteId: z.string().uuid('No se ha podido identificar el deportista.'),
+  feeTemplateId: z.string().uuid('Selecciona una cuota.'),
+  chargeDay: z.coerce.number().int().min(1, 'El día debe estar entre 1 y 28.').max(28, 'El día debe estar entre 1 y 28.'),
+  startMonth: z.string().regex(/^\d{4}-\d{2}$/, 'Selecciona el mes de inicio.'),
+})
+
+function getFrequencyMonths(value: string | null) {
+  if (value === 'cada_2_meses') return 2
+  if (value === 'cada_3_meses') return 3
+  if (value === 'cada_6_meses') return 6
+  return 1
+}
+
+function addMonths(year: number, monthIndex: number, monthsToAdd: number) {
+  return new Date(Date.UTC(year, monthIndex + monthsToAdd, 1))
+}
+
+function toDueDate(startMonth: string, chargeDay: number, offsetMonths: number) {
+  const [year, month] = startMonth.split('-').map(Number)
+  const date = addMonths(year, month - 1, offsetMonths)
+  date.setUTCDate(chargeDay)
+  return date.toISOString().slice(0, 10)
+}
+
+async function getPaidEnrollmentCreditCents(athleteId: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('payments')
+    .select('amount_cents')
+    .eq('athlete_id', athleteId)
+    .eq('payment_type', 'enrollment')
+    .eq('status', 'paid')
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).reduce((sum, payment) => sum + Number(payment.amount_cents ?? 0), 0)
+}
+
 export async function createAthleteAction(
   _prev: CreateAthleteState,
   formData: FormData,
@@ -182,4 +231,159 @@ export async function createAthleteAction(
   revalidatePath('/admin/matriculas')
   revalidatePath('/admin/equipos')
   return { ok: true, message: 'Deportista creado correctamente.' }
+}
+
+export async function assignAthleteFeeAction(
+  _prev: AthleteFeeAssignmentState,
+  formData: FormData,
+): Promise<AthleteFeeAssignmentState> {
+  const admin = await requireAdminAction()
+  const parsed = athleteFeeAssignmentSchema.safeParse({
+    athleteId: formData.get('athleteId'),
+    feeTemplateId: formData.get('feeTemplateId'),
+    chargeDay: formData.get('chargeDay'),
+    startMonth: formData.get('startMonth'),
+  })
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Revisa los datos de la cuota.' }
+  }
+
+  const supabase = createAdminClient()
+  const values = parsed.data
+  const { data: athlete, error: athleteError } = await supabase
+    .from('athletes')
+    .select('id, guardian_id, first_name, last_name')
+    .eq('id', values.athleteId)
+    .maybeSingle()
+
+  if (athleteError || !athlete) {
+    return { ok: false, message: athleteError?.message ?? 'No se ha encontrado el deportista.' }
+  }
+
+  if (!athlete.guardian_id) {
+    return { ok: false, message: 'Sólo se puede asignar una cuota si el deportista tiene tutor asignado.' }
+  }
+
+  const { data: fee, error: feeError } = await supabase
+    .from('admin_fee_templates')
+    .select('id, name, fee_type, total_amount_cents, currency, split_payment, charge_frequency, charge_count, stripe_product_id')
+    .eq('id', values.feeTemplateId)
+    .maybeSingle()
+
+  if (feeError || !fee) {
+    return { ok: false, message: feeError?.message ?? 'No se ha encontrado la cuota seleccionada.' }
+  }
+
+  const totalCharges = fee.split_payment ? Number(fee.charge_count ?? 0) : 1
+  if (totalCharges < 1) {
+    return { ok: false, message: 'La cuota no tiene una configuración de cargos válida.' }
+  }
+
+  let enrollmentCreditCents = 0
+  try {
+    enrollmentCreditCents = await getPaidEnrollmentCreditCents(athlete.id)
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'No se ha podido comprobar la matrícula pagada.',
+    }
+  }
+
+  const amountToChargeCents = Math.max(0, fee.total_amount_cents - enrollmentCreditCents)
+  if (amountToChargeCents <= 0) {
+    return {
+      ok: false,
+      message: 'La matrícula pagada cubre el importe completo de esta cuota. No hay importe pendiente que programar.',
+    }
+  }
+
+  const frequencyMonths = fee.split_payment ? getFrequencyMonths(fee.charge_frequency) : 1
+  const baseAmount = Math.floor(amountToChargeCents / totalCharges)
+  const remainder = amountToChargeCents % totalCharges
+  const charges = Array.from({ length: totalCharges }, (_, index) => ({
+    assignment_id: '',
+    guardian_id: athlete.guardian_id,
+    athlete_id: athlete.id,
+    fee_template_id: values.feeTemplateId,
+    charge_number: index + 1,
+    due_date: toDueDate(values.startMonth, values.chargeDay, index * frequencyMonths),
+    amount_cents: baseAmount + (index < remainder ? 1 : 0),
+    currency: 'eur',
+    status: 'scheduled',
+  }))
+
+  try {
+    validateFirstDueDate(charges[0].due_date)
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Revisa la fecha del primer cobro.' }
+  }
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from('tutor_fee_assignments')
+    .insert({
+      guardian_id: athlete.guardian_id,
+      athlete_id: athlete.id,
+      fee_template_id: values.feeTemplateId,
+      charge_day: values.chargeDay,
+      start_month: `${values.startMonth}-01`,
+      status: 'active',
+      created_by: admin.id,
+    })
+    .select('id')
+    .single()
+
+  if (assignmentError || !assignment) {
+    return { ok: false, message: assignmentError?.message ?? 'No se ha podido asignar la cuota.' }
+  }
+
+  const chargePayload = charges.map((charge) => ({
+    ...charge,
+    assignment_id: assignment.id,
+  }))
+
+  const { data: createdCharges, error: chargesError } = await supabase
+    .from('tutor_fee_charges')
+    .insert(chargePayload)
+    .select('id, amount_cents, due_date, charge_number')
+
+  if (chargesError || !createdCharges) {
+    await supabase.from('tutor_fee_assignments').delete().eq('id', assignment.id)
+    return { ok: false, message: chargesError?.message ?? 'No se han podido crear los cargos.' }
+  }
+
+  try {
+    const schedule = await createTutorFeeStripeSchedule({
+      assignmentId: assignment.id,
+      guardianId: athlete.guardian_id,
+      athleteId: athlete.id,
+      fee,
+      charges: createdCharges as TutorFeeChargeDraft[],
+      frequencyMonths,
+    })
+
+    const { error: scheduleError } = await supabase
+      .from('tutor_fee_assignments')
+      .update({ stripe_subscription_schedule_id: schedule.id })
+      .eq('id', assignment.id)
+
+    if (scheduleError) throw new Error(scheduleError.message)
+  } catch (error) {
+    await supabase.from('tutor_fee_assignments').delete().eq('id', assignment.id)
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'No se ha podido programar la cuota en Stripe.',
+    }
+  }
+
+  const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim()
+  revalidatePath('/admin/deportistas')
+  revalidatePath('/admin/tutores')
+  revalidatePath('/admin/pagos')
+  const creditMessage =
+    enrollmentCreditCents > 0
+      ? ` Se ha descontado la matrícula pagada (${(enrollmentCreditCents / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}).`
+      : ''
+
+  return { ok: true, message: `Cuota asignada a ${athleteName} y cobros programados en Stripe correctamente.${creditMessage}` }
 }

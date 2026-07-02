@@ -114,7 +114,7 @@ export function AuditoriaClient({ logs }: AuditoriaClientProps) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+              <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
                 <th className="px-4 py-2.5">Fecha</th>
                 <th className="px-4 py-2.5">Acción</th>
                 <th className="px-4 py-2.5">Administrador</th>

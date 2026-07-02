@@ -2,7 +2,6 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray, type UseFormRegisterReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, ArrowRight, ArrowLeft, CreditCard } from 'lucide-react'
@@ -38,7 +37,6 @@ const selectClasses = cn(
 )
 
 export function RegistroForm() {
-  const router = useRouter()
   const errId = useId()
   const [serverError, setServerError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
@@ -119,7 +117,7 @@ export function RegistroForm() {
         }
 
         setSubmitted(true)
-        router.push('/app')
+        window.location.assign('/app')
       } catch (err) {
         setServerError(
           err instanceof Error

@@ -262,6 +262,7 @@ async function updateOne(admin, table, id, payload, select = 'id') {
 }
 
 async function deleteOne(admin, table, id) {
+  if (!id) return
   const { error } = await admin.from(table).delete().eq('id', id)
   noError(error, `delete ${table}`)
 }
@@ -623,6 +624,7 @@ async function main() {
     })
     cleanup.consentIds.push(consent.id)
 
+    const enrollmentCreditCents = 5000
     const payment = await insertOne(admin, 'payments', {
       user_id: familyUser.id,
       guardian_id: testGuardianId,
@@ -631,7 +633,7 @@ async function main() {
       payment_type: 'enrollment',
       provider: 'manual',
       status: 'pending',
-      amount_cents: 100,
+      amount_cents: enrollmentCreditCents,
       description: 'Audit enrollment',
     })
     cleanup.paymentIds.push(payment.id)
@@ -651,18 +653,23 @@ async function main() {
     })
     cleanup.financeMovementIds.push(movement.id)
 
+    const feeTotalCents = 24000
     const template = await insertOne(admin, 'admin_fee_templates', {
       name: 'Audit Fee',
       fee_type: 'audit',
-      total_amount_cents: 1200,
+      total_amount_cents: feeTotalCents,
       split_payment: true,
       charge_frequency: 'monthly',
-      charge_count: 3,
+      charge_count: 10,
     })
     cleanup.feeTemplateIds.push(template.id)
 
+    const feeNetCents = feeTotalCents - enrollmentCreditCents
+    assert(feeNetCents === 19000, 'fee net amount did not subtract paid enrollment')
+
     const assignment = await insertOne(admin, 'tutor_fee_assignments', {
       guardian_id: testGuardianId,
+      athlete_id: testAthleteId,
       fee_template_id: template.id,
       charge_day: 5,
       start_month: '2031-01-01',
@@ -670,16 +677,24 @@ async function main() {
     })
     cleanup.tutorFeeAssignmentIds.push(assignment.id)
 
-    const charge = await insertOne(admin, 'tutor_fee_charges', {
-      assignment_id: assignment.id,
-      guardian_id: testGuardianId,
-      fee_template_id: template.id,
-      charge_number: 1,
-      due_date: '2031-01-05',
-      amount_cents: 400,
-      status: 'scheduled',
-    })
+    const charge = await insertOne(
+      admin,
+      'tutor_fee_charges',
+      {
+        assignment_id: assignment.id,
+        guardian_id: testGuardianId,
+        athlete_id: testAthleteId,
+        fee_template_id: template.id,
+        charge_number: 1,
+        due_date: '2031-01-05',
+        amount_cents: Math.floor(feeNetCents / 10),
+        status: 'scheduled',
+      },
+      'id,athlete_id,amount_cents',
+    )
     cleanup.tutorFeeChargeIds.push(charge.id)
+    assert(charge.athlete_id === testAthleteId, 'fee charge was not linked to athlete')
+    assert(charge.amount_cents === 1900, 'fee charge amount did not use enrollment-discounted net')
   })
 
   await check('Admin CRUD: news and sponsors', async () => {

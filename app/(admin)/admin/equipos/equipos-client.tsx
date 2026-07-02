@@ -147,13 +147,13 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/40">
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Nombre</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground sm:table-cell">Categoría</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground md:table-cell">Temporada</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Jugadores</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Estado</th>
-              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Acciones</th>
+            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Nombre</th>
+              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Categoría</th>
+              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Temporada</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Jugadores</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Estado</th>
+              <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-card">

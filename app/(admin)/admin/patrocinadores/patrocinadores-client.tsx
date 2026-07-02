@@ -128,20 +128,20 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/40">
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
+            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">
                 Imagen
               </th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">
                 Título
               </th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">
                 Tipo
               </th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">
                 Estado
               </th>
-              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
+              <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">
                 Acciones
               </th>
             </tr>

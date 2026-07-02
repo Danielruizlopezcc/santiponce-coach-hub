@@ -409,7 +409,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
     if (pendingStatusFilter === 'pendiente' || pendingStatusFilter === 'fallido') return []
     return feeAssignments.filter((assignment) => {
       if (!q) return true
-      return [assignment.feeName, assignment.feeType, assignment.nextChargeDate, String(assignment.chargeDay), String(assignment.scheduledCharges)]
+      return [assignment.feeName, assignment.feeType, assignment.athleteName, assignment.nextChargeDate, String(assignment.chargeDay), String(assignment.scheduledCharges)]
         .join(' ')
         .toLowerCase()
         .includes(q)
@@ -717,7 +717,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
                   <th className="px-4 py-2.5">Operación</th>
                   <th className="hidden px-4 py-2.5 md:table-cell">Tutor</th>
                   <th className="px-4 py-2.5">Estado</th>
@@ -952,7 +952,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 ) : null}
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                    <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
                       <th className="px-4 py-2.5">Nombre</th>
                       <th className="px-4 py-2.5">Tipo</th>
                       <th className="px-4 py-2.5">Importe</th>
@@ -1104,7 +1104,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                      <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
                         <th className="px-4 py-2.5">Operación</th>
                         <th className="px-4 py-2.5">Tutor</th>
                         <th className="px-4 py-2.5">Importe</th>
@@ -1151,7 +1151,12 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                   visibleFeeAssignments.map((assignment) => (
                     <div key={assignment.id} className="rounded-lg border border-border bg-white p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-black text-foreground">{assignment.feeName}</p>
+                        <div>
+                          <p className="font-black text-foreground">{assignment.feeName}</p>
+                          <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
+                            {assignment.athleteName}
+                          </p>
+                        </div>
                         <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
                           Próximo: {assignment.nextChargeDate}
                         </span>
@@ -1570,7 +1575,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                    <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
                       <th className="px-4 py-2.5">Concepto</th>
                       <th className="px-4 py-2.5">Categoría</th>
                       <th className="hidden px-4 py-2.5 lg:table-cell">Método</th>

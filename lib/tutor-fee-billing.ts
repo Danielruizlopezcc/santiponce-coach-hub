@@ -132,12 +132,14 @@ async function createRecurringPrice({
 export async function createTutorFeeStripeSchedule({
   assignmentId,
   guardianId,
+  athleteId,
   fee,
   charges,
   frequencyMonths,
 }: {
   assignmentId: string
   guardianId: string
+  athleteId?: string | null
   fee: FeeTemplateForStripe
   charges: TutorFeeChargeDraft[]
   frequencyMonths: number
@@ -201,6 +203,7 @@ export async function createTutorFeeStripeSchedule({
       guardianId,
       feeTemplateId: fee.id,
       flowType: 'tutor_fee_assignment',
+      ...(athleteId ? { athleteId } : {}),
     },
   })
 

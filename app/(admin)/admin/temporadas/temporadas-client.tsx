@@ -210,7 +210,7 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+            <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
               <th className="px-4 py-2.5">Nombre</th>
               <th className="px-4 py-2.5">Fecha inicio</th>
               <th className="px-4 py-2.5">Fecha fin</th>

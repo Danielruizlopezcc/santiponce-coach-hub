@@ -240,14 +240,14 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
           {actionError ? <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{actionError}</p> : null}
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Nombre</th>
-                <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground md:table-cell">Email</th>
-                <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground lg:table-cell">Equipo</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Rol</th>
-                <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground sm:table-cell">Estado</th>
-                <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground xl:table-cell">Alta</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Acciones</th>
+              <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
+                <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Nombre</th>
+                <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Email</th>
+                <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 lg:table-cell">Equipo</th>
+                <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Rol</th>
+                <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Estado</th>
+                <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 xl:table-cell">Alta</th>
+                <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-card">

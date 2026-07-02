@@ -2,3 +2,10 @@
 - Local:         http://localhost:3000
 - Network:       http://192.168.56.1:3000
 ✓ Ready in 346ms
+
+C:\Users\sergi\OneDrive\Escritorio\CDS\santiponce-coach-hub>node  "C:\Users\sergi\OneDrive\Escritorio\CDS\santiponce-coach-hub\node_modules\.bin\\..\.pnpm\next@16.2.6_@babel+core@7.2_40a7effce8bcad24669d45809ebe449e\node_modules\next\dist\bin\next" start 
+▲ Next.js 16.2.6
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+✓ Ready in 4.6s
+[ELIFECYCLE] Command failed with exit code 4294967295.

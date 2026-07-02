@@ -1228,7 +1228,7 @@ export function CalendarioClient({
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-center text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+            <tr className="border-b border-border bg-blue-50 text-xs font-bold text-blue-950">
               <th className="px-4 py-2.5 text-center">Jornada</th>
               <th className="px-4 py-2.5 text-center">Fecha</th>
               <th className="px-4 py-2.5 text-center">Partido</th>
@@ -1702,7 +1702,7 @@ export function CalendarioClient({
                     <col className="w-[7%]" />
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-border bg-muted/40 text-muted-foreground">
+                    <tr className="border-b border-border bg-blue-50 font-bold text-blue-950">
                       <th className="px-2 py-2">Jugador</th>
                       <th className="px-1 py-2 text-center">Conv.</th>
                       <th className="px-1 py-2 text-center">Tit.</th>

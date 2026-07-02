@@ -1,12 +1,11 @@
 import { PageContainer } from '@/components/page-container'
-import { getAdminFeeTemplates, getAdminMembers, getAdminTutorFeeAssignments, getAdminTutors } from '@/lib/admin-app'
+import { getAdminMembers, getAdminTutorFeeAssignments, getAdminTutors } from '@/lib/admin-app'
 import { TutorsMembersClient } from './tutores-client'
 
 export default async function AdminTutoresPage() {
-  const [tutors, members, feeTemplates, feeAssignments] = await Promise.all([
+  const [tutors, members, feeAssignments] = await Promise.all([
     getAdminTutors(),
     getAdminMembers(),
-    getAdminFeeTemplates(),
     getAdminTutorFeeAssignments(),
   ])
 
@@ -19,7 +18,6 @@ export default async function AdminTutoresPage() {
       <TutorsMembersClient
         tutors={tutors}
         members={members}
-        feeTemplates={feeTemplates}
         feeAssignments={feeAssignments}
       />
     </PageContainer>

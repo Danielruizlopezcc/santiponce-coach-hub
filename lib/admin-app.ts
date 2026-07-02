@@ -309,6 +309,8 @@ export type AdminFeeTemplateRow = {
 export type AdminTutorFeeAssignmentRow = {
   id: string
   guardianId: string
+  athleteId: string | null
+  athleteName: string
   feeTemplateId: string
   feeName: string
   feeType: string
@@ -464,6 +466,7 @@ type AdminFeeTemplateRecord = {
 type AdminTutorFeeAssignmentRecord = {
   id: string
   guardian_id: string
+  athlete_id: string | null
   fee_template_id: string
   charge_day: number
   start_month: string
@@ -474,6 +477,7 @@ type AdminTutorFeeAssignmentRecord = {
 type AdminTutorFeeChargeRecord = {
   assignment_id: string
   due_date: string
+  amount_cents: number
   status: 'scheduled' | 'paid' | 'failed' | 'canceled'
 }
 
@@ -1500,10 +1504,10 @@ export async function getAdminFeeTemplates(): Promise<AdminFeeTemplateRow[]> {
 
 export async function getAdminTutorFeeAssignments(): Promise<AdminTutorFeeAssignmentRow[]> {
   const supabase = await createClient()
-  const [{ data: assignments }, { data: feeTemplates }, { data: charges }] = await Promise.all([
+  const [{ data: assignments }, { data: feeTemplates }, { data: charges }, { data: athletes }] = await Promise.all([
     supabase
       .from('tutor_fee_assignments')
-      .select('id, guardian_id, fee_template_id, charge_day, start_month, status, created_at')
+      .select('id, guardian_id, athlete_id, fee_template_id, charge_day, start_month, status, created_at')
       .neq('status', 'canceled')
       .order('created_at', { ascending: false }),
     supabase
@@ -1511,12 +1515,21 @@ export async function getAdminTutorFeeAssignments(): Promise<AdminTutorFeeAssign
       .select('id, name, fee_type, total_amount_cents, is_public, split_payment, charge_frequency, charge_count, created_at'),
     supabase
       .from('tutor_fee_charges')
-      .select('assignment_id, due_date, status')
+      .select('assignment_id, due_date, amount_cents, status')
       .order('due_date', { ascending: true }),
+    supabase
+      .from('athletes')
+      .select('id, first_name, last_name'),
   ])
 
   const feeById = new Map(
     ((feeTemplates ?? []) as AdminFeeTemplateRecord[]).map((fee) => [fee.id, fee]),
+  )
+  const athleteById = new Map(
+    (athletes ?? []).map((athlete) => [
+      athlete.id,
+      `${athlete.first_name} ${athlete.last_name}`.trim(),
+    ]),
   )
   const chargesByAssignment = new Map<string, AdminTutorFeeChargeRecord[]>()
 
@@ -1530,14 +1543,22 @@ export async function getAdminTutorFeeAssignments(): Promise<AdminTutorFeeAssign
     const fee = feeById.get(assignment.fee_template_id)
     const assignmentCharges = chargesByAssignment.get(assignment.id) ?? []
     const nextCharge = assignmentCharges.find((charge) => charge.status === 'scheduled')
+    const totalAmountCents =
+      assignmentCharges.length > 0
+        ? assignmentCharges.reduce((sum, charge) => sum + Number(charge.amount_cents ?? 0), 0)
+        : fee?.total_amount_cents ?? 0
 
     return {
       id: assignment.id,
       guardianId: assignment.guardian_id,
+      athleteId: assignment.athlete_id,
+      athleteName: assignment.athlete_id
+        ? athleteById.get(assignment.athlete_id) ?? 'Deportista no disponible'
+        : 'Cuota familiar',
       feeTemplateId: assignment.fee_template_id,
       feeName: fee?.name ?? 'Cuota no disponible',
       feeType: fee?.fee_type ?? 'Sin tipo',
-      totalAmount: (fee?.total_amount_cents ?? 0) / 100,
+      totalAmount: totalAmountCents / 100,
       chargeDay: assignment.charge_day,
       startMonth: formatSpanishDate(assignment.start_month),
       status: assignment.status,

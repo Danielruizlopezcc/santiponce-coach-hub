@@ -1,14 +1,29 @@
 'use client'
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { CreditCard, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import type { AdminAthleteRow, AdminCategoryRow, AdminSeasonRow, AdminTeamRow, AdminTutorOption } from '@/lib/admin-app'
-import { createAthleteAction, deleteAthleteAction, type CreateAthleteState, updateAthleteAdminAction } from './actions'
+import type {
+  AdminAthleteRow,
+  AdminCategoryRow,
+  AdminFeeTemplateRow,
+  AdminSeasonRow,
+  AdminTeamRow,
+  AdminTutorFeeAssignmentRow,
+  AdminTutorOption,
+} from '@/lib/admin-app'
+import {
+  assignAthleteFeeAction,
+  createAthleteAction,
+  deleteAthleteAction,
+  type AthleteFeeAssignmentState,
+  type CreateAthleteState,
+  updateAthleteAdminAction,
+} from './actions'
 
 const ESTADO_STYLES: Record<AdminAthleteRow['estadoMatricula'], string> = {
   Matriculado: 'bg-emerald-100 text-emerald-700',
@@ -22,6 +37,8 @@ type Props = {
   teams: AdminTeamRow[]
   seasons: AdminSeasonRow[]
   tutors: AdminTutorOption[]
+  feeTemplates: AdminFeeTemplateRow[]
+  feeAssignments: AdminTutorFeeAssignmentRow[]
 }
 
 type Draft = {
@@ -39,10 +56,12 @@ const STATUS_OPTIONS = [
 ] as const
 
 const initialCreateState: CreateAthleteState = { ok: false, message: '' }
+const initialFeeAssignmentState: AthleteFeeAssignmentState = { ok: false, message: '' }
 
-export function DeportistasClient({ athletes, categories, teams, seasons, tutors }: Props) {
+export function DeportistasClient({ athletes, categories, teams, seasons, tutors, feeTemplates, feeAssignments }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
+  const [assigningAthlete, setAssigningAthlete] = useState<AdminAthleteRow | null>(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [teamFilter, setTeamFilter] = useState('')
@@ -54,9 +73,20 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
   const [actionError, setActionError] = useState<string | null>(null)
   const createFormRef = useRef<HTMLFormElement>(null)
   const [createState, createAction, createPending] = useActionState(createAthleteAction, initialCreateState)
+  const [feeAssignmentState, feeAssignmentAction, feeAssignmentPending] = useActionState(assignAthleteFeeAction, initialFeeAssignmentState)
 
   const activeCategories = categories.filter((category) => category.estado === 'Activa')
   const hasActiveFilters = [search, categoryFilter, teamFilter, statusFilter, seasonFilter].some(Boolean)
+  const assignmentsByAthlete = useMemo(() => {
+    const map = new Map<string, AdminTutorFeeAssignmentRow[]>()
+    for (const assignment of feeAssignments) {
+      if (!assignment.athleteId) continue
+      const current = map.get(assignment.athleteId) ?? []
+      current.push(assignment)
+      map.set(assignment.athleteId, current)
+    }
+    return map
+  }, [feeAssignments])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -213,6 +243,115 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
             </p>
           ) : null}
         </form>
+      </AdminFormDialog>
+
+      <AdminFormDialog
+        open={Boolean(assigningAthlete)}
+        onOpenChange={(open) => {
+          if (!open) setAssigningAthlete(null)
+        }}
+        title="Asignar cuota"
+        description="Programa una cuota para el deportista. El cobro se hará al tutor asignado."
+        maxWidth="lg"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setAssigningAthlete(null)}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="assign-athlete-fee-form"
+              disabled={feeAssignmentPending || !assigningAthlete?.guardianId || feeTemplates.length === 0}
+            >
+              {feeAssignmentPending ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+              Programar cuota
+            </Button>
+          </>
+        }
+      >
+        {assigningAthlete ? (
+          <form id="assign-athlete-fee-form" action={feeAssignmentAction} className="space-y-4">
+            <input type="hidden" name="athleteId" value={assigningAthlete.id} />
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+              <p className="font-black text-foreground">{assigningAthlete.nombre}</p>
+              <p className="text-muted-foreground">Tutor pagador: {assigningAthlete.tutor}</p>
+            </div>
+
+            {!assigningAthlete.guardianId ? (
+              <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
+                Este deportista no tiene tutor asignado. Asigna primero un tutor para poder programar una cuota.
+              </p>
+            ) : feeTemplates.length === 0 ? (
+              <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
+                Primero crea una cuota en Contabilidad &gt; Cuotas.
+              </p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label htmlFor="athlete-fee-template" className="text-sm font-black text-foreground">
+                    Tipo de cuota
+                  </label>
+                  <select
+                    id="athlete-fee-template"
+                    name="feeTemplateId"
+                    className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    required
+                  >
+                    <option value="">Selecciona cuota</option>
+                    {feeTemplates.map((fee) => (
+                      <option key={fee.id} value={fee.id}>
+                        {fee.nombre} · {fee.importe.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="athlete-start-month" className="text-sm font-black text-foreground">
+                    Mes de inicio
+                  </label>
+                  <Input id="athlete-start-month" name="startMonth" type="month" className="mt-2 bg-white" required />
+                </div>
+                <div>
+                  <label htmlFor="athlete-charge-day" className="text-sm font-black text-foreground">
+                    Día de cobro
+                  </label>
+                  <select
+                    id="athlete-charge-day"
+                    name="chargeDay"
+                    className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    defaultValue="1"
+                    required
+                  >
+                    {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
+                      <option key={day} value={day}>
+                        Día {day}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {feeAssignmentState.message ? (
+              <p className={cn('rounded-lg px-3 py-2 text-sm font-semibold', feeAssignmentState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
+                {feeAssignmentState.message}
+              </p>
+            ) : null}
+
+            {(assignmentsByAthlete.get(assigningAthlete.id)?.length ?? 0) > 0 ? (
+              <div className="grid gap-2">
+                {assignmentsByAthlete.get(assigningAthlete.id)?.map((assignment) => (
+                  <div key={assignment.id} className="rounded-lg border border-border bg-white px-3 py-2 text-sm">
+                    <p className="font-black text-foreground">{assignment.feeName}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Próximo cargo: {assignment.nextChargeDate} · {assignment.scheduledCharges} pendientes · {assignment.paidCharges} pagados
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </form>
+        ) : null}
       </AdminFormDialog>
 
       <AdminFormDialog
@@ -378,14 +517,14 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/40">
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Nombre</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground md:table-cell">Tutor</th>
-              <th className="min-w-48 px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Categoría</th>
-              <th className="min-w-48 px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Equipo</th>
-              <th className="min-w-40 px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Temporada</th>
-              <th className="min-w-36 px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Estado</th>
-              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Acciones</th>
+            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Nombre</th>
+              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Tutor</th>
+              <th className="min-w-48 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Categoría</th>
+              <th className="min-w-48 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Equipo</th>
+              <th className="min-w-40 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Temporada</th>
+              <th className="min-w-36 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Estado</th>
+              <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-card">
@@ -399,10 +538,18 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
 
             {filtered.map((athlete) => {
               const isDeleting = deleteId === athlete.id
+              const athleteAssignments = assignmentsByAthlete.get(athlete.id) ?? []
 
               return (
                 <tr key={athlete.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
-                  <td className="px-4 py-3 font-medium">{athlete.nombre}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <p>{athlete.nombre}</p>
+                    {athleteAssignments.length > 0 ? (
+                      <p className="mt-1 text-xs font-semibold text-primary">
+                        {athleteAssignments.length} cuota{athleteAssignments.length !== 1 ? 's' : ''} asignada{athleteAssignments.length !== 1 ? 's' : ''}
+                      </p>
+                    ) : null}
+                  </td>
                   <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
                     {athlete.tutor}
                   </td>
@@ -435,6 +582,16 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
                       <div className="flex justify-end gap-1">
                         <Button size="icon-sm" variant="ghost" aria-label="Editar deportista" onClick={() => openEdit(athlete)}>
                           <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label="Asignar cuota"
+                          title={athlete.guardianId ? 'Asignar cuota' : 'Asigna primero un tutor'}
+                          disabled={!athlete.guardianId}
+                          onClick={() => setAssigningAthlete(athlete)}
+                        >
+                          <CreditCard className="size-4" />
                         </Button>
                         <Button size="icon-sm" variant="destructive" aria-label="Eliminar deportista" onClick={() => { setEditId(null); setDraft(null); setDeleteId(athlete.id) }}>
                           <Trash2 className="size-4" />

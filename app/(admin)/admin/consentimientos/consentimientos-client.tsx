@@ -152,12 +152,12 @@ export function ConsentimientosClient({ consents }: { consents: AdminConsentRow[
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/40">
+            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
               <th className="w-8 px-2 py-2.5" />
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Persona</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground sm:table-cell">Firmados</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-medium text-muted-foreground sm:table-cell">Revocados</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Consentimientos</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Persona</th>
+              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Firmados</th>
+              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Revocados</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Consentimientos</th>
             </tr>
           </thead>
 
