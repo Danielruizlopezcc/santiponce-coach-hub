@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -243,12 +244,8 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
               <Label htmlFor="cat-active">Activa</Label>
             </div>
 
-            {formError && (
-              <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {formError}
-              </p>
-            )}
       </AdminFormDialog>
+      <AdminErrorDialog message={formError} onClose={() => setFormError(null)} />
     </>
   )
 

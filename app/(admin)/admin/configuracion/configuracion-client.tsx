@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react'
 import { CheckCircle2, Loader2, Save, Settings2 } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { AdminConfigData } from '@/lib/admin-app'
@@ -15,7 +16,7 @@ import {
 const initialState: AdminSettingsActionState = { ok: false, message: '' }
 
 function FormMessage({ state }: { state: AdminSettingsActionState }) {
-  if (!state.message) return null
+  if (!state.message || !state.ok) return null
   return (
     <p
       className={cn(
@@ -32,16 +33,18 @@ export function ConfiguracionClient({ data }: { data: AdminConfigData }) {
   const [state, action, pending] = useActionState(updateAdminSettingsAction, initialState)
   const [activeSeasonId, setActiveSeasonId] = useState(data.activeSeasonId)
   const [seasonMessage, setSeasonMessage] = useState<string | null>(null)
+  const [seasonError, setSeasonError] = useState<string | null>(null)
   const [isSeasonPending, startSeasonTransition] = useTransition()
 
   function handleActiveSeasonSave() {
     setSeasonMessage(null)
+    setSeasonError(null)
     startSeasonTransition(async () => {
       try {
         await updateActiveSeasonAction({ seasonId: activeSeasonId })
         setSeasonMessage('Temporada activa actualizada.')
       } catch (error) {
-        setSeasonMessage(error instanceof Error ? error.message : 'No se ha podido actualizar la temporada.')
+        setSeasonError(error instanceof Error ? error.message : 'No se ha podido actualizar la temporada.')
       }
     })
   }
@@ -173,6 +176,11 @@ export function ConfiguracionClient({ data }: { data: AdminConfigData }) {
           <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-sm font-semibold text-foreground">{seasonMessage}</p>
         ) : null}
       </section>
+
+      <AdminErrorDialog
+        message={(state.message && !state.ok ? state.message : null) ?? seasonError}
+        onClose={() => setSeasonError(null)}
+      />
     </div>
   )
 }

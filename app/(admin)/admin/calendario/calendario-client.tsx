@@ -1,19 +1,23 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, ClipboardList, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Loader2, Palette, Pencil, Pipette, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CLUB } from '@/lib/club'
-import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow, AdminTrainingSessionRow, TrainingLocation } from '@/lib/admin-app'
+import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamColorMap, AdminTeamRow, AdminTrainingSessionRow, TrainingLocation } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import {
   createMatchAction as adminCreateMatchAction,
   createTrainingAction as adminCreateTrainingAction,
   deleteMatchAction as adminDeleteMatchAction,
   deleteTrainingAction as adminDeleteTrainingAction,
+  resetAllTeamColorsAction as adminResetAllTeamColorsAction,
+  resetTeamColorAction as adminResetTeamColorAction,
+  updateTeamColorAction as adminUpdateTeamColorAction,
   updateMatchAction as adminUpdateMatchAction,
   updateTrainingAction as adminUpdateTrainingAction,
 } from './actions'
@@ -25,6 +29,7 @@ type Props = {
   actions?: CalendarActions
   emptyTeamsMessage?: string
   showCoordinatorSections?: boolean
+  teamColors?: AdminTeamColorMap
 }
 
 type SheetMode = 'create' | 'edit'
@@ -35,7 +40,9 @@ type MatchFormState = {
   opponentName: string
   matchDate: string
   matchTime: string
-  location: string
+  durationHours: string
+  durationMinutes: string
+  location: TrainingLocation
   isHome: boolean
   matchType: AdminMatchType
   roundLabel: string
@@ -156,7 +163,9 @@ type MatchActionInput = {
   opponentName: string
   matchDate: string
   matchTime: string
-  location: string
+  durationHours: number
+  durationMinutes: number
+  location: TrainingLocation
   isHome: boolean
   matchType: AdminMatchType
   roundLabel: string
@@ -214,6 +223,39 @@ type CalendarActions = {
   deleteTraining?: (id: string) => Promise<void>
 }
 
+const TEAM_COLOR_ACTIONS = {
+  update: adminUpdateTeamColorAction,
+  reset: adminResetTeamColorAction,
+  resetAll: adminResetAllTeamColorsAction,
+}
+
+type ScheduleSlot = {
+  date: string
+  time: string
+}
+
+type ScheduleEvent = {
+  id: string
+  kind: 'match' | 'training'
+  title: string
+  subtitle: string
+  teamName: string
+  categoryName: string
+  date: string
+  startTime: string
+  startMinute: number
+  durationMinutes: number
+  location: TrainingLocation
+  team?: AdminTeamRow
+  match?: AdminMatchRow
+  training?: AdminTrainingSessionRow
+}
+
+type PositionedScheduleEvent = ScheduleEvent & {
+  lane: number
+  laneCount: number
+}
+
 const STATUS_LABELS: Record<AdminMatchStatus, string> = {
   scheduled: 'Programado',
   played: 'Jugado',
@@ -233,7 +275,25 @@ const MATCH_TYPE_LABELS: Record<AdminMatchType, string> = {
   friendly: 'Amistoso',
 }
 
-const TRAINING_LOCATIONS: TrainingLocation[] = ['Campo 1', 'Campo 2', 'Anexo']
+const FIELD_LOCATIONS: TrainingLocation[] = ['Campo 1', 'Campo 2', 'Campo completo', 'Anexo']
+const TRAINING_LOCATIONS = FIELD_LOCATIONS
+const SCHEDULE_START_HOUR = 8
+const SCHEDULE_END_HOUR = 22
+const SCHEDULE_STEP_MINUTES = 15
+const SCHEDULE_ROW_HEIGHT = 24
+const FULL_FIELD_CATEGORIES = ['infantil', 'cadete', 'juvenil', 'senior']
+const SCHEDULE_CATEGORY_HUES = [211, 156, 276, 18, 188, 332, 43, 246, 126, 6, 225, 168]
+const STANDARD_TEAM_COLORS = ['#000000', '#ffffff', '#4d86f7', '#ea4335', '#f4b400', '#34a853', '#ff6d01', '#46bdc6']
+const TEAM_COLOR_PALETTE = [
+  '#000000', '#444444', '#666666', '#999999', '#b7b7b7', '#cccccc', '#d9d9d9', '#efefef', '#f3f3f3', '#ffffff',
+  '#980000', '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff',
+  '#e6b8af', '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#c9daf8', '#cfe2f3', '#d9d2e9', '#ead1dc',
+  '#dd7e6b', '#ea9999', '#f9cb9c', '#ffe599', '#b6d7a8', '#a2c4c9', '#a4c2f4', '#9fc5e8', '#b4a7d6', '#d5a6bd',
+  '#cc4125', '#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#6d9eeb', '#6fa8dc', '#8e7cc3', '#c27ba0',
+  '#a61c00', '#cc0000', '#e69138', '#f1c232', '#6aa84f', '#45818e', '#3c78d8', '#3d85c6', '#674ea7', '#a64d79',
+  '#85200c', '#990000', '#b45f06', '#bf9000', '#38761d', '#134f5c', '#1155cc', '#0b5394', '#351c75', '#741b47',
+  '#5b0f00', '#660000', '#783f04', '#7f6000', '#274e13', '#0c343d', '#1c4587', '#073763', '#20124d', '#4c1130',
+]
 
 const POSITION_OPTIONS: Array<{ value: PlayerStatFormState['position']; label: string }> = [
   { value: '', label: 'Sin posicion' },
@@ -243,13 +303,15 @@ const POSITION_OPTIONS: Array<{ value: PlayerStatFormState['position']; label: s
   { value: 'forward', label: 'Delantero' },
 ]
 
-function createEmptyForm(defaultTeamId = ''): MatchFormState {
+function createEmptyForm(defaultTeamId = '', defaultLocation: TrainingLocation = 'Campo 1'): MatchFormState {
   return {
     teamId: defaultTeamId,
     opponentName: '',
     matchDate: '',
     matchTime: '',
-    location: '',
+    durationHours: '2',
+    durationMinutes: '0',
+    location: defaultLocation,
     isHome: true,
     matchType: 'league',
     roundLabel: '',
@@ -270,6 +332,199 @@ function createEmptyTrainingForm(defaultTeamId = ''): TrainingFormState {
     location: 'Campo 1',
     notes: '',
   }
+}
+
+function getTeamDefaultMatchLocation(team?: AdminTeamRow): TrainingLocation {
+  const category = team?.categoria.toLowerCase() ?? ''
+  return FULL_FIELD_CATEGORIES.some((name) => category.includes(name)) ? 'Campo completo' : 'Campo 1'
+}
+
+function isValidFieldLocation(value: string): value is TrainingLocation {
+  return FIELD_LOCATIONS.includes(value as TrainingLocation)
+}
+
+function normalizeFieldLocation(value: string): TrainingLocation {
+  return isValidFieldLocation(value) ? value : 'Campo 1'
+}
+
+function hashText(value: string) {
+  return Array.from(value).reduce((hash, character) => ((hash << 5) - hash + character.charCodeAt(0)) | 0, 0)
+}
+
+function hslToHex(hue: number, saturation: number, lightness: number) {
+  const s = saturation / 100
+  const l = lightness / 100
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1))
+  const m = l - c / 2
+  const [r, g, b] =
+    hue < 60 ? [c, x, 0] :
+    hue < 120 ? [x, c, 0] :
+    hue < 180 ? [0, c, x] :
+    hue < 240 ? [0, x, c] :
+    hue < 300 ? [x, 0, c] :
+    [c, 0, x]
+
+  return `#${[r, g, b].map((value) => Math.round((value + m) * 255).toString(16).padStart(2, '0')).join('')}`
+}
+
+function normalizeHexColor(value: string) {
+  return /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : null
+}
+
+function getDefaultTeamColor(team: Pick<AdminTeamRow, 'id' | 'nombre' | 'categoria'>) {
+  const categoryKey = team.categoria.toLowerCase().trim() || 'sin categoria'
+  const teamKey = team.nombre.toLowerCase().trim() || team.id
+  const categoryHash = Math.abs(hashText(categoryKey))
+  const teamHash = Math.abs(hashText(teamKey))
+  const baseHue = SCHEDULE_CATEGORY_HUES[categoryHash % SCHEDULE_CATEGORY_HUES.length]
+  const toneOffset = ((teamHash % 7) - 3) * 7
+  const hue = (baseHue + toneOffset + 360) % 360
+  const lightness = 38 + (teamHash % 3) * 5
+
+  return hslToHex(hue, 72, lightness)
+}
+
+function getTeamColor(team: Pick<AdminTeamRow, 'id' | 'nombre' | 'categoria'>, colors: AdminTeamColorMap) {
+  return normalizeHexColor(colors[team.id] ?? '') ?? getDefaultTeamColor(team)
+}
+
+function getReadableTextColor(backgroundColor: string) {
+  const color = backgroundColor.replace('#', '')
+  const red = parseInt(color.slice(0, 2), 16)
+  const green = parseInt(color.slice(2, 4), 16)
+  const blue = parseInt(color.slice(4, 6), 16)
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000
+
+  return luminance > 170 ? '#0f172a' : '#ffffff'
+}
+
+function hexToRgb(value: string) {
+  const color = normalizeHexColor(value) ?? '#000000'
+  return {
+    red: parseInt(color.slice(1, 3), 16),
+    green: parseInt(color.slice(3, 5), 16),
+    blue: parseInt(color.slice(5, 7), 16),
+  }
+}
+
+function rgbToHex(red: number, green: number, blue: number) {
+  return `#${[red, green, blue]
+    .map((value) => Math.min(255, Math.max(0, value)).toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
+function getScheduleEventColor(event: ScheduleEvent, colors: AdminTeamColorMap) {
+  const teamColor = event.team ? getTeamColor(event.team, colors) : '#2563eb'
+  const textColor = getReadableTextColor(teamColor)
+
+  return {
+    backgroundColor: teamColor,
+    borderColor: textColor === '#ffffff' ? 'rgba(255,255,255,0.28)' : 'rgba(15,23,42,0.22)',
+    boxShadow: `0 8px 18px ${teamColor}33`,
+    color: textColor,
+  }
+}
+
+function getDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getWeekStart(date: Date) {
+  const weekStart = new Date(date)
+  const day = weekStart.getDay() || 7
+  weekStart.setHours(0, 0, 0, 0)
+  weekStart.setDate(weekStart.getDate() - day + 1)
+  return weekStart
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function addMinutesToTime(time: string, minutesToAdd: number) {
+  const start = timeToMinutes(time)
+  const total = start + minutesToAdd
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.slice(0, 5).split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+function minutesToTime(value: number) {
+  const hours = Math.floor(value / 60)
+  const minutes = value % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+function formatShortDay(date: Date) {
+  return new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(date)
+}
+
+function formatDayNumber(date: Date) {
+  return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' }).format(date)
+}
+
+function formatWeekTitle(weekStart: Date) {
+  const weekEnd = addDays(weekStart, 6)
+  const formatter = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+  return `${formatter.format(weekStart)} - ${formatter.format(weekEnd)}`
+}
+
+function rangesOverlap(left: ScheduleEvent, right: ScheduleEvent) {
+  return left.startMinute < right.startMinute + right.durationMinutes && right.startMinute < left.startMinute + left.durationMinutes
+}
+
+function positionDayEvents(events: ScheduleEvent[]): PositionedScheduleEvent[] {
+  const sorted = [...events].sort((a, b) => a.startMinute - b.startMinute || b.durationMinutes - a.durationMinutes)
+  const positioned: PositionedScheduleEvent[] = []
+  const activeCluster: ScheduleEvent[] = []
+  let clusterEnd = 0
+
+  function flushCluster() {
+    if (activeCluster.length === 0) return
+    const lanes: ScheduleEvent[][] = []
+
+    for (const event of activeCluster) {
+      const laneIndex = lanes.findIndex((lane) => !lane.some((placed) => rangesOverlap(placed, event)))
+      const targetLane = laneIndex === -1 ? lanes.length : laneIndex
+      lanes[targetLane] = [...(lanes[targetLane] ?? []), event]
+    }
+
+    for (const lane of lanes) {
+      for (const event of lane) {
+        positioned.push({
+          ...event,
+          lane: lanes.indexOf(lane),
+          laneCount: lanes.length,
+        })
+      }
+    }
+
+    activeCluster.length = 0
+    clusterEnd = 0
+  }
+
+  for (const event of sorted) {
+    if (activeCluster.length > 0 && event.startMinute >= clusterEnd) {
+      flushCluster()
+    }
+
+    activeCluster.push(event)
+    clusterEnd = Math.max(clusterEnd, event.startMinute + event.durationMinutes)
+  }
+
+  flushCluster()
+  return positioned
 }
 
 function trainingToForm(training: AdminTrainingSessionRow): TrainingFormState {
@@ -403,17 +658,6 @@ function getAutoTotalShots(form: ResultFormState, side: 'club' | 'opponent') {
   )
 }
 
-function CoordinatorPendingSection({ title }: { title: string }) {
-  return (
-    <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-      <h2 className="text-lg font-black text-foreground">{title}</h2>
-      <p className="mt-4 rounded-lg bg-muted/40 px-4 py-5 text-sm font-semibold text-muted-foreground">
-        Pendiente de configurar.
-      </p>
-    </section>
-  )
-}
-
 export function CalendarioClient({
   matches,
   teams,
@@ -421,8 +665,16 @@ export function CalendarioClient({
   actions,
   emptyTeamsMessage = 'Crea al menos un equipo antes de programar partidos.',
   showCoordinatorSections = false,
+  teamColors = {},
 }: Props) {
-  const [activeCoordinatorTab, setActiveCoordinatorTab] = useState<CoordinatorCalendarTab>('partidos')
+  const [activeCoordinatorTab, setActiveCoordinatorTab] = useState<CoordinatorCalendarTab>('horario')
+  const [scheduleWeekStart, setScheduleWeekStart] = useState(() => getWeekStart(new Date()))
+  const [scheduleSlot, setScheduleSlot] = useState<ScheduleSlot | null>(null)
+  const [teamColorMap, setTeamColorMap] = useState<AdminTeamColorMap>(teamColors)
+  const [teamColorsOpen, setTeamColorsOpen] = useState(false)
+  const [editingTeamColorId, setEditingTeamColorId] = useState<string | null>(null)
+  const [selectedTeamColor, setSelectedTeamColor] = useState('')
+  const [colorActionError, setColorActionError] = useState<string | null>(null)
   const [trainingSearch, setTrainingSearch] = useState('')
   const [trainingFilters, setTrainingFilters] = useState<TrainingFilters>({
     week: '',
@@ -488,7 +740,7 @@ export function CalendarioClient({
   const [eventPlayerId, setEventPlayerId] = useState<string | null>(null)
   const [statWarnings, setStatWarnings] = useState<string[]>([])
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [form, setForm] = useState<MatchFormState>(() => createEmptyForm(teams[0]?.id ?? ''))
+  const [form, setForm] = useState<MatchFormState>(() => createEmptyForm(teams[0]?.id ?? '', getTeamDefaultMatchLocation(teams[0])))
   const [formError, setFormError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const calendarActions = actions ?? {
@@ -505,6 +757,22 @@ export function CalendarioClient({
     [teams],
   )
   const selectableTeams = activeTeams.length > 0 ? activeTeams : teams
+  const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams])
+  const selectedMatchTeam = selectableTeams.find((team) => team.id === form.teamId) ?? teams.find((team) => team.id === form.teamId)
+  const matchRequiresFullField = selectedMatchTeam ? getTeamDefaultMatchLocation(selectedMatchTeam) === 'Campo completo' : false
+  const scheduleDays = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDays(scheduleWeekStart, index)),
+    [scheduleWeekStart],
+  )
+  const scheduleDateKeys = useMemo(() => scheduleDays.map(getDateKey), [scheduleDays])
+  const scheduleSlots = useMemo(
+    () =>
+      Array.from(
+        { length: ((SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) * 60) / SCHEDULE_STEP_MINUTES },
+        (_, index) => SCHEDULE_START_HOUR * 60 + index * SCHEDULE_STEP_MINUTES,
+      ),
+    [],
+  )
   const weekOptions = useMemo(
     () => Array.from(new Set(matches.map((match) => `${match.weekLabel}|${match.weekRangeLabel}`))),
     [matches],
@@ -513,6 +781,67 @@ export function CalendarioClient({
     () => Array.from(new Set(trainings.map((training) => `${training.weekLabel}|${training.weekRangeLabel}`))),
     [trainings],
   )
+  const positionedScheduleEventsByDate = useMemo(() => {
+    const eventsByDate = new Map<string, ScheduleEvent[]>()
+
+    for (const match of matches) {
+      if (!match.matchTime) continue
+      if (!scheduleDateKeys.includes(match.matchDate)) continue
+      const startMinute = timeToMinutes(match.matchTime)
+      if (startMinute < SCHEDULE_START_HOUR * 60 || startMinute >= SCHEDULE_END_HOUR * 60) continue
+      const location = normalizeFieldLocation(match.location)
+      const team = teamById.get(match.teamId)
+
+      eventsByDate.set(match.matchDate, [
+        ...(eventsByDate.get(match.matchDate) ?? []),
+        {
+          id: match.id,
+          kind: 'match',
+          title: `${CLUB.shortName} - ${match.opponentName}`,
+          subtitle: `${match.categoryName} · ${match.teamName} · ${match.durationLabel} · ${match.location || location}`,
+          teamName: match.teamName,
+          categoryName: match.categoryName,
+          team,
+          date: match.matchDate,
+          startTime: match.matchTime,
+          startMinute,
+          durationMinutes: match.durationMinutes,
+          location,
+          match,
+        },
+      ])
+    }
+
+    for (const training of trainings) {
+      if (!training.startTime || !scheduleDateKeys.includes(training.trainingDate)) continue
+      const startMinute = timeToMinutes(training.startTime)
+      if (startMinute < SCHEDULE_START_HOUR * 60 || startMinute >= SCHEDULE_END_HOUR * 60) continue
+      const team = teamById.get(training.teamId)
+
+      eventsByDate.set(training.trainingDate, [
+        ...(eventsByDate.get(training.trainingDate) ?? []),
+        {
+          id: training.id,
+          kind: 'training',
+          title: training.teamName,
+          subtitle: `${training.categoryName} · ${training.durationLabel} · ${training.location}`,
+          teamName: training.teamName,
+          categoryName: training.categoryName,
+          team,
+          date: training.trainingDate,
+          startTime: training.startTime,
+          startMinute,
+          durationMinutes: training.durationMinutes,
+          location: training.location,
+          training,
+        },
+      ])
+    }
+
+    return new Map(
+      Array.from(eventsByDate.entries()).map(([date, events]) => [date, positionDayEvents(events)]),
+    )
+  }, [matches, scheduleDateKeys, teamById, trainings])
 
   const filteredMatches = matches.filter((match) => {
     const q = search.toLowerCase().trim()
@@ -611,24 +940,49 @@ export function CalendarioClient({
   }
 
   function openCreate() {
+    const defaultTeam = selectableTeams[0]
     setMode('create')
     setEditing(null)
     setDeleteId(null)
-    setForm(createEmptyForm(selectableTeams[0]?.id ?? ''))
+    setForm(createEmptyForm(defaultTeam?.id ?? '', getTeamDefaultMatchLocation(defaultTeam)))
     setFormError(null)
     setSheetOpen(true)
   }
 
-  function openTrainingCreate() {
+  function openCreateFromSchedule(slot: ScheduleSlot) {
+    const defaultTeam = selectableTeams[0]
+    setMode('create')
+    setEditing(null)
+    setDeleteId(null)
+    setScheduleSlot(null)
+    setForm({
+      ...createEmptyForm(defaultTeam?.id ?? '', getTeamDefaultMatchLocation(defaultTeam)),
+      matchDate: slot.date,
+      matchTime: slot.time,
+    })
+    setFormError(null)
+    setSheetOpen(true)
+  }
+
+  function openTrainingCreate(slot?: ScheduleSlot) {
     setTrainingMode('create')
     setEditingTraining(null)
     setDeleteTrainingId(null)
-    setTrainingForm(createEmptyTrainingForm(selectableTeams[0]?.id ?? ''))
+    setTrainingForm({
+      ...createEmptyTrainingForm(selectableTeams[0]?.id ?? ''),
+      trainingDate: slot?.date ?? '',
+      startTime: slot?.time ?? '',
+    })
     setTrainingError(null)
+    setScheduleSlot(null)
     setTrainingSheetOpen(true)
   }
 
   function openEdit(match: AdminMatchRow) {
+    const matchTeam = selectableTeams.find((team) => team.id === match.teamId) ?? teams.find((team) => team.id === match.teamId)
+    const defaultLocation = getTeamDefaultMatchLocation(matchTeam)
+    const location = defaultLocation === 'Campo completo' ? defaultLocation : normalizeFieldLocation(match.location)
+
     setMode('edit')
     setEditing(match)
     setDeleteId(null)
@@ -637,7 +991,9 @@ export function CalendarioClient({
       opponentName: match.opponentName,
       matchDate: match.matchDate,
       matchTime: match.matchTime,
-      location: match.location,
+      durationHours: String(Math.floor(match.durationMinutes / 60)),
+      durationMinutes: String(match.durationMinutes % 60),
+      location,
       isHome: match.isHome,
       matchType: match.matchType,
       roundLabel: match.roundLabel,
@@ -707,13 +1063,17 @@ export function CalendarioClient({
   function buildPayload() {
     const homeScore = parseScore(form.homeScore)
     const awayScore = parseScore(form.awayScore)
+    const team = selectableTeams.find((team) => team.id === form.teamId) ?? teams.find((team) => team.id === form.teamId)
+    const defaultLocation = getTeamDefaultMatchLocation(team)
 
     return {
       teamId: form.teamId,
       opponentName: form.opponentName.trim(),
       matchDate: form.matchDate,
       matchTime: form.matchTime,
-      location: form.location.trim(),
+      durationHours: Number(form.durationHours || 0),
+      durationMinutes: Number(form.durationMinutes || 0),
+      location: defaultLocation === 'Campo completo' ? defaultLocation : form.location,
       isHome: form.isHome,
       matchType: form.matchType,
       roundLabel: form.roundLabel.trim(),
@@ -737,9 +1097,16 @@ export function CalendarioClient({
   }
 
   function validateForm() {
+    const durationHours = Number(form.durationHours || 0)
+    const durationMinutes = Number(form.durationMinutes || 0)
+
     if (!form.teamId) return 'Selecciona un equipo.'
     if (!form.opponentName.trim()) return 'Introduce el rival.'
     if (!form.matchDate) return 'Introduce la fecha del partido.'
+    if (!form.matchTime) return 'Introduce la hora del partido.'
+    if (durationHours <= 0 && durationMinutes <= 0) return 'Introduce una duración mayor que cero.'
+    if (durationMinutes > 59) return 'Los minutos deben estar entre 0 y 59.'
+    if (!FIELD_LOCATIONS.includes(form.location)) return 'Selecciona un campo válido.'
     if (form.matchType === 'league' && !form.roundLabel.trim()) return 'Introduce la jornada de liga.'
     if (form.status === 'played' && (!form.homeScore.trim() || !form.awayScore.trim())) {
       return 'Introduce el resultado para marcar el partido como jugado.'
@@ -1206,7 +1573,9 @@ export function CalendarioClient({
           opponentName: resultMatch.opponentName,
           matchDate: resultMatch.matchDate,
           matchTime: resultMatch.matchTime,
-          location: resultMatch.location,
+          durationHours: Math.floor(resultMatch.durationMinutes / 60),
+          durationMinutes: resultMatch.durationMinutes % 60,
+          location: normalizeFieldLocation(resultMatch.location),
           isHome: resultMatch.isHome,
           matchType: resultMatch.matchType,
           roundLabel: resultMatch.roundLabel,
@@ -1256,6 +1625,7 @@ export function CalendarioClient({
       try {
         await calendarActions.deleteMatch(id)
         setDeleteId(null)
+        setSheetOpen(false)
       } catch (error) {
         setFormError(error instanceof Error ? error.message : 'No se ha podido eliminar el partido.')
       }
@@ -1269,6 +1639,7 @@ export function CalendarioClient({
       try {
         await deleteTraining(id)
         setDeleteTrainingId(null)
+        setTrainingSheetOpen(false)
       } catch (error) {
         setTrainingError(error instanceof Error ? error.message : 'No se ha podido eliminar el entrenamiento.')
       }
@@ -1281,6 +1652,65 @@ export function CalendarioClient({
   const eventHasRedCard = Boolean(eventPlayer && (eventPlayer.redCard || parseRequiredStat(eventPlayer.yellowCards) >= 2))
   const eventGoalMinutes = eventPlayer ? getMinuteFields(eventPlayer.goalMinutes, eventGoalCount) : []
   const eventYellowMinutes = eventPlayer ? getMinuteFields(eventPlayer.yellowCardMinutes, eventYellowCount) : []
+  const editingTeamColor = editingTeamColorId ? teams.find((team) => team.id === editingTeamColorId) ?? null : null
+  const selectedColorRgb = hexToRgb(selectedTeamColor)
+
+  function openTeamColorEditor(team: AdminTeamRow) {
+    setEditingTeamColorId(team.id)
+    setSelectedTeamColor(getTeamColor(team, teamColorMap))
+    setColorActionError(null)
+  }
+
+  function handleSaveTeamColor() {
+    if (!editingTeamColor) return
+    const parsedColor = normalizeHexColor(selectedTeamColor)
+
+    if (!parsedColor) {
+      setColorActionError('Selecciona un color válido.')
+      return
+    }
+
+    setColorActionError(null)
+    startTransition(async () => {
+      try {
+        await TEAM_COLOR_ACTIONS.update(editingTeamColor.id, parsedColor)
+        setTeamColorMap((current) => ({ ...current, [editingTeamColor.id]: parsedColor }))
+        setEditingTeamColorId(null)
+      } catch (error) {
+        setColorActionError(error instanceof Error ? error.message : 'No se ha podido guardar el color.')
+      }
+    })
+  }
+
+  function handleResetTeamColor(team: AdminTeamRow) {
+    setColorActionError(null)
+    startTransition(async () => {
+      try {
+        await TEAM_COLOR_ACTIONS.reset(team.id)
+        setTeamColorMap((current) => {
+          const next = { ...current }
+          delete next[team.id]
+          return next
+        })
+        setSelectedTeamColor(getDefaultTeamColor(team))
+      } catch (error) {
+        setColorActionError(error instanceof Error ? error.message : 'No se ha podido restablecer el color.')
+      }
+    })
+  }
+
+  function handleResetAllTeamColors() {
+    setColorActionError(null)
+    startTransition(async () => {
+      try {
+        await TEAM_COLOR_ACTIONS.resetAll()
+        setTeamColorMap({})
+        setEditingTeamColorId(null)
+      } catch (error) {
+        setColorActionError(error instanceof Error ? error.message : 'No se han podido restablecer los colores.')
+      }
+    })
+  }
 
   return (
     <div className="space-y-5">
@@ -1311,13 +1741,152 @@ export function CalendarioClient({
       ) : null}
 
       {showCoordinatorSections && activeCoordinatorTab === 'horario' ? (
-        <CoordinatorPendingSection title="Horario" />
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setScheduleWeekStart(getWeekStart(new Date()))}>
+                Hoy
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Semana anterior"
+                onClick={() => setScheduleWeekStart((current) => addDays(current, -7))}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Semana siguiente"
+                onClick={() => setScheduleWeekStart((current) => addDays(current, 7))}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+              <h2 className="ml-2 text-xl font-black text-foreground">{formatWeekTitle(scheduleWeekStart)}</h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setTeamColorsOpen(true)}>
+                <Palette className="size-4 text-primary" aria-hidden="true" />
+                Colores
+              </Button>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-black uppercase text-muted-foreground ring-1 ring-foreground/10">
+                <CalendarDays className="size-4 text-primary" aria-hidden="true" />
+                Semana
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl bg-white/82 shadow-sm ring-1 ring-foreground/10 backdrop-blur lg:overflow-visible">
+            <div className="min-w-[1330px]">
+              <div className="sticky top-12 z-20 grid grid-cols-[72px_repeat(7,minmax(180px,1fr))] border-b border-border bg-white/95 shadow-sm backdrop-blur">
+                <div className="border-r border-border bg-white/95" />
+                {scheduleDays.map((day) => {
+                  const isToday = getDateKey(day) === getDateKey(new Date())
+
+                  return (
+                    <div
+                      key={getDateKey(day)}
+                      className={cn(
+                        'border-r border-border px-3 py-3 last:border-r-0',
+                        isToday ? 'bg-primary/10 text-primary' : 'bg-white/95 text-foreground',
+                      )}
+                    >
+                      <p className="text-sm font-black capitalize">{formatShortDay(day)}</p>
+                      <p className="mt-1 text-lg font-black">{formatDayNumber(day)}</p>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="grid grid-cols-[72px_repeat(7,minmax(180px,1fr))]">
+                <div className="border-r border-border bg-muted/20">
+                  {scheduleSlots.map((slot) => (
+                    <div
+                      key={slot}
+                      className={cn(
+                        'flex items-start justify-end border-b border-dotted border-border/70 pr-2 pt-0.5 text-[11px] font-semibold text-muted-foreground',
+                        slot % 60 === 0 && 'border-b-border text-foreground',
+                      )}
+                      style={{ height: SCHEDULE_ROW_HEIGHT }}
+                    >
+                      {slot % 60 === 0 ? minutesToTime(slot) : ''}
+                    </div>
+                  ))}
+                </div>
+
+                {scheduleDays.map((day) => {
+                  const date = getDateKey(day)
+                  const dayEvents = positionedScheduleEventsByDate.get(date) ?? []
+
+                  return (
+                    <div
+                      key={date}
+                      className="relative border-r border-border last:border-r-0"
+                      style={{ height: scheduleSlots.length * SCHEDULE_ROW_HEIGHT }}
+                    >
+                      {scheduleSlots.map((slot) => {
+                        const time = minutesToTime(slot)
+
+                        return (
+                          <button
+                            key={`${date}-${time}`}
+                            type="button"
+                            className={cn(
+                              'absolute left-0 right-0 border-b border-dotted border-border/70 transition-colors hover:bg-primary/5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              slot % 60 === 0 && 'border-b-border',
+                            )}
+                            style={{
+                              top: ((slot - SCHEDULE_START_HOUR * 60) / SCHEDULE_STEP_MINUTES) * SCHEDULE_ROW_HEIGHT,
+                              height: SCHEDULE_ROW_HEIGHT,
+                            }}
+                            aria-label={`Crear el ${date} a las ${time}`}
+                            onClick={() => setScheduleSlot({ date, time })}
+                          />
+                        )
+                      })}
+
+                      {dayEvents.map((event) => {
+                        const top = ((event.startMinute - SCHEDULE_START_HOUR * 60) / SCHEDULE_STEP_MINUTES) * SCHEDULE_ROW_HEIGHT
+                        const height = Math.max(22, (event.durationMinutes / SCHEDULE_STEP_MINUTES) * SCHEDULE_ROW_HEIGHT - 4)
+                        const gap = 4
+                        const width = `calc((100% - ${gap * (event.laneCount + 1)}px) / ${event.laneCount})`
+                        const left = `calc(${event.lane} * ((100% - ${gap * (event.laneCount + 1)}px) / ${event.laneCount}) + ${gap * (event.lane + 1)}px)`
+                        const eventColor = getScheduleEventColor(event, teamColorMap)
+
+                        return (
+                          <button
+                            key={`${event.kind}-${event.id}`}
+                            type="button"
+                            className={cn(
+                              'absolute z-10 overflow-y-auto rounded-md border px-2 py-1 text-left text-white transition-transform hover:z-20 hover:-translate-y-0.5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              event.kind === 'training' && 'border-dashed',
+                            )}
+                            style={{ top, height, width, left, ...eventColor }}
+                            onClick={() => (event.kind === 'match' && event.match ? openEdit(event.match) : event.training ? openTrainingEdit(event.training) : null)}
+                            title={`${event.title} · ${minutesToTime(event.startMinute)}-${addMinutesToTime(event.startTime, event.durationMinutes)} · ${event.location}`}
+                          >
+                            <p className="whitespace-normal break-words text-[11px] font-black leading-tight">{event.title}</p>
+                            <p className="mt-0.5 whitespace-normal break-words text-[10px] font-bold leading-tight opacity-95">
+                              {minutesToTime(event.startMinute)}-{addMinutesToTime(event.startTime, event.durationMinutes)}
+                            </p>
+                            <p className="mt-0.5 whitespace-normal break-words text-[10px] font-semibold leading-tight opacity-95">{event.subtitle}</p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
       ) : null}
 
       {showCoordinatorSections && activeCoordinatorTab === 'entrenamientos' ? (
         <section className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button size="sm" onClick={openTrainingCreate} disabled={selectableTeams.length === 0}>
+            <Button size="sm" onClick={() => openTrainingCreate()} disabled={selectableTeams.length === 0}>
               <Plus className="size-4" aria-hidden="true" />
               Nuevo entrenamiento
             </Button>
@@ -1412,12 +1981,6 @@ export function CalendarioClient({
               </select>
             </div>
           </div>
-
-          {trainingError && !trainingSheetOpen ? (
-            <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              {trainingError}
-            </div>
-          ) : null}
 
           <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
             <table className="w-full text-center text-sm">
@@ -1643,20 +2206,6 @@ export function CalendarioClient({
         </div>
       </div>
 
-      {formError && !sheetOpen && !resultMatch ? (
-        <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {formError.includes('\n') ? (
-            <ul className="space-y-1">
-              {formError.split('\n').map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>{formError}</p>
-          )}
-        </div>
-      ) : null}
-
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-center text-sm">
           <thead>
@@ -1665,6 +2214,7 @@ export function CalendarioClient({
               <th className="px-4 py-2.5 text-center">Fecha</th>
               <th className="px-4 py-2.5 text-center">Partido</th>
               <th className="px-4 py-2.5 text-center">Competición</th>
+              <th className="px-4 py-2.5 text-center">Duración</th>
               <th className="px-4 py-2.5 text-center">Lugar</th>
               <th className="px-4 py-2.5 text-center">Estado</th>
               <th className="px-4 py-2.5 text-center">Resultado</th>
@@ -1674,7 +2224,7 @@ export function CalendarioClient({
           <tbody className="divide-y divide-border bg-card">
             {filteredMatches.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-14 text-center text-sm text-muted-foreground">
+                <td colSpan={9} className="px-4 py-14 text-center text-sm text-muted-foreground">
                   No hay partidos registrados todavía.
                 </td>
               </tr>
@@ -1709,6 +2259,7 @@ export function CalendarioClient({
                         {MATCH_TYPE_LABELS[match.matchType]}
                       </div>
                     </td>
+                    <td className="px-4 py-3 font-semibold text-foreground">{match.durationLabel}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {match.location || 'Sin lugar'}
                     </td>
@@ -1767,6 +2318,56 @@ export function CalendarioClient({
       ) : null}
 
       <AdminFormDialog
+        open={Boolean(scheduleSlot)}
+        onOpenChange={(open) => {
+          if (!open) setScheduleSlot(null)
+        }}
+        title="Crear en horario"
+        description={scheduleSlot ? `${scheduleSlot.date} a las ${scheduleSlot.time}` : undefined}
+        maxWidth="md"
+        footer={
+          <Button variant="outline" onClick={() => setScheduleSlot(null)}>
+            Cancelar
+          </Button>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button
+            type="button"
+            className="h-24 flex-col items-start justify-center gap-2 px-4 text-left"
+            disabled={!scheduleSlot || selectableTeams.length === 0}
+            onClick={() => {
+              if (scheduleSlot) openCreateFromSchedule(scheduleSlot)
+            }}
+          >
+            <CalendarDays className="size-5" aria-hidden="true" />
+            <span className="text-base font-black">Partido</span>
+            <span className="text-xs font-semibold opacity-85">Duración configurable</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-24 flex-col items-start justify-center gap-2 px-4 text-left"
+            disabled={!scheduleSlot || selectableTeams.length === 0}
+            onClick={() => {
+              if (scheduleSlot) openTrainingCreate(scheduleSlot)
+            }}
+          >
+            <ClipboardList className="size-5" aria-hidden="true" />
+            <span className="text-base font-black">Entrenamiento</span>
+            <span className="text-xs font-semibold text-muted-foreground">Duración configurable</span>
+          </Button>
+        </div>
+
+        {selectableTeams.length === 0 ? (
+          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
+            Crea al menos un equipo antes de programar el horario.
+          </p>
+        ) : null}
+      </AdminFormDialog>
+
+      <AdminFormDialog
         open={trainingSheetOpen}
         onOpenChange={setTrainingSheetOpen}
         title={trainingMode === 'create' ? 'Nuevo entrenamiento' : 'Editar entrenamiento'}
@@ -1774,6 +2375,12 @@ export function CalendarioClient({
         maxWidth="lg"
         footer={
           <>
+            {trainingMode === 'edit' && editingTraining ? (
+              <Button variant="destructive" onClick={() => handleTrainingDelete(editingTraining.id)} disabled={isPending}>
+                <Trash2 className="size-4" />
+                Eliminar
+              </Button>
+            ) : null}
             <Button variant="outline" onClick={() => setTrainingSheetOpen(false)}>
               Cancelar
             </Button>
@@ -1877,11 +2484,6 @@ export function CalendarioClient({
           </div>
         </div>
 
-        {trainingError ? (
-          <div className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {trainingError}
-          </div>
-        ) : null}
       </AdminFormDialog>
 
       <AdminFormDialog
@@ -1892,6 +2494,12 @@ export function CalendarioClient({
         maxWidth="xl"
         footer={
           <>
+            {mode === 'edit' && editing ? (
+              <Button variant="destructive" onClick={() => handleDelete(editing.id)} disabled={isPending}>
+                <Trash2 className="size-4" />
+                Eliminar
+              </Button>
+            ) : null}
             <Button variant="outline" onClick={() => setSheetOpen(false)}>
               Cancelar
             </Button>
@@ -1908,7 +2516,15 @@ export function CalendarioClient({
             <select
               id="match-team"
               value={form.teamId}
-              onChange={(event) => setField('teamId', event.target.value)}
+              onChange={(event) => {
+                const teamId = event.target.value
+                const nextTeam = selectableTeams.find((team) => team.id === teamId)
+                setForm((current) => ({
+                  ...current,
+                  teamId,
+                  location: getTeamDefaultMatchLocation(nextTeam),
+                }))
+              }}
               className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               <option value="">Selecciona equipo</option>
@@ -1951,14 +2567,58 @@ export function CalendarioClient({
             />
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="match-duration-hours">Duración horas</Label>
+              <Input
+                id="match-duration-hours"
+                type="number"
+                min="0"
+                max="6"
+                step="1"
+                value={form.durationHours}
+                onChange={(event) => setField('durationHours', event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="match-duration-minutes">Duración minutos</Label>
+              <Input
+                id="match-duration-minutes"
+                type="number"
+                min="0"
+                max="59"
+                step="1"
+                value={form.durationMinutes}
+                onChange={(event) => setField('durationMinutes', event.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-location">Lugar</Label>
-            <Input
-              id="match-location"
-              value={form.location}
-              onChange={(event) => setField('location', event.target.value)}
-              placeholder="Campo municipal, pabellón..."
-            />
+            <Label htmlFor="match-location">Campo</Label>
+            {matchRequiresFullField ? (
+              <Input id="match-location" value="Campo completo" readOnly className="font-semibold text-muted-foreground" />
+            ) : (
+              <select
+                id="match-location"
+                value={form.location}
+                onChange={(event) => setField('location', event.target.value as TrainingLocation)}
+                className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                {FIELD_LOCATIONS.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
+            )}
+            {selectedMatchTeam ? (
+              <p className="text-xs font-semibold text-muted-foreground">
+                {matchRequiresFullField
+                  ? 'Esta categoría usa campo completo por defecto.'
+                  : 'Puedes elegir medio campo, campo completo o anexo.'}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -2037,19 +2697,6 @@ export function CalendarioClient({
           />
         </div>
 
-        {formError ? (
-          <div className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {formError.includes('\n') ? (
-              <ul className="space-y-1">
-                {formError.split('\n').map((message) => (
-                  <li key={message}>{message}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>{formError}</p>
-            )}
-          </div>
-        ) : null}
       </AdminFormDialog>
 
       <AdminFormDialog
@@ -2464,19 +3111,6 @@ export function CalendarioClient({
           )}
         </div>
 
-        {formError ? (
-          <div className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {formError.includes('\n') ? (
-              <ul className="space-y-1">
-                {formError.split('\n').map((message) => (
-                  <li key={message}>{message}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>{formError}</p>
-            )}
-          </div>
-        ) : null}
       </AdminFormDialog>
 
       <AdminFormDialog
@@ -2629,6 +3263,213 @@ export function CalendarioClient({
           </ul>
         </div>
       </AdminFormDialog>
+
+      <AdminFormDialog
+        open={teamColorsOpen}
+        onOpenChange={(open) => {
+          setTeamColorsOpen(open)
+          if (!open) {
+            setEditingTeamColorId(null)
+            setColorActionError(null)
+          }
+        }}
+        title="Colores de equipos"
+        description="Personaliza cómo se muestran los equipos en el horario semanal."
+        maxWidth="2xl"
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <Button type="button" variant="outline" onClick={handleResetAllTeamColors} disabled={isPending}>
+              <RotateCcw className="size-4" aria-hidden="true" />
+              Restablecer todos
+            </Button>
+            <Button type="button" onClick={() => setTeamColorsOpen(false)}>
+              Aceptar
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-h-0 rounded-lg border border-border bg-white">
+            <div className="border-b border-border px-4 py-3">
+              <p className="text-sm font-black text-foreground">Equipos</p>
+            </div>
+            <div className="max-h-[52vh] overflow-y-auto">
+              {teams.map((team) => {
+                const color = getTeamColor(team, teamColorMap)
+                const isEditing = editingTeamColorId === team.id
+
+                return (
+                  <div
+                    key={team.id}
+                    className={cn(
+                      'grid gap-3 border-b border-border px-4 py-3 last:border-b-0 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center',
+                      isEditing && 'bg-primary/5',
+                    )}
+                  >
+                    <span
+                      className="size-9 rounded-full border border-foreground/10 shadow-sm"
+                      style={{ backgroundColor: color }}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-foreground">{team.nombre}</p>
+                      <p className="truncate text-xs font-semibold text-muted-foreground">{team.categoria} · {team.temporada}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => openTeamColorEditor(team)}>
+                        <Palette className="size-4" aria-hidden="true" />
+                        Cambiar
+                      </Button>
+                      {teamColorMap[team.id] ? (
+                        <Button type="button" variant="ghost" size="icon-sm" aria-label="Restablecer color" onClick={() => handleResetTeamColor(team)} disabled={isPending}>
+                          <RotateCcw className="size-4" aria-hidden="true" />
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <aside className="rounded-lg border border-border bg-[#f8fafc] p-4">
+            {editingTeamColor ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="size-12 rounded-full border border-foreground/10 shadow-sm"
+                    style={{ backgroundColor: selectedTeamColor }}
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-foreground">{editingTeamColor.nombre}</p>
+                    <p className="truncate text-xs font-semibold text-muted-foreground">{editingTeamColor.categoria}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-black uppercase text-muted-foreground">Paleta</p>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedTeamColor(getDefaultTeamColor(editingTeamColor))}>
+                      <RotateCcw className="size-4" aria-hidden="true" />
+                      Base
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-10 gap-2">
+                    {TEAM_COLOR_PALETTE.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={cn(
+                          'size-7 rounded-full border border-foreground/10 ring-offset-2 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          selectedTeamColor === color.toLowerCase() && 'ring-2 ring-primary',
+                        )}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Color ${color}`}
+                        onClick={() => setSelectedTeamColor(color.toLowerCase())}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  <p className="mb-2 text-xs font-black uppercase text-muted-foreground">Estándar</p>
+                  <div className="flex flex-wrap gap-2">
+                    {STANDARD_TEAM_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={cn(
+                          'size-8 rounded-full border border-foreground/10 ring-offset-2 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          selectedTeamColor === color.toLowerCase() && 'ring-2 ring-primary',
+                        )}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Color estándar ${color}`}
+                        onClick={() => setSelectedTeamColor(color.toLowerCase())}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  <p className="mb-3 text-xs font-black uppercase text-muted-foreground">Personalizado</p>
+                  <div className="grid gap-3">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="color"
+                        value={normalizeHexColor(selectedTeamColor) ?? '#000000'}
+                        onChange={(event) => setSelectedTeamColor(event.target.value.toLowerCase())}
+                        className="h-11 w-16 cursor-pointer p-1"
+                        aria-label="Seleccionar color personalizado"
+                      />
+                      <div className="inline-flex size-11 items-center justify-center rounded-lg border border-border bg-white text-muted-foreground">
+                        <Pipette className="size-5" aria-hidden="true" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
+                        Hexadecimal
+                        <Input
+                          value={selectedTeamColor}
+                          onChange={(event) => setSelectedTeamColor(event.target.value)}
+                          className="h-10 bg-white"
+                        />
+                      </label>
+                      {([
+                        { label: 'R', value: selectedColorRgb.red, channel: 'red' },
+                        { label: 'V', value: selectedColorRgb.green, channel: 'green' },
+                        { label: 'A', value: selectedColorRgb.blue, channel: 'blue' },
+                      ] as const).map((channel) => (
+                        <label key={channel.label} className="grid gap-1 text-xs font-semibold text-muted-foreground">
+                          {channel.label}
+                          <Input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={channel.value}
+                            onChange={(event) => {
+                              const nextValue = Number(event.target.value)
+                              const nextRgb = { ...selectedColorRgb }
+                              nextRgb[channel.channel] = nextValue
+                              setSelectedTeamColor(rgbToHex(nextRgb.red, nextRgb.green, nextRgb.blue))
+                            }}
+                            className="h-10 bg-white"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {colorActionError ? (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-100">
+                    {colorActionError}
+                  </p>
+                ) : null}
+
+                <div className="flex justify-end gap-2 border-t border-border pt-4">
+                  <Button type="button" variant="outline" onClick={() => setEditingTeamColorId(null)}>
+                    Cancelar
+                  </Button>
+                  <Button type="button" onClick={handleSaveTeamColor} disabled={isPending}>
+                    {isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Palette className="size-4" aria-hidden="true" />}
+                    Guardar color
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-white/70 p-6 text-center">
+                <Palette className="size-8 text-primary" aria-hidden="true" />
+                <p className="mt-3 text-sm font-black text-foreground">Selecciona un equipo</p>
+                <p className="mt-1 text-sm text-muted-foreground">Pulsa Cambiar para editar su color.</p>
+              </div>
+            )}
+          </aside>
+        </div>
+      </AdminFormDialog>
+
+      <AdminErrorDialog message={formError} onClose={() => setFormError(null)} />
+      <AdminErrorDialog message={trainingError} onClose={() => setTrainingError(null)} />
     </div>
   )
 }

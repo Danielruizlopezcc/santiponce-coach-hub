@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Pencil, UserMinus, UserPlus, Users } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -178,12 +179,6 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
           </p>
         </div>
       </div>
-
-      {actionError && (
-        <p className="mb-6 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {actionError}
-        </p>
-      )}
 
       {/* ── Jugadores del equipo ─────────────────────────────────── */}
       <section className="mb-8">
@@ -384,11 +379,6 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
               <Label htmlFor="edit-active">Equipo activo</Label>
             </div>
 
-            {editError && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {editError}
-              </p>
-            )}
           </div>
 
           <SheetFooter>
@@ -399,6 +389,11 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <AdminErrorDialog
+        message={actionError ?? editError}
+        onClose={() => { setActionError(null); setEditError(null) }}
+      />
 
     </div>
   )

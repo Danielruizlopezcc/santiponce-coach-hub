@@ -3,6 +3,7 @@
 import { ChangeEvent, useState, useTransition } from 'react'
 import { BadgeCheck, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import Image from 'next/image'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -334,12 +335,8 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
             </div>
           </div>
 
-            {formError ? (
-              <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {formError}
-              </p>
-            ) : null}
       </AdminFormDialog>
+      <AdminErrorDialog message={formError} onClose={() => setFormError(null)} />
     </PageContainer>
   )
 }

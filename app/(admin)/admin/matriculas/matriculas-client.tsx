@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { CheckCircle2, Pencil, Search, Trash2, X } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageContainer } from '@/components/page-container'
@@ -188,12 +189,6 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
         </div>
       </div>
 
-      {actionError && (
-        <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {actionError}
-        </p>
-      )}
-
       {/* ── Tabla ───────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
@@ -353,6 +348,8 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
           </tbody>
         </table>
       </div>
+
+      <AdminErrorDialog message={actionError} onClose={() => setActionError(null)} />
     </>
   )
 

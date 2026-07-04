@@ -223,6 +223,8 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
       timeLabel: formatMatchTime(match.match_time),
       weekLabel: weekInfo.weekLabel,
       weekRangeLabel: weekInfo.weekRangeLabel,
+      durationMinutes: 120,
+      durationLabel: '2 horas',
       location: match.location ?? '',
       isHome: Boolean(match.is_home),
       matchType: (match.match_type ?? 'league') as AdminMatchType,

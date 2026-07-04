@@ -4,6 +4,7 @@ import { ChangeEvent, useState, useTransition } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import Image from 'next/image'
 import { Folder, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { PageContainer } from '@/components/page-container'
 import { RichTextEditor } from '@/components/rich-text-editor'
 import { Button } from '@/components/ui/button'
@@ -231,12 +232,6 @@ export function NoticiasClient({ news, sections }: Props) {
             </Button>
           </div>
         </div>
-
-        {sectionError ? (
-          <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {sectionError}
-          </p>
-        ) : null}
 
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {sections.map((section) => (
@@ -476,11 +471,6 @@ export function NoticiasClient({ news, sections }: Props) {
                     />
                   </div>
 
-                  {formError ? (
-                    <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
-                      {formError}
-                    </p>
-                  ) : null}
                 </aside>
               </div>
             </div>
@@ -500,6 +490,7 @@ export function NoticiasClient({ news, sections }: Props) {
           </Dialog.Popup>
         </Dialog.Portal>
       </Dialog.Root>
+      <AdminErrorDialog message={formError ?? sectionError} onClose={() => { setFormError(null); setSectionError(null) }} />
     </PageContainer>
   )
 }

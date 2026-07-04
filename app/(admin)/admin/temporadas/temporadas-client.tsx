@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -200,8 +201,6 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
         ) : null}
       </div>
 
-      {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
-
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
@@ -261,6 +260,8 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
           </tbody>
         </table>
       </div>
+
+      <AdminErrorDialog message={error} onClose={() => setError(null)} />
     </div>
   )
 }

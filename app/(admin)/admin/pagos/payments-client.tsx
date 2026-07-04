@@ -8,6 +8,7 @@ import {
   type Column,
   type FilterConfig,
 } from '@/components/admin/admin-table'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -700,7 +701,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             emptyTitle="Sin pagos"
             emptyDescription="No hay pagos que coincidan con los filtros aplicados."
           />
-          {paymentMessage?.message ? (
+          {paymentMessage?.message && paymentMessage.ok ? (
             <p
               className={cn(
                 'mt-4 rounded-lg px-3 py-2 text-sm font-semibold',
@@ -858,7 +859,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                     </div>
                   ) : null}
 
-                  {feeState.message ? (
+                  {feeState.message && feeState.ok ? (
                     <p
                       className={cn(
                         'rounded-lg px-3 py-2 text-sm font-semibold',
@@ -933,7 +934,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               </div>
 
               <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-                {feeDeleteMessage?.message ? (
+                {feeDeleteMessage?.message && feeDeleteMessage.ok ? (
                   <p
                     className={cn(
                       'mb-3 rounded-lg px-3 py-2 text-sm font-semibold',
@@ -1450,7 +1451,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                   />
                 </div>
 
-                {movementState.message ? (
+                {movementState.message && movementState.ok ? (
                   <p
                     className={cn(
                       'rounded-lg px-3 py-2 text-sm font-semibold',
@@ -1542,13 +1543,11 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 </select>
               </div>
 
-              {(deleteMessage?.message || deletePendingId) ? (
+              {(deleteMessage?.ok || deletePendingId) ? (
                 <p
                   className={cn(
                     'rounded-lg px-3 py-2 text-sm font-semibold',
-                    deleteMessage?.ok
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-rose-100 text-rose-700',
+                    'bg-emerald-100 text-emerald-700',
                   )}
                 >
                   {deletePendingId ? 'Eliminando movimiento...' : deleteMessage?.message}
@@ -1673,6 +1672,20 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
         </div>
       </section>
       ) : null}
+      <AdminErrorDialog
+        message={
+          (paymentMessage?.message && !paymentMessage.ok ? paymentMessage.message : null) ??
+          (feeState.message && !feeState.ok ? feeState.message : null) ??
+          (feeDeleteMessage?.message && !feeDeleteMessage.ok ? feeDeleteMessage.message : null) ??
+          (movementState.message && !movementState.ok ? movementState.message : null) ??
+          (deleteMessage?.message && !deleteMessage.ok ? deleteMessage.message : null)
+        }
+        onClose={() => {
+          setPaymentMessage(null)
+          setFeeDeleteMessage(null)
+          setDeleteMessage(null)
+        }}
+      />
     </div>
   )
 }

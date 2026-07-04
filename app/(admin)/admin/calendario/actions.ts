@@ -7,7 +7,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 const matchStatusSchema = z.enum(['scheduled', 'played', 'postponed', 'cancelled'])
 const matchTypeSchema = z.enum(['league', 'friendly'])
-const trainingLocationSchema = z.enum(['Campo 1', 'Campo 2', 'Anexo'])
+const fieldLocationSchema = z.enum(['Campo 1', 'Campo 2', 'Campo completo', 'Anexo'])
+const trainingLocationSchema = fieldLocationSchema
 
 const playerStatSchema = z.object({
   athleteId: z.string().uuid(),
@@ -50,7 +51,9 @@ const matchBaseSchema = z.object({
   opponentName: z.string().trim().min(2, 'Introduce el rival.').max(80, 'El rival es demasiado largo.'),
   matchDate: z.string().min(1, 'Introduce la fecha del partido.'),
   matchTime: z.string().optional(),
-  location: z.string().trim().max(120, 'El lugar es demasiado largo.').optional(),
+  durationHours: z.number().int().min(0).max(6),
+  durationMinutes: z.number().int().min(0).max(59),
+  location: fieldLocationSchema,
   isHome: z.boolean(),
   matchType: matchTypeSchema,
   roundLabel: z.string().trim().max(40, 'La jornada es demasiado larga.').optional(),
@@ -199,8 +202,28 @@ function validateMatchStats(value: z.infer<typeof matchBaseSchema>, ctx: z.Refin
   validatePlayerStats(value.playerStats, ctx)
 }
 
-const matchSchema = matchBaseSchema
+const createMatchSchema = matchBaseSchema
+  .omit({ id: true })
   .superRefine(validateMatchStats)
+  .refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
+    message: 'Introduce una duración mayor que cero.',
+    path: ['durationHours'],
+  })
+  .refine(
+    (value) => value.status !== 'played' || (value.homeScore !== null && value.awayScore !== null),
+    {
+      message: 'Introduce el resultado para marcar el partido como jugado.',
+      path: ['homeScore'],
+    },
+  )
+
+const updateMatchSchema = matchBaseSchema
+  .required({ id: true })
+  .superRefine(validateMatchStats)
+  .refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
+    message: 'Introduce una duración mayor que cero.',
+    path: ['durationHours'],
+  })
   .refine(
     (value) => value.status !== 'played' || (value.homeScore !== null && value.awayScore !== null),
     {
@@ -215,24 +238,17 @@ const matchSchema = matchBaseSchema
       path: ['roundLabel'],
     },
   )
+  .refine(
+    (value) => value.matchType !== 'league' || Boolean(value.roundLabel?.trim()),
+    {
+      message: 'Introduce la jornada de liga.',
+      path: ['roundLabel'],
+    },
+  )
 
-const createMatchSchema = matchBaseSchema.omit({ id: true }).superRefine(validateMatchStats).refine(
-  (value) => value.status !== 'played' || (value.homeScore !== null && value.awayScore !== null),
-  {
-    message: 'Introduce el resultado para marcar el partido como jugado.',
-    path: ['homeScore'],
-  },
-).refine(
-  (value) => value.matchType !== 'league' || Boolean(value.roundLabel?.trim()),
-  {
-    message: 'Introduce la jornada de liga.',
-    path: ['roundLabel'],
-  },
-)
+type MatchInput = z.infer<typeof matchBaseSchema>
 
-type MatchInput = z.infer<typeof matchSchema>
-
-const trainingSchema = z.object({
+const trainingBaseSchema = z.object({
   id: z.string().uuid().optional(),
   teamId: z.string().uuid('Selecciona un equipo.'),
   trainingDate: z.string().min(1, 'Introduce la fecha del entrenamiento.'),
@@ -241,14 +257,18 @@ const trainingSchema = z.object({
   durationMinutes: z.number().int().min(0).max(59),
   location: trainingLocationSchema,
   notes: z.string().trim().max(300, 'Las notas son demasiado largas.').optional(),
-}).refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
+})
+
+const createTrainingSchema = trainingBaseSchema.omit({ id: true }).refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
+  message: 'Introduce una duración mayor que cero.',
+  path: ['durationHours'],
+})
+const updateTrainingSchema = trainingBaseSchema.required({ id: true }).refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
   message: 'Introduce una duración mayor que cero.',
   path: ['durationHours'],
 })
 
-const createTrainingSchema = trainingSchema.omit({ id: true })
-
-type TrainingInput = z.infer<typeof trainingSchema>
+type TrainingInput = z.infer<typeof trainingBaseSchema>
 type StoredTrainingSession = {
   id: string
   teamId: string
@@ -259,8 +279,22 @@ type StoredTrainingSession = {
   location: z.infer<typeof trainingLocationSchema>
   notes: string
 }
+type StoredMatchScheduleMeta = {
+  matchId: string
+  durationMinutes: number
+}
 
 const TRAINING_SETTINGS_KEY = 'coordinator_training_sessions'
+const MATCH_SCHEDULE_META_SETTINGS_KEY = 'coordinator_match_schedule_meta'
+const TEAM_COLORS_SETTINGS_KEY = 'coordinator_team_colors'
+const DEFAULT_MATCH_DURATION_MINUTES = 120
+const FULL_FIELD_CATEGORIES = ['infantil', 'cadete', 'juvenil', 'senior']
+const hexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i, 'Selecciona un color válido.')
+
+type TeamScheduleInfo = {
+  seasonId: string
+  categoryName: string
+}
 
 function revalidateCalendarPaths() {
   revalidatePath('/admin/calendario')
@@ -313,18 +347,201 @@ async function writeStoredTrainings(trainings: StoredTrainingSession[]) {
   if (error) throw new Error(error.message)
 }
 
-async function getTeamSeasonId(teamId: string) {
+async function readStoredMatchScheduleMeta(): Promise<StoredMatchScheduleMeta[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', MATCH_SCHEDULE_META_SETTINGS_KEY)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  try {
+    return JSON.parse(data?.value ?? '[]') as StoredMatchScheduleMeta[]
+  } catch {
+    return []
+  }
+}
+
+async function writeStoredMatchScheduleMeta(rows: StoredMatchScheduleMeta[]) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert(
+      {
+        key: MATCH_SCHEDULE_META_SETTINGS_KEY,
+        value: JSON.stringify(rows),
+      },
+      { onConflict: 'key' },
+    )
+
+  if (error) throw new Error(error.message)
+}
+
+async function readStoredTeamColors(): Promise<Record<string, string>> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', TEAM_COLORS_SETTINGS_KEY)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  try {
+    const parsed = JSON.parse(data?.value ?? '{}') as Record<string, string>
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, color]) => hexColorSchema.safeParse(color).success),
+    )
+  } catch {
+    return {}
+  }
+}
+
+async function writeStoredTeamColors(colors: Record<string, string>) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert(
+      {
+        key: TEAM_COLORS_SETTINGS_KEY,
+        value: JSON.stringify(colors),
+      },
+      { onConflict: 'key' },
+    )
+
+  if (error) throw new Error(error.message)
+}
+
+async function upsertStoredMatchDuration(matchId: string, durationMinutes: number) {
+  const rows = await readStoredMatchScheduleMeta()
+  const nextRows = [
+    ...rows.filter((row) => row.matchId !== matchId),
+    { matchId, durationMinutes },
+  ]
+
+  await writeStoredMatchScheduleMeta(nextRows)
+}
+
+async function deleteStoredMatchDuration(matchId: string) {
+  const rows = await readStoredMatchScheduleMeta()
+  await writeStoredMatchScheduleMeta(rows.filter((row) => row.matchId !== matchId))
+}
+
+function isFullFieldCategory(categoryName: string) {
+  const normalized = categoryName.toLowerCase()
+  return FULL_FIELD_CATEGORIES.some((category) => normalized.includes(category))
+}
+
+function getEffectiveMatchLocation(
+  location: z.infer<typeof fieldLocationSchema>,
+  categoryName: string,
+): z.infer<typeof fieldLocationSchema> {
+  return isFullFieldCategory(categoryName) ? 'Campo completo' : location
+}
+
+async function getTeamScheduleInfo(teamId: string): Promise<TeamScheduleInfo> {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('teams')
-    .select('season_id')
+    .select('season_id, category_id')
     .eq('id', teamId)
     .maybeSingle()
 
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No se ha encontrado el equipo seleccionado.')
 
-  return data.season_id
+  const { data: category, error: categoryError } = await supabase
+    .from('categories')
+    .select('name')
+    .eq('id', data.category_id)
+    .maybeSingle()
+
+  if (categoryError) throw new Error(categoryError.message)
+
+  return {
+    seasonId: data.season_id,
+    categoryName: category?.name ?? '',
+  }
+}
+
+function timeToMinutes(value: string | null | undefined) {
+  if (!value) return null
+  const [hours, minutes] = value.slice(0, 5).split(':').map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
+  return hours * 60 + minutes
+}
+
+function rangesOverlap(startA: number, durationA: number, startB: number, durationB: number) {
+  return startA < startB + durationB && startB < startA + durationA
+}
+
+function fieldsConflict(left: z.infer<typeof fieldLocationSchema>, right: z.infer<typeof fieldLocationSchema>) {
+  if (left === right) return true
+  if (left === 'Anexo' || right === 'Anexo') return false
+  return left === 'Campo completo' || right === 'Campo completo'
+}
+
+async function assertFieldIsAvailable(input: {
+  kind: 'match' | 'training'
+  id?: string
+  date: string
+  startTime: string
+  durationMinutes: number
+  location: z.infer<typeof fieldLocationSchema>
+}) {
+  const start = timeToMinutes(input.startTime)
+  if (start === null) return
+
+  const supabase = createAdminClient()
+  const [{ data: matches, error: matchesError }, { data: teams, error: teamsError }, { data: categories, error: categoriesError }, trainings, matchScheduleMeta] = await Promise.all([
+    supabase
+      .from('matches')
+      .select('id, team_id, match_date, match_time, location, opponent_name')
+      .eq('match_date', input.date),
+    supabase.from('teams').select('id, category_id'),
+    supabase.from('categories').select('id, name'),
+    readStoredTrainings(),
+    readStoredMatchScheduleMeta(),
+  ])
+
+  if (matchesError) throw new Error(matchesError.message)
+  if (teamsError) throw new Error(teamsError.message)
+  if (categoriesError) throw new Error(categoriesError.message)
+
+  const teamCategoryIdById = new Map((teams ?? []).map((team) => [team.id, team.category_id]))
+  const categoryNameById = new Map((categories ?? []).map((category) => [category.id, category.name]))
+  const matchDurationById = new Map(matchScheduleMeta.map((row) => [row.matchId, row.durationMinutes]))
+
+  for (const match of matches ?? []) {
+    if (input.kind === 'match' && match.id === input.id) continue
+    const matchStart = timeToMinutes(match.match_time)
+    const parsedLocation = fieldLocationSchema.safeParse(match.location)
+    const categoryName = categoryNameById.get(teamCategoryIdById.get(match.team_id) ?? '') ?? ''
+    const location = getEffectiveMatchLocation(parsedLocation.success ? parsedLocation.data : 'Campo 1', categoryName)
+
+    if (matchStart === null) continue
+    const durationMinutes = matchDurationById.get(match.id) ?? DEFAULT_MATCH_DURATION_MINUTES
+
+    if (!fieldsConflict(input.location, location)) continue
+    if (!rangesOverlap(start, input.durationMinutes, matchStart, durationMinutes)) continue
+
+    throw new Error(`Ese campo ya está ocupado por el partido contra ${match.opponent_name ?? 'otro rival'} en esa franja.`)
+  }
+
+  for (const training of trainings) {
+    if (input.kind === 'training' && training.id === input.id) continue
+    if (training.trainingDate !== input.date) continue
+    const location = fieldLocationSchema.safeParse(training.location)
+    const trainingStart = timeToMinutes(training.startTime)
+
+    if (!location.success || trainingStart === null) continue
+    if (!fieldsConflict(input.location, location.data)) continue
+    if (!rangesOverlap(start, input.durationMinutes, trainingStart, training.durationMinutes)) continue
+
+    throw new Error('Ese campo ya está ocupado por un entrenamiento en esa franja.')
+  }
 }
 
 async function saveMatchPlayerStats(matchId: string, teamId: string, seasonId: string, playerStats: z.infer<typeof playerStatSchema>[]) {
@@ -381,7 +598,7 @@ async function saveMatchPlayerStats(matchId: string, teamId: string, seasonId: s
   if (error) throw new Error(error.message)
 }
 
-function toMatchPayload(parsed: MatchInput, seasonId: string) {
+function toMatchPayload(parsed: MatchInput, seasonId: string, location: z.infer<typeof fieldLocationSchema>) {
   const isPlayed = parsed.status === 'played'
   const isLeague = parsed.matchType === 'league'
 
@@ -391,7 +608,7 @@ function toMatchPayload(parsed: MatchInput, seasonId: string) {
     opponent_name: parsed.opponentName,
     match_date: parsed.matchDate,
     match_time: parsed.matchTime || null,
-    location: parsed.location || null,
+    location,
     is_home: parsed.isHome,
     match_type: parsed.matchType,
     round_label: isLeague ? parsed.roundLabel?.trim() ?? null : null,
@@ -433,29 +650,54 @@ function toMatchPayload(parsed: MatchInput, seasonId: string) {
   return payload
 }
 
+function getMatchDurationMinutes(parsed: Pick<MatchInput, 'durationHours' | 'durationMinutes'>) {
+  return parsed.durationHours * 60 + parsed.durationMinutes
+}
+
 export async function createMatchAction(input: MatchInput): Promise<void> {
   await requireSportsAdminAction()
   const parsed = createMatchSchema.parse(input)
-  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const teamInfo = await getTeamScheduleInfo(parsed.teamId)
+  const location = getEffectiveMatchLocation(parsed.location, teamInfo.categoryName)
   const supabase = createAdminClient()
 
-  const { error } = await supabase
+  await assertFieldIsAvailable({
+    kind: 'match',
+    date: parsed.matchDate,
+    startTime: parsed.matchTime ?? '',
+    durationMinutes: getMatchDurationMinutes(parsed),
+    location,
+  })
+
+  const { data, error } = await supabase
     .from('matches')
-    .insert(toMatchPayload(parsed, seasonId))
+    .insert(toMatchPayload(parsed, teamInfo.seasonId, location))
+    .select('id')
+    .single()
 
   if (error) throw new Error(error.message)
+  await upsertStoredMatchDuration(data.id, getMatchDurationMinutes(parsed))
   revalidateCalendarPaths()
 }
 
 export async function createTrainingAction(input: TrainingInput): Promise<void> {
   await requireSportsAdminAction()
   const parsed = createTrainingSchema.parse(input)
-  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const teamInfo = await getTeamScheduleInfo(parsed.teamId)
   const trainings = await readStoredTrainings()
+  const durationMinutes = parsed.durationHours * 60 + parsed.durationMinutes
+
+  await assertFieldIsAvailable({
+    kind: 'training',
+    date: parsed.trainingDate,
+    startTime: parsed.startTime,
+    durationMinutes,
+    location: parsed.location,
+  })
 
   trainings.push({
     id: crypto.randomUUID(),
-    ...toTrainingPayload(parsed, seasonId),
+    ...toTrainingPayload(parsed, teamInfo.seasonId),
   })
   await writeStoredTrainings(trainings)
   revalidateCalendarPaths()
@@ -463,14 +705,25 @@ export async function createTrainingAction(input: TrainingInput): Promise<void> 
 
 export async function updateTrainingAction(input: TrainingInput & { id: string }): Promise<void> {
   await requireSportsAdminAction()
-  const parsed = trainingSchema.required({ id: true }).parse(input)
-  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const parsed = updateTrainingSchema.parse(input)
+  const teamInfo = await getTeamScheduleInfo(parsed.teamId)
   const trainings = await readStoredTrainings()
+  const durationMinutes = parsed.durationHours * 60 + parsed.durationMinutes
+
+  await assertFieldIsAvailable({
+    kind: 'training',
+    id: parsed.id,
+    date: parsed.trainingDate,
+    startTime: parsed.startTime,
+    durationMinutes,
+    location: parsed.location,
+  })
+
   const nextTrainings = trainings.map((training) =>
     training.id === parsed.id
       ? {
           id: parsed.id,
-          ...toTrainingPayload(parsed, seasonId),
+          ...toTrainingPayload(parsed, teamInfo.seasonId),
         }
       : training,
   )
@@ -490,18 +743,29 @@ export async function deleteTrainingAction(id: string): Promise<void> {
 
 export async function updateMatchAction(input: MatchInput & { id: string }): Promise<void> {
   await requireSportsAdminAction()
-  const parsed = matchSchema.required({ id: true }).parse(input)
-  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const parsed = updateMatchSchema.parse(input)
+  const teamInfo = await getTeamScheduleInfo(parsed.teamId)
+  const location = getEffectiveMatchLocation(parsed.location, teamInfo.categoryName)
   const supabase = createAdminClient()
+
+  await assertFieldIsAvailable({
+    kind: 'match',
+    id: parsed.id,
+    date: parsed.matchDate,
+    startTime: parsed.matchTime ?? '',
+    durationMinutes: getMatchDurationMinutes(parsed),
+    location,
+  })
 
   const { error } = await supabase
     .from('matches')
-    .update(toMatchPayload(parsed, seasonId))
+    .update(toMatchPayload(parsed, teamInfo.seasonId, location))
     .eq('id', parsed.id)
 
   if (error) throw new Error(error.message)
+  await upsertStoredMatchDuration(parsed.id, getMatchDurationMinutes(parsed))
   if (parsed.playerStats) {
-    await saveMatchPlayerStats(parsed.id, parsed.teamId, seasonId, parsed.playerStats)
+    await saveMatchPlayerStats(parsed.id, parsed.teamId, teamInfo.seasonId, parsed.playerStats)
   }
   revalidateCalendarPaths()
 }
@@ -513,5 +777,36 @@ export async function deleteMatchAction(id: string): Promise<void> {
   const { error } = await supabase.from('matches').delete().eq('id', parsedId)
 
   if (error) throw new Error(error.message)
+  await deleteStoredMatchDuration(parsedId)
+  revalidateCalendarPaths()
+}
+
+export async function updateTeamColorAction(teamId: string, color: string): Promise<void> {
+  await requireSportsAdminAction()
+  const parsedTeamId = z.string().uuid('No se ha podido identificar el equipo.').parse(teamId)
+  const parsedColor = hexColorSchema.parse(color)
+  const colors = await readStoredTeamColors()
+
+  await writeStoredTeamColors({
+    ...colors,
+    [parsedTeamId]: parsedColor.toLowerCase(),
+  })
+  revalidateCalendarPaths()
+}
+
+export async function resetTeamColorAction(teamId: string): Promise<void> {
+  await requireSportsAdminAction()
+  const parsedTeamId = z.string().uuid('No se ha podido identificar el equipo.').parse(teamId)
+  const colors = await readStoredTeamColors()
+  const nextColors = { ...colors }
+  delete nextColors[parsedTeamId]
+
+  await writeStoredTeamColors(nextColors)
+  revalidateCalendarPaths()
+}
+
+export async function resetAllTeamColorsAction(): Promise<void> {
+  await requireSportsAdminAction()
+  await writeStoredTeamColors({})
   revalidateCalendarPaths()
 }

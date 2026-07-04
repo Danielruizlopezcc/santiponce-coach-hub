@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { AlertTriangle, CheckCircle2, CreditCard, KeyRound, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X, XCircle } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,7 +31,7 @@ type Props = {
 const initialState: TutorSocioActionState = { ok: false, message: '' }
 
 function FormMessage({ state }: { state: TutorSocioActionState }) {
-  if (!state.message) return null
+  if (!state.message || !state.ok) return null
   return (
     <p
       className={cn(
@@ -349,7 +350,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} placeholder="Buscar por tutor, email, teléfono o ciudad" className="pl-9" />
             </div>
-            {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
+            {toggleMessage?.message && toggleMessage.ok ? <FormMessage state={toggleMessage} /> : null}
             <div className="mt-4 overflow-hidden rounded-xl ring-1 ring-foreground/10">
               <table className="w-full table-fixed text-sm">
                 <colgroup>
@@ -474,7 +475,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'pendientes' ? (
         <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-          {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
+          {toggleMessage?.message && toggleMessage.ok ? <FormMessage state={toggleMessage} /> : null}
           <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
             <table className="w-full text-sm">
               <thead>
@@ -535,7 +536,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'rechazados' ? (
         <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-          {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
+          {toggleMessage?.message && toggleMessage.ok ? <FormMessage state={toggleMessage} /> : null}
           <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
             <table className="w-full text-sm">
               <thead>
@@ -705,6 +706,14 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
           </div>
         </section>
       ) : null}
+      <AdminErrorDialog
+        message={
+          (toggleMessage?.message && !toggleMessage.ok ? toggleMessage.message : null) ??
+          (tutorState.message && !tutorState.ok ? tutorState.message : null) ??
+          (memberState.message && !memberState.ok ? memberState.message : null)
+        }
+        onClose={() => setToggleMessage(null)}
+      />
     </div>
   )
 }

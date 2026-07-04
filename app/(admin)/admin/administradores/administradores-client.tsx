@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState, useTransition } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +23,7 @@ const ROLE_OPTIONS = [
 ] as const
 
 function FormMessage({ state }: { state: AdminManagerActionState }) {
-  if (!state.message) return null
+  if (!state.message || !state.ok) return null
   return (
     <p
       className={cn(
@@ -235,10 +236,6 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
           />
         </div>
 
-        {actionError ? (
-          <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{actionError}</p>
-        ) : null}
-
         <div className="overflow-x-auto rounded-lg ring-1 ring-foreground/10">
           <table className="w-full text-sm">
             <thead>
@@ -309,6 +306,11 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
           </table>
         </div>
       </section>
+
+      <AdminErrorDialog
+        message={state.message && !state.ok ? state.message : actionError}
+        onClose={() => setActionError(null)}
+      />
     </div>
   )
 }

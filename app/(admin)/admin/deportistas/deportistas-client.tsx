@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { CreditCard, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { PageContainer } from '@/components/page-container'
 import { Button } from '@/components/ui/button'
@@ -229,7 +230,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
               {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
             </select>
           </div>
-          {createState.message ? (
+          {createState.message && createState.ok ? (
             <p className={cn('rounded-lg px-3 py-2 text-sm font-semibold', createState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
               {createState.message}
             </p>
@@ -325,7 +326,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
               </div>
             )}
 
-            {feeAssignmentState.message ? (
+            {feeAssignmentState.message && feeAssignmentState.ok ? (
               <p className={cn('rounded-lg px-3 py-2 text-sm font-semibold', feeAssignmentState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
                 {feeAssignmentState.message}
               </p>
@@ -502,8 +503,6 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         </div>
       </div>
 
-      {actionError ? <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{actionError}</p> : null}
-
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
@@ -597,6 +596,15 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
           </tbody>
         </table>
       </div>
+
+      <AdminErrorDialog
+        message={
+          actionError ??
+          (createState.message && !createState.ok ? createState.message : null) ??
+          (feeAssignmentState.message && !feeAssignmentState.ok ? feeAssignmentState.message : null)
+        }
+        onClose={() => setActionError(null)}
+      />
     </PageContainer>
   )
 }

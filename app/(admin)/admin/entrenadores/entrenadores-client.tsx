@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState, useTransition } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,7 +19,7 @@ type Props = {
 const initialState: CoachActionState = { ok: false, message: '' }
 
 function FormMessage({ state }: { state: CoachActionState }) {
-  if (!state.message) return null
+  if (!state.message || !state.ok) return null
   return (
     <p
       className={cn(
@@ -234,7 +235,6 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
         </div>
 
         <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-          {actionError ? <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{actionError}</p> : null}
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
@@ -308,6 +308,11 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
           </table>
         </div>
       </section>
+
+      <AdminErrorDialog
+        message={state.message && !state.ok ? state.message : actionError}
+        onClose={() => setActionError(null)}
+      />
     </div>
   )
 }
