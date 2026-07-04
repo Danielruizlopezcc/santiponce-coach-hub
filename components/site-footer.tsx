@@ -10,7 +10,6 @@ const FOOTER_COLUMNS = [
       { label: 'Noticias', href: '/noticias' },
       { label: 'Calendario', href: '/calendario' },
       { label: 'Equipos', href: '/equipos' },
-      { label: 'Club', href: '/club' },
       { label: 'Patrocinadores', href: '/patrocinadores' },
     ],
   },

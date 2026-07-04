@@ -39,6 +39,7 @@ type Props = {
   tutors: AdminTutorOption[]
   feeTemplates: AdminFeeTemplateRow[]
   feeAssignments: AdminTutorFeeAssignmentRow[]
+  canManageFees: boolean
 }
 
 type Draft = {
@@ -58,7 +59,7 @@ const STATUS_OPTIONS = [
 const initialCreateState: CreateAthleteState = { ok: false, message: '' }
 const initialFeeAssignmentState: AthleteFeeAssignmentState = { ok: false, message: '' }
 
-export function DeportistasClient({ athletes, categories, teams, seasons, tutors, feeTemplates, feeAssignments }: Props) {
+export function DeportistasClient({ athletes, categories, teams, seasons, tutors, feeTemplates, feeAssignments, canManageFees }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
   const [assigningAthlete, setAssigningAthlete] = useState<AdminAthleteRow | null>(null)
@@ -75,7 +76,6 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
   const [createState, createAction, createPending] = useActionState(createAthleteAction, initialCreateState)
   const [feeAssignmentState, feeAssignmentAction, feeAssignmentPending] = useActionState(assignAthleteFeeAction, initialFeeAssignmentState)
 
-  const activeCategories = categories.filter((category) => category.estado === 'Activa')
   const hasActiveFilters = [search, categoryFilter, teamFilter, statusFilter, seasonFilter].some(Boolean)
   const assignmentsByAthlete = useMemo(() => {
     const map = new Map<string, AdminTutorFeeAssignmentRow[]>()
@@ -178,15 +178,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
       description="Listado visual de deportistas, categoría solicitada y estado de matrícula."
       className="max-w-7xl"
     >
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            {athletes.length} deportista{athletes.length !== 1 ? 's' : ''}
-          </span>
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-            {activeCategories.length} categoría{activeCategories.length !== 1 ? 's' : ''} activa{activeCategories.length !== 1 ? 's' : ''}
-          </span>
-        </div>
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
         <Button onClick={() => setShowCreate((current) => !current)}>
           <Plus className="size-4" aria-hidden="true" />
           Añadir jugador
@@ -245,6 +237,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         </form>
       </AdminFormDialog>
 
+      {canManageFees ? (
       <AdminFormDialog
         open={Boolean(assigningAthlete)}
         onOpenChange={(open) => {
@@ -353,6 +346,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
           </form>
         ) : null}
       </AdminFormDialog>
+      ) : null}
 
       <AdminFormDialog
         open={Boolean(editId)}
@@ -510,10 +504,6 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
 
       {actionError ? <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{actionError}</p> : null}
 
-      <p className="mb-2 text-xs text-muted-foreground">
-        {filtered.length === athletes.length ? `${athletes.length} registro${athletes.length !== 1 ? 's' : ''}` : `${filtered.length} de ${athletes.length} registros`}
-      </p>
-
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
@@ -544,7 +534,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
                 <tr key={athlete.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
                   <td className="px-4 py-3 font-medium">
                     <p>{athlete.nombre}</p>
-                    {athleteAssignments.length > 0 ? (
+                    {canManageFees && athleteAssignments.length > 0 ? (
                       <p className="mt-1 text-xs font-semibold text-primary">
                         {athleteAssignments.length} cuota{athleteAssignments.length !== 1 ? 's' : ''} asignada{athleteAssignments.length !== 1 ? 's' : ''}
                       </p>
@@ -583,16 +573,18 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
                         <Button size="icon-sm" variant="ghost" aria-label="Editar deportista" onClick={() => openEdit(athlete)}>
                           <Pencil className="size-4" />
                         </Button>
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label="Asignar cuota"
-                          title={athlete.guardianId ? 'Asignar cuota' : 'Asigna primero un tutor'}
-                          disabled={!athlete.guardianId}
-                          onClick={() => setAssigningAthlete(athlete)}
-                        >
-                          <CreditCard className="size-4" />
-                        </Button>
+                        {canManageFees ? (
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="Asignar cuota"
+                            title={athlete.guardianId ? 'Asignar cuota' : 'Asigna primero un tutor'}
+                            disabled={!athlete.guardianId}
+                            onClick={() => setAssigningAthlete(athlete)}
+                          >
+                            <CreditCard className="size-4" />
+                          </Button>
+                        ) : null}
                         <Button size="icon-sm" variant="destructive" aria-label="Eliminar deportista" onClick={() => { setEditId(null); setDraft(null); setDeleteId(athlete.id) }}>
                           <Trash2 className="size-4" />
                         </Button>

@@ -86,10 +86,7 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
   const content = (
     <>
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {categories.length} {categories.length === 1 ? 'categoría' : 'categorías'}
-        </span>
+      <div className="mb-6 flex items-center justify-end gap-3">
         <Button size="sm" onClick={openCreate}>
           <Plus className="size-4" aria-hidden="true" />
           Nueva categoría

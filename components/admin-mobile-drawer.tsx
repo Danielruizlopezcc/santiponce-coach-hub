@@ -14,9 +14,11 @@ import {
 } from '@/components/ui/sheet'
 import { AdminNav } from '@/components/admin-nav'
 import { CLUB } from '@/lib/club'
+import { getDefaultAdminPath, type AdminRole } from '@/lib/admin-permissions'
 
-export function AdminMobileDrawer() {
+export function AdminMobileDrawer({ role }: { role: AdminRole }) {
   const [open, setOpen] = useState(false)
+  const homeHref = getDefaultAdminPath(role)
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -32,7 +34,7 @@ export function AdminMobileDrawer() {
         <SheetHeader className="flex h-12 flex-row items-center border-b border-white/10 px-4 py-0 gap-0">
           <SheetTitle className="sr-only">Menú de administración</SheetTitle>
           <Link
-            href="/admin"
+            href={homeHref}
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           >
@@ -55,7 +57,7 @@ export function AdminMobileDrawer() {
             </div>
           </Link>
         </SheetHeader>
-        <AdminNav onNavigate={() => setOpen(false)} />
+        <AdminNav role={role} onNavigate={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   )

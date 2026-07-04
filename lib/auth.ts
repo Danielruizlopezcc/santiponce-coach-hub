@@ -1,6 +1,10 @@
 import 'server-only'
 
 import { redirect } from 'next/navigation'
+import {
+  ADMIN_PORTAL_ROLES,
+  type AdminRole,
+} from '@/lib/admin-permissions'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -26,14 +30,14 @@ export async function requireAdmin() {
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .eq('role', 'admin')
-    .maybeSingle()
+    .in('role', ADMIN_PORTAL_ROLES)
 
-  if (error || !data) {
+  if (error || !data?.length) {
     redirect('/app')
   }
 
-  return user
+  const role = data.some((row) => row.role === 'admin') ? 'admin' : 'sports_coordinator'
+  return { user, role: role as AdminRole }
 }
 
 export async function requireAdminAction() {
@@ -57,6 +61,31 @@ export async function requireAdminAction() {
 
   if (error || !data) {
     throw new Error('No tienes permisos de administrador para realizar esta acción.')
+  }
+
+  return user
+}
+
+export async function requireSportsAdminAction() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
+  }
+
+  const adminSupabase = createAdminClient()
+  const { data, error } = await adminSupabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .in('role', ADMIN_PORTAL_ROLES)
+
+  if (error || !data?.length) {
+    throw new Error('No tienes permisos para realizar esta acción.')
   }
 
   return user

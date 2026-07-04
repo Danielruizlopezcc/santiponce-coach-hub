@@ -3,13 +3,16 @@ import Link from 'next/link'
 import { ShieldCheck } from 'lucide-react'
 import { AdminNav } from '@/components/admin-nav'
 import { CLUB } from '@/lib/club'
+import { getDefaultAdminPath, type AdminRole } from '@/lib/admin-permissions'
 
-export function AdminSidebar() {
+export function AdminSidebar({ role }: { role: AdminRole }) {
+  const homeHref = getDefaultAdminPath(role)
+
   return (
     <aside className="sticky top-0 hidden h-svh w-52 shrink-0 flex-col bg-blue-900 md:flex">
       <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-white/10 px-4">
         <Link
-          href="/admin"
+          href={homeHref}
           className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           aria-label="CD Santiponce — Panel de administración"
         >
@@ -32,7 +35,7 @@ export function AdminSidebar() {
           </div>
         </Link>
       </div>
-      <AdminNav />
+      <AdminNav role={role} />
     </aside>
   )
 }

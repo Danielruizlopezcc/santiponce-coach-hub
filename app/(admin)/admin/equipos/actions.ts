@@ -1,12 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAdminAction } from '@/lib/auth'
+import { requireSportsAdminAction } from '@/lib/auth'
 import type { PlayerPosition } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 async function getAdminSupabase() {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   return createAdminClient()
 }
 

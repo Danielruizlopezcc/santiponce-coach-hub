@@ -16,6 +16,10 @@ import {
 } from './actions'
 
 const initialState: AdminManagerActionState = { ok: false, message: '' }
+const ROLE_OPTIONS = [
+  { label: 'Administrador General', value: 'admin' },
+  { label: 'Coordinador deportivo', value: 'sports_coordinator' },
+] as const
 
 function FormMessage({ state }: { state: AdminManagerActionState }) {
   if (!state.message) return null
@@ -43,6 +47,7 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
     nombre: '',
     apellidos: '',
     email: '',
+    role: 'admin' as AdminManagerRow['role'],
   })
 
   const visibleAdmins = useMemo(() => {
@@ -62,6 +67,7 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
       nombre: nombre ?? '',
       apellidos: apellidos.join(' '),
       email: admin.email,
+      role: admin.role,
     })
   }
 
@@ -75,6 +81,7 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
           nombre: draft.nombre,
           apellidos: draft.apellidos,
           email: draft.email,
+          role: draft.role,
         })
         setEditId(null)
       } catch (error) {
@@ -97,10 +104,7 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {admins.length} administradores
-        </span>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Button type="button" onClick={() => setFormOpen(true)}>
           <Plus className="size-4" />
           Crear administrador
@@ -111,7 +115,7 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
         open={formOpen}
         onOpenChange={setFormOpen}
         title="Crear administrador"
-        description="Crea una cuenta con permisos completos de administración."
+        description="Crea una cuenta de administración y selecciona su nivel de permisos."
         maxWidth="md"
       >
         <form action={action} className="space-y-4">
@@ -123,6 +127,27 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
             <Input name="email" type="email" placeholder="Email" required />
             <Input name="password" type="password" placeholder="Contraseña" minLength={8} required />
           </div>
+          <fieldset className="rounded-lg border border-border p-3">
+            <legend className="px-1 text-sm font-black text-foreground">Tipo de usuario</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {ROLE_OPTIONS.map((role) => (
+                <label
+                  key={role.value}
+                  className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm font-semibold text-foreground"
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={role.value}
+                    defaultChecked={role.value === 'admin'}
+                    className="size-4 accent-primary"
+                    required
+                  />
+                  {role.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <FormMessage state={state} />
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
             <Dialog.Close render={<Button type="button" variant="outline" disabled={pending} />}>
@@ -175,6 +200,27 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
             type="email"
             placeholder="Email"
           />
+          <fieldset className="rounded-lg border border-border p-3">
+            <legend className="px-1 text-sm font-black text-foreground">Tipo de usuario</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {ROLE_OPTIONS.map((role) => (
+                <label
+                  key={role.value}
+                  className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm font-semibold text-foreground"
+                >
+                  <input
+                    type="radio"
+                    name="edit-role"
+                    value={role.value}
+                    checked={draft.role === role.value}
+                    onChange={() => setDraft((current) => ({ ...current, role: role.value }))}
+                    className="size-4 accent-primary"
+                  />
+                  {role.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </div>
       </AdminFormDialog>
 

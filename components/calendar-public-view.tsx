@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarDays, Filter, MapPin, Trophy } from 'lucide-react'
+import { CalendarDays, Clock3, Dumbbell, Filter, MapPin, Trophy } from 'lucide-react'
 import { BrandedPageHero } from '@/components/branded-page-hero'
 import { MatchCountdown } from '@/components/match-countdown'
 import { CLUB } from '@/lib/club'
@@ -233,6 +233,30 @@ function MatchRow({ match }: { match: PublicCalendarMatch }) {
   )
 }
 
+function EmptyCalendarSection({
+  id,
+  title,
+  icon: Icon,
+}: {
+  id: string
+  title: string
+  icon: typeof Clock3
+}) {
+  return (
+    <section id={id} className="scroll-mt-24">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-white">
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+        <h2 className="text-3xl font-black tracking-tight text-foreground">{title}</h2>
+      </div>
+      <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
+        <p className="text-base font-black text-foreground">Pendiente de configurar</p>
+      </div>
+    </section>
+  )
+}
+
 export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
   const selectedSeason = getSelectedSeason(data, filters.season)
   const selectedStatus = filters.status || 'all'
@@ -251,92 +275,126 @@ export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
       />
 
       <div className="border-b border-border bg-white/95 shadow-sm">
-        <form className="mx-auto grid max-w-7xl gap-3 px-4 py-4 md:grid-cols-4 md:px-8" action="/calendario">
-          <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
-            Temporada
-            <select name="season" defaultValue={selectedSeason} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
-              {data.seasons.map((season) => (
-                <option key={season.id} value={season.id}>
-                  {season.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
-            Equipo
-            <select name="team" defaultValue={normalizeFilter(filters.team) || 'all'} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
-              <option value="all">Todos</option>
-              {visibleTeams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
-            Competición
-            <select name="competition" defaultValue={normalizeFilter(filters.competition) || 'all'} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
-              <option value="all">Todas</option>
-              <option value="league">Liga</option>
-              <option value="friendly">Amistosos</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
-            Estado
-            <select name="status" defaultValue={selectedStatus} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
-              <option value="all">Todos</option>
-              <option value="upcoming">Próximos</option>
-              <option value="played">Jugados</option>
-            </select>
-          </label>
-
-          <div className="flex gap-2 md:col-span-4">
-            <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-black text-white" type="submit">
-              <Filter className="size-4" aria-hidden="true" />
-              Filtrar
-            </button>
-            <Link className="inline-flex h-10 items-center rounded-lg border border-border bg-white px-4 text-sm font-black text-muted-foreground" href="/calendario">
-              Limpiar
-            </Link>
-          </div>
-        </form>
+        <nav className="mx-auto flex max-w-7xl flex-wrap gap-2 px-4 py-4 md:px-8" aria-label="Secciones del calendario">
+          {[
+            { href: '#horario', label: 'Horario', icon: Clock3 },
+            { href: '#entrenamientos', label: 'Entrenamientos', icon: Dumbbell },
+            { href: '#partidos', label: 'Partidos', icon: Trophy },
+          ].map((item) => {
+            const Icon = item.icon
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-4 text-sm font-black text-foreground shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Icon className="size-4 text-primary" aria-hidden="true" />
+                {item.label}
+              </a>
+            )
+          })}
+        </nav>
       </div>
 
       <div className="mx-auto max-w-7xl space-y-10 px-4 py-8 md:px-8 md:py-12">
-        {monthGroups.length === 0 ? (
-          <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
-            <Trophy className="mx-auto size-10 text-primary" aria-hidden="true" />
-            <h2 className="mt-4 text-2xl font-black text-foreground">No hay partidos con estos filtros</h2>
-            <p className="mt-2 text-sm font-medium text-muted-foreground">
-              Prueba con otra temporada, equipo, competición o estado.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {featuredMatch ? (
-              <FeaturedMatch match={featuredMatch} isPlayedMode={selectedStatus === 'played'} />
-            ) : null}
+        <EmptyCalendarSection id="horario" title="Horario" icon={Clock3} />
+        <EmptyCalendarSection id="entrenamientos" title="Entrenamientos" icon={Dumbbell} />
 
-            {monthGroups.map((group) => (
-              <section key={group.key}>
-                <div className="mb-4 flex items-center gap-3">
-                  <CalendarDays className="size-5 text-primary" aria-hidden="true" />
-                  <h2 className="text-3xl font-black capitalize tracking-tight text-foreground">
-                    {group.label}
-                  </h2>
-                </div>
-                <div className="space-y-3">
-                  {group.matches.map((match) => (
-                    <MatchRow key={match.id} match={match} />
-                  ))}
-                </div>
-              </section>
-            ))}
+        <section id="partidos" className="scroll-mt-24 space-y-6">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-white">
+              <Trophy className="size-5" aria-hidden="true" />
+            </span>
+            <h2 className="text-3xl font-black tracking-tight text-foreground">Partidos</h2>
           </div>
-        )}
+
+          <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <form className="grid gap-3 md:grid-cols-4" action="/calendario#partidos">
+              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+                Temporada
+                <select name="season" defaultValue={selectedSeason} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                  {data.seasons.map((season) => (
+                    <option key={season.id} value={season.id}>
+                      {season.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+                Equipo
+                <select name="team" defaultValue={normalizeFilter(filters.team) || 'all'} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                  <option value="all">Todos</option>
+                  {visibleTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+                Competición
+                <select name="competition" defaultValue={normalizeFilter(filters.competition) || 'all'} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                  <option value="all">Todas</option>
+                  <option value="league">Liga</option>
+                  <option value="friendly">Amistosos</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+                Estado
+                <select name="status" defaultValue={selectedStatus} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                  <option value="all">Todos</option>
+                  <option value="upcoming">Próximos</option>
+                  <option value="played">Jugados</option>
+                </select>
+              </label>
+
+              <div className="flex gap-2 md:col-span-4">
+                <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-black text-white" type="submit">
+                  <Filter className="size-4" aria-hidden="true" />
+                  Filtrar
+                </button>
+                <Link className="inline-flex h-10 items-center rounded-lg border border-border bg-white px-4 text-sm font-black text-muted-foreground" href="/calendario#partidos">
+                  Limpiar
+                </Link>
+              </div>
+            </form>
+          </div>
+
+          {monthGroups.length === 0 ? (
+            <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
+              <Trophy className="mx-auto size-10 text-primary" aria-hidden="true" />
+              <h2 className="mt-4 text-2xl font-black text-foreground">No hay partidos con estos filtros</h2>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                Prueba con otra temporada, equipo, competición o estado.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {featuredMatch ? (
+                <FeaturedMatch match={featuredMatch} isPlayedMode={selectedStatus === 'played'} />
+              ) : null}
+
+              {monthGroups.map((group) => (
+                <section key={group.key}>
+                  <div className="mb-4 flex items-center gap-3">
+                    <CalendarDays className="size-5 text-primary" aria-hidden="true" />
+                    <h2 className="text-3xl font-black capitalize tracking-tight text-foreground">
+                      {group.label}
+                    </h2>
+                  </div>
+                  <div className="space-y-3">
+                    {group.matches.map((match) => (
+                      <MatchRow key={match.id} match={match} />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </section>
   )

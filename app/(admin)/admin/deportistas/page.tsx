@@ -7,17 +7,20 @@ import {
   getAdminTutorFeeAssignments,
   getAdminTutorOptions,
 } from '@/lib/admin-app'
+import { requireAdmin } from '@/lib/auth'
 import { DeportistasClient } from './deportistas-client'
 
 export default async function AdminDeportistasPage() {
+  const { role } = await requireAdmin()
+  const canManageFees = role === 'admin'
   const [athletes, categories, teams, seasons, tutors, feeTemplates, feeAssignments] = await Promise.all([
     getAdminAthletes(),
     getAdminCategories(),
     getAdminTeams(),
     getAdminSeasons(),
     getAdminTutorOptions(),
-    getAdminFeeTemplates(),
-    getAdminTutorFeeAssignments(),
+    canManageFees ? getAdminFeeTemplates() : Promise.resolve([]),
+    canManageFees ? getAdminTutorFeeAssignments() : Promise.resolve([]),
   ])
 
   return (
@@ -29,6 +32,7 @@ export default async function AdminDeportistasPage() {
       tutors={tutors}
       feeTemplates={feeTemplates}
       feeAssignments={feeAssignments}
+      canManageFees={canManageFees}
     />
   )
 }

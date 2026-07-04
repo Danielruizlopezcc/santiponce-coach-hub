@@ -209,13 +209,6 @@ export function AdminTable({
         )}
       </div>
 
-      {/* ── Results count ────────────────────────────────────────────── */}
-      <p className="text-xs text-muted-foreground" aria-live="polite" aria-atomic="true">
-        {filtered.length === data.length
-          ? `${data.length} registro${data.length !== 1 ? 's' : ''}`
-          : `${filtered.length} de ${data.length} registro${data.length !== 1 ? 's' : ''}`}
-      </p>
-
       {/* ── Table ────────────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
@@ -342,15 +335,7 @@ export function AdminTable({
 
       {/* ── Pagination ───────────────────────────────────────────────── */}
       {!isLoading && filtered.length > pageSize && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            Mostrando{' '}
-            <span className="font-medium">
-              {(current - 1) * pageSize + 1}–{Math.min(current * pageSize, filtered.length)}
-            </span>{' '}
-            de <span className="font-medium">{filtered.length}</span>
-          </p>
-
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <nav
             className="flex items-center gap-1"
             role="navigation"

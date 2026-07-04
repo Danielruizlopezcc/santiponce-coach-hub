@@ -9,7 +9,7 @@ type AdminHeaderProps = {
 export function AdminHeader({ viewer }: AdminHeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-border bg-background/95 px-5 backdrop-blur supports-backdrop-filter:bg-background/80 md:px-8">
-      <AdminMobileDrawer />
+      <AdminMobileDrawer role={viewer.role} />
 
       <span className="hidden items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[0.72rem] font-semibold text-blue-700 sm:flex">
         <ShieldCheck className="size-3" aria-hidden="true" />

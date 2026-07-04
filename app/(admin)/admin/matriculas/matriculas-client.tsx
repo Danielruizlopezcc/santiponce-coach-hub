@@ -55,9 +55,6 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
       .includes(q)
   })
 
-  const enRevision = enrollments.filter((e) => e.estadoMatricula === 'En revisión').length
-  const matriculados = enrollments.filter((e) => e.estadoMatricula === 'Matriculado').length
-
   function handleConfirm(id: string) {
     setActionError(null)
     startTransition(async () => {
@@ -122,23 +119,6 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
 
   const content = (
     <>
-      {/* ── Resumen rápido ───────────────────────────────────────── */}
-      <div className="mb-6 flex flex-wrap gap-2">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {enrollments.length} {enrollments.length === 1 ? 'deportista' : 'deportistas'}
-        </span>
-        {enRevision > 0 && (
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-            {enRevision} en revisión
-          </span>
-        )}
-        {matriculados > 0 && (
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-            {matriculados} matriculado{matriculados !== 1 ? 's' : ''}
-          </span>
-        )}
-      </div>
-
       {/* ── Buscador y filtros ──────────────────────────────────── */}
       <div className="mb-4 space-y-3 rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
         <div className="flex gap-2">
@@ -213,12 +193,6 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
           {actionError}
         </p>
       )}
-
-      <p className="mb-2 text-xs text-muted-foreground">
-        {filtered.length === enrollments.length
-          ? `${enrollments.length} registro${enrollments.length !== 1 ? 's' : ''}`
-          : `${filtered.length} de ${enrollments.length} registros`}
-      </p>
 
       {/* ── Tabla ───────────────────────────────────────────────── */}
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">

@@ -3,15 +3,18 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { SignOutButton } from '@/components/sign-out-button'
-import { ADMIN_NAV } from '@/lib/admin'
+import { getAdminNavForRole } from '@/lib/admin'
+import type { AdminRole } from '@/lib/admin-permissions'
 import { cn } from '@/lib/utils'
 
 type AdminNavProps = {
   onNavigate?: () => void
+  role: AdminRole
 }
 
-export function AdminNav({ onNavigate }: AdminNavProps) {
+export function AdminNav({ onNavigate, role }: AdminNavProps) {
   const pathname = usePathname()
+  const navItems = getAdminNavForRole(role)
 
   return (
     <nav
@@ -20,7 +23,7 @@ export function AdminNav({ onNavigate }: AdminNavProps) {
     >
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="grid gap-0.5">
-          {ADMIN_NAV.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             const isActive =
               item.href === '/admin'

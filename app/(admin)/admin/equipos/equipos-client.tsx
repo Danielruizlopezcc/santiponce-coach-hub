@@ -134,10 +134,7 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
         <CategoriasClient categories={categories} embedded />
       ) : (
         <>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {teams.length} {teams.length === 1 ? 'equipo' : 'equipos'}
-        </span>
+      <div className="mb-6 flex items-center justify-end gap-3">
         <Button size="sm" onClick={openCreate}>
           <Plus className="size-4" aria-hidden="true" />
           Nuevo equipo

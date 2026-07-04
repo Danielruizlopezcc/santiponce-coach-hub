@@ -2,11 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { requireAdminAction } from '@/lib/auth'
+import { requireSportsAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const matchStatusSchema = z.enum(['scheduled', 'played', 'postponed', 'cancelled'])
 const matchTypeSchema = z.enum(['league', 'friendly'])
+const trainingLocationSchema = z.enum(['Campo 1', 'Campo 2', 'Anexo'])
 
 const playerStatSchema = z.object({
   athleteId: z.string().uuid(),
@@ -231,11 +232,85 @@ const createMatchSchema = matchBaseSchema.omit({ id: true }).superRefine(validat
 
 type MatchInput = z.infer<typeof matchSchema>
 
+const trainingSchema = z.object({
+  id: z.string().uuid().optional(),
+  teamId: z.string().uuid('Selecciona un equipo.'),
+  trainingDate: z.string().min(1, 'Introduce la fecha del entrenamiento.'),
+  startTime: z.string().min(1, 'Introduce la hora del entrenamiento.'),
+  durationHours: z.number().int().min(0).max(6),
+  durationMinutes: z.number().int().min(0).max(59),
+  location: trainingLocationSchema,
+  notes: z.string().trim().max(300, 'Las notas son demasiado largas.').optional(),
+}).refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
+  message: 'Introduce una duración mayor que cero.',
+  path: ['durationHours'],
+})
+
+const createTrainingSchema = trainingSchema.omit({ id: true })
+
+type TrainingInput = z.infer<typeof trainingSchema>
+type StoredTrainingSession = {
+  id: string
+  teamId: string
+  seasonId: string
+  trainingDate: string
+  startTime: string
+  durationMinutes: number
+  location: z.infer<typeof trainingLocationSchema>
+  notes: string
+}
+
+const TRAINING_SETTINGS_KEY = 'coordinator_training_sessions'
+
 function revalidateCalendarPaths() {
   revalidatePath('/admin/calendario')
   revalidatePath('/admin')
   revalidatePath('/calendario')
   revalidatePath('/app/calendario')
+}
+
+function toTrainingPayload(parsed: TrainingInput, seasonId: string) {
+  return {
+    teamId: parsed.teamId,
+    seasonId,
+    trainingDate: parsed.trainingDate,
+    startTime: parsed.startTime,
+    durationMinutes: parsed.durationHours * 60 + parsed.durationMinutes,
+    location: parsed.location,
+    notes: parsed.notes?.trim() || '',
+  }
+}
+
+async function readStoredTrainings(): Promise<StoredTrainingSession[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', TRAINING_SETTINGS_KEY)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  try {
+    return JSON.parse(data?.value ?? '[]') as StoredTrainingSession[]
+  } catch {
+    return []
+  }
+}
+
+async function writeStoredTrainings(trainings: StoredTrainingSession[]) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert(
+      {
+        key: TRAINING_SETTINGS_KEY,
+        value: JSON.stringify(trainings),
+      },
+      { onConflict: 'key' },
+    )
+
+  if (error) throw new Error(error.message)
 }
 
 async function getTeamSeasonId(teamId: string) {
@@ -359,7 +434,7 @@ function toMatchPayload(parsed: MatchInput, seasonId: string) {
 }
 
 export async function createMatchAction(input: MatchInput): Promise<void> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsed = createMatchSchema.parse(input)
   const seasonId = await getTeamSeasonId(parsed.teamId)
   const supabase = createAdminClient()
@@ -372,8 +447,49 @@ export async function createMatchAction(input: MatchInput): Promise<void> {
   revalidateCalendarPaths()
 }
 
+export async function createTrainingAction(input: TrainingInput): Promise<void> {
+  await requireSportsAdminAction()
+  const parsed = createTrainingSchema.parse(input)
+  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const trainings = await readStoredTrainings()
+
+  trainings.push({
+    id: crypto.randomUUID(),
+    ...toTrainingPayload(parsed, seasonId),
+  })
+  await writeStoredTrainings(trainings)
+  revalidateCalendarPaths()
+}
+
+export async function updateTrainingAction(input: TrainingInput & { id: string }): Promise<void> {
+  await requireSportsAdminAction()
+  const parsed = trainingSchema.required({ id: true }).parse(input)
+  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const trainings = await readStoredTrainings()
+  const nextTrainings = trainings.map((training) =>
+    training.id === parsed.id
+      ? {
+          id: parsed.id,
+          ...toTrainingPayload(parsed, seasonId),
+        }
+      : training,
+  )
+
+  await writeStoredTrainings(nextTrainings)
+  revalidateCalendarPaths()
+}
+
+export async function deleteTrainingAction(id: string): Promise<void> {
+  await requireSportsAdminAction()
+  const parsedId = z.string().uuid().parse(id)
+  const trainings = await readStoredTrainings()
+
+  await writeStoredTrainings(trainings.filter((training) => training.id !== parsedId))
+  revalidateCalendarPaths()
+}
+
 export async function updateMatchAction(input: MatchInput & { id: string }): Promise<void> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsed = matchSchema.required({ id: true }).parse(input)
   const seasonId = await getTeamSeasonId(parsed.teamId)
   const supabase = createAdminClient()
@@ -391,7 +507,7 @@ export async function updateMatchAction(input: MatchInput & { id: string }): Pro
 }
 
 export async function deleteMatchAction(id: string): Promise<void> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsedId = z.string().uuid().parse(id)
   const supabase = createAdminClient()
   const { error } = await supabase.from('matches').delete().eq('id', parsedId)

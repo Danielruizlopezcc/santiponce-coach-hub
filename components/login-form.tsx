@@ -1,61 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useActionState, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
+import { loginAction } from '@/app/iniciar-sesion/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createClient } from '@/lib/supabase/client'
+
+const initialState = {
+  ok: false,
+  message: '',
+} as const
 
 export function LoginForm() {
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [state, formAction, pending] = useActionState(loginAction, initialState)
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    const formData = new FormData(event.currentTarget)
-    const email = String(formData.get('email') ?? '')
-    const password = String(formData.get('password') ?? '')
-
-    const supabase = createClient()
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (signInError) {
-      setLoading(false)
-      setError('Correo o contraseña incorrectos.')
-      return
+  useEffect(() => {
+    if (state.ok) {
+      window.location.assign(state.targetPath)
     }
-
-    const userId = signInData.user?.id
-    let targetPath = '/app'
-
-    if (userId) {
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-
-      const roleNames = new Set((roles ?? []).map((role) => role.role))
-
-      if (roleNames.has('admin')) {
-        targetPath = '/admin'
-      } else if (roleNames.has('coach')) {
-        targetPath = '/entrenador/calendario'
-      }
-    }
-
-    setLoading(false)
-    window.location.assign(targetPath)
-  }
+  }, [state])
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+    <form className="flex flex-col gap-4" action={formAction}>
       <div className="grid gap-2">
         <Label htmlFor="email">Correo electrónico</Label>
         <Input
@@ -80,17 +47,17 @@ export function LoginForm() {
         />
       </div>
 
-      {error && (
+      {state.message && (
         <div
           role="alert"
           className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
-          {error}
+          {state.message}
         </div>
       )}
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         Iniciar sesión
       </Button>
     </form>

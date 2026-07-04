@@ -96,15 +96,7 @@ export function ConsentimientosClient({ consents }: { consents: AdminConsentRow[
       className="max-w-7xl"
     >
       {/* ── Cabecera ──────────────────────────────────────────────── */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            {groups.length} {groups.length === 1 ? 'persona' : 'personas'}
-          </span>
-          <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
-            {consents.length} consentimientos
-          </span>
-        </div>
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
         <Button
           variant="outline"
           size="sm"

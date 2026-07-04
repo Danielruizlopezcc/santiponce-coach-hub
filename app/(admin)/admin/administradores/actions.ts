@@ -6,6 +6,7 @@ import { createAdminAuditLog } from '@/lib/audit'
 import { requireAdminAction } from '@/lib/auth'
 import { normalizeEmail } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { AdminRole } from '@/lib/admin-permissions'
 
 export type AdminManagerActionState = {
   ok: boolean
@@ -17,11 +18,16 @@ const createManagerSchema = z.object({
   apellidos: z.string().trim().min(2, 'Introduce los apellidos.').max(80),
   email: z.string().trim().email('Correo no válido.').max(120),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.'),
+  role: z.enum(['admin', 'sports_coordinator']),
 })
 
 const updateManagerSchema = createManagerSchema.omit({ password: true }).extend({
   adminId: z.string().uuid('No se ha podido identificar el administrador.'),
 })
+
+function getManagerRoleLabel(role: AdminRole) {
+  return role === 'admin' ? 'Administrador General' : 'Coordinador deportivo'
+}
 
 async function countAdmins() {
   const { count, error } = await createAdminClient()
@@ -44,6 +50,7 @@ export async function createAdminManagerAction(
     apellidos: formData.get('apellidos'),
     email: formData.get('email'),
     password: formData.get('password'),
+    role: formData.get('role'),
   })
 
   if (!parsed.success) {
@@ -90,7 +97,7 @@ export async function createAdminManagerAction(
 
     const { error: roleError } = await supabase
       .from('user_roles')
-      .upsert({ user_id: createdUserId, role: 'admin' }, { onConflict: 'user_id,role' })
+      .upsert({ user_id: createdUserId, role: values.role }, { onConflict: 'user_id,role' })
     if (roleError) throw new Error(roleError.message)
 
     await createAdminAuditLog({
@@ -98,13 +105,13 @@ export async function createAdminManagerAction(
       action: 'admin.create',
       entityType: 'profile',
       entityId: createdUserId,
-      summary: `Creó el administrador ${values.nombre} ${values.apellidos}.`,
-      metadata: { email },
+      summary: `Creó ${getManagerRoleLabel(values.role)} ${values.nombre} ${values.apellidos}.`,
+      metadata: { email, role: values.role },
     })
 
     revalidatePath('/admin/administradores')
     revalidatePath('/admin')
-    return { ok: true, message: 'Administrador creado correctamente.' }
+    return { ok: true, message: 'Usuario de administración creado correctamente.' }
   } catch (error) {
     if (createdUserId) {
       await supabase.auth.admin.deleteUser(createdUserId)
@@ -112,7 +119,7 @@ export async function createAdminManagerAction(
 
     return {
       ok: false,
-      message: error instanceof Error ? error.message : 'No se ha podido crear el administrador.',
+      message: error instanceof Error ? error.message : 'No se ha podido crear el usuario de administración.',
     }
   }
 }
@@ -125,13 +132,12 @@ export async function updateAdminManagerAction(input: unknown): Promise<void> {
 
   const { data: adminRole, error: roleLookupError } = await supabase
     .from('user_roles')
-    .select('user_id')
+    .select('role')
     .eq('user_id', parsed.adminId)
-    .eq('role', 'admin')
-    .maybeSingle()
+    .in('role', ['admin', 'sports_coordinator'])
 
   if (roleLookupError) throw new Error(roleLookupError.message)
-  if (!adminRole) throw new Error('No se ha encontrado el administrador.')
+  if (!adminRole?.length) throw new Error('No se ha encontrado el usuario de administración.')
 
   const { data: conflictingProfile, error: conflictError } = await supabase
     .from('profiles')
@@ -160,13 +166,35 @@ export async function updateAdminManagerAction(input: unknown): Promise<void> {
   })
   if (profileError) throw new Error(profileError.message)
 
+  const currentRoles = new Set(adminRole.map((row) => row.role))
+  const roleToRemove = parsed.role === 'admin' ? 'sports_coordinator' : 'admin'
+
+  if (currentRoles.has('admin') && parsed.role !== 'admin') {
+    const totalAdmins = await countAdmins()
+    if (totalAdmins <= 1) {
+      throw new Error('Debe quedar al menos un administrador general activo.')
+    }
+  }
+
+  const { error: removeRoleError } = await supabase
+    .from('user_roles')
+    .delete()
+    .eq('user_id', parsed.adminId)
+    .eq('role', roleToRemove)
+  if (removeRoleError) throw new Error(removeRoleError.message)
+
+  const { error: upsertRoleError } = await supabase
+    .from('user_roles')
+    .upsert({ user_id: parsed.adminId, role: parsed.role }, { onConflict: 'user_id,role' })
+  if (upsertRoleError) throw new Error(upsertRoleError.message)
+
   await createAdminAuditLog({
     actor: admin,
     action: 'admin.update',
     entityType: 'profile',
     entityId: parsed.adminId,
-    summary: `Actualizó el administrador ${parsed.nombre} ${parsed.apellidos}.`,
-    metadata: { email },
+    summary: `Actualizó ${getManagerRoleLabel(parsed.role)} ${parsed.nombre} ${parsed.apellidos}.`,
+    metadata: { email, role: parsed.role },
   })
 
   revalidatePath('/admin/administradores')
@@ -181,21 +209,24 @@ export async function deleteAdminManagerAction(adminId: string): Promise<void> {
     throw new Error('No puedes eliminar tu propio usuario administrador desde aquí.')
   }
 
-  const totalAdmins = await countAdmins()
-  if (totalAdmins <= 1) {
-    throw new Error('Debe quedar al menos un administrador activo.')
-  }
-
   const supabase = createAdminClient()
   const { data: adminRole, error: roleLookupError } = await supabase
     .from('user_roles')
-    .select('user_id')
+    .select('role')
     .eq('user_id', parsedAdminId)
-    .eq('role', 'admin')
-    .maybeSingle()
+    .in('role', ['admin', 'sports_coordinator'])
 
   if (roleLookupError) throw new Error(roleLookupError.message)
-  if (!adminRole) throw new Error('No se ha encontrado el administrador.')
+  if (!adminRole?.length) throw new Error('No se ha encontrado el usuario de administración.')
+
+  const isGeneralAdmin = adminRole.some((row) => row.role === 'admin')
+
+  if (isGeneralAdmin) {
+    const totalAdmins = await countAdmins()
+    if (totalAdmins <= 1) {
+      throw new Error('Debe quedar al menos un administrador general activo.')
+    }
+  }
 
   const { error } = await supabase.auth.admin.deleteUser(parsedAdminId)
   if (error) throw new Error(error.message)

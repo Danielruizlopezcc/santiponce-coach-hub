@@ -7,22 +7,28 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CLUB } from '@/lib/club'
-import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow } from '@/lib/admin-app'
+import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamRow, AdminTrainingSessionRow, TrainingLocation } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import {
   createMatchAction as adminCreateMatchAction,
+  createTrainingAction as adminCreateTrainingAction,
   deleteMatchAction as adminDeleteMatchAction,
+  deleteTrainingAction as adminDeleteTrainingAction,
   updateMatchAction as adminUpdateMatchAction,
+  updateTrainingAction as adminUpdateTrainingAction,
 } from './actions'
 
 type Props = {
   matches: AdminMatchRow[]
   teams: AdminTeamRow[]
+  trainings?: AdminTrainingSessionRow[]
   actions?: CalendarActions
   emptyTeamsMessage?: string
+  showCoordinatorSections?: boolean
 }
 
 type SheetMode = 'create' | 'edit'
+type CoordinatorCalendarTab = 'horario' | 'entrenamientos' | 'partidos'
 
 type MatchFormState = {
   teamId: string
@@ -39,6 +45,16 @@ type MatchFormState = {
   notes: string
 }
 
+type TrainingFormState = {
+  teamId: string
+  trainingDate: string
+  startTime: string
+  durationHours: string
+  durationMinutes: string
+  location: TrainingLocation
+  notes: string
+}
+
 type ColumnFilters = {
   week: string
   round: string
@@ -48,6 +64,13 @@ type ColumnFilters = {
   location: string
   type: string
   status: string
+}
+
+type TrainingFilters = {
+  week: string
+  date: string
+  team: string
+  location: string
 }
 
 type ResultFormState = {
@@ -172,10 +195,23 @@ type MatchActionInput = {
   notes: string
 }
 
+type TrainingActionInput = {
+  teamId: string
+  trainingDate: string
+  startTime: string
+  durationHours: number
+  durationMinutes: number
+  location: TrainingLocation
+  notes: string
+}
+
 type CalendarActions = {
   createMatch: (input: MatchActionInput) => Promise<void>
   updateMatch: (input: MatchActionInput & { id: string }) => Promise<void>
   deleteMatch: (id: string) => Promise<void>
+  createTraining?: (input: TrainingActionInput) => Promise<void>
+  updateTraining?: (input: TrainingActionInput & { id: string }) => Promise<void>
+  deleteTraining?: (id: string) => Promise<void>
 }
 
 const STATUS_LABELS: Record<AdminMatchStatus, string> = {
@@ -196,6 +232,8 @@ const MATCH_TYPE_LABELS: Record<AdminMatchType, string> = {
   league: 'Liga',
   friendly: 'Amistoso',
 }
+
+const TRAINING_LOCATIONS: TrainingLocation[] = ['Campo 1', 'Campo 2', 'Anexo']
 
 const POSITION_OPTIONS: Array<{ value: PlayerStatFormState['position']; label: string }> = [
   { value: '', label: 'Sin posicion' },
@@ -219,6 +257,30 @@ function createEmptyForm(defaultTeamId = ''): MatchFormState {
     homeScore: '',
     awayScore: '',
     notes: '',
+  }
+}
+
+function createEmptyTrainingForm(defaultTeamId = ''): TrainingFormState {
+  return {
+    teamId: defaultTeamId,
+    trainingDate: '',
+    startTime: '',
+    durationHours: '1',
+    durationMinutes: '30',
+    location: 'Campo 1',
+    notes: '',
+  }
+}
+
+function trainingToForm(training: AdminTrainingSessionRow): TrainingFormState {
+  return {
+    teamId: training.teamId,
+    trainingDate: training.trainingDate,
+    startTime: training.startTime.slice(0, 5),
+    durationHours: String(Math.floor(training.durationMinutes / 60)),
+    durationMinutes: String(training.durationMinutes % 60),
+    location: training.location,
+    notes: training.notes,
   }
 }
 
@@ -341,12 +403,39 @@ function getAutoTotalShots(form: ResultFormState, side: 'club' | 'opponent') {
   )
 }
 
+function CoordinatorPendingSection({ title }: { title: string }) {
+  return (
+    <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+      <h2 className="text-lg font-black text-foreground">{title}</h2>
+      <p className="mt-4 rounded-lg bg-muted/40 px-4 py-5 text-sm font-semibold text-muted-foreground">
+        Pendiente de configurar.
+      </p>
+    </section>
+  )
+}
+
 export function CalendarioClient({
   matches,
   teams,
+  trainings = [],
   actions,
   emptyTeamsMessage = 'Crea al menos un equipo antes de programar partidos.',
+  showCoordinatorSections = false,
 }: Props) {
+  const [activeCoordinatorTab, setActiveCoordinatorTab] = useState<CoordinatorCalendarTab>('partidos')
+  const [trainingSearch, setTrainingSearch] = useState('')
+  const [trainingFilters, setTrainingFilters] = useState<TrainingFilters>({
+    week: '',
+    date: '',
+    team: '',
+    location: '',
+  })
+  const [trainingSheetOpen, setTrainingSheetOpen] = useState(false)
+  const [trainingMode, setTrainingMode] = useState<SheetMode>('create')
+  const [editingTraining, setEditingTraining] = useState<AdminTrainingSessionRow | null>(null)
+  const [deleteTrainingId, setDeleteTrainingId] = useState<string | null>(null)
+  const [trainingForm, setTrainingForm] = useState<TrainingFormState>(() => createEmptyTrainingForm(teams[0]?.id ?? ''))
+  const [trainingError, setTrainingError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<ColumnFilters>({
     week: '',
@@ -406,6 +495,9 @@ export function CalendarioClient({
     createMatch: adminCreateMatchAction,
     updateMatch: adminUpdateMatchAction,
     deleteMatch: adminDeleteMatchAction,
+    createTraining: adminCreateTrainingAction,
+    updateTraining: adminUpdateTrainingAction,
+    deleteTraining: adminDeleteTrainingAction,
   }
 
   const activeTeams = useMemo(
@@ -416,6 +508,10 @@ export function CalendarioClient({
   const weekOptions = useMemo(
     () => Array.from(new Set(matches.map((match) => `${match.weekLabel}|${match.weekRangeLabel}`))),
     [matches],
+  )
+  const trainingWeekOptions = useMemo(
+    () => Array.from(new Set(trainings.map((training) => `${training.weekLabel}|${training.weekRangeLabel}`))),
+    [trainings],
   )
 
   const filteredMatches = matches.filter((match) => {
@@ -450,13 +546,44 @@ export function CalendarioClient({
   })
 
   const hasColumnFilters = Object.values(filters).some(Boolean)
+  const filteredTrainings = trainings.filter((training) => {
+    const q = trainingSearch.toLowerCase().trim()
+    const searchable = [
+      training.weekLabel,
+      training.weekRangeLabel,
+      training.dateLabel,
+      training.timeLabel,
+      training.teamName,
+      training.categoryName,
+      training.durationLabel,
+      training.location,
+      training.notes,
+    ].join(' ').toLowerCase()
+
+    if (q && !searchable.includes(q)) return false
+    if (trainingFilters.week && `${training.weekLabel}|${training.weekRangeLabel}` !== trainingFilters.week) return false
+    if (trainingFilters.date && !training.dateLabel.toLowerCase().includes(trainingFilters.date.toLowerCase())) return false
+    if (trainingFilters.team && training.teamId !== trainingFilters.team) return false
+    if (trainingFilters.location && training.location !== trainingFilters.location) return false
+
+    return true
+  })
+  const hasTrainingFilters = Object.values(trainingFilters).some(Boolean)
 
   function setField<K extends keyof MatchFormState>(field: K, value: MatchFormState[K]) {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
+  function setTrainingField<K extends keyof TrainingFormState>(field: K, value: TrainingFormState[K]) {
+    setTrainingForm((current) => ({ ...current, [field]: value }))
+  }
+
   function setFilter<K extends keyof ColumnFilters>(field: K, value: ColumnFilters[K]) {
     setFilters((current) => ({ ...current, [field]: value }))
+  }
+
+  function setTrainingFilter<K extends keyof TrainingFilters>(field: K, value: TrainingFilters[K]) {
+    setTrainingFilters((current) => ({ ...current, [field]: value }))
   }
 
   function clearFilters() {
@@ -473,6 +600,16 @@ export function CalendarioClient({
     })
   }
 
+  function clearTrainingFilters() {
+    setTrainingSearch('')
+    setTrainingFilters({
+      week: '',
+      date: '',
+      team: '',
+      location: '',
+    })
+  }
+
   function openCreate() {
     setMode('create')
     setEditing(null)
@@ -480,6 +617,15 @@ export function CalendarioClient({
     setForm(createEmptyForm(selectableTeams[0]?.id ?? ''))
     setFormError(null)
     setSheetOpen(true)
+  }
+
+  function openTrainingCreate() {
+    setTrainingMode('create')
+    setEditingTraining(null)
+    setDeleteTrainingId(null)
+    setTrainingForm(createEmptyTrainingForm(selectableTeams[0]?.id ?? ''))
+    setTrainingError(null)
+    setTrainingSheetOpen(true)
   }
 
   function openEdit(match: AdminMatchRow) {
@@ -502,6 +648,15 @@ export function CalendarioClient({
     })
     setFormError(null)
     setSheetOpen(true)
+  }
+
+  function openTrainingEdit(training: AdminTrainingSessionRow) {
+    setTrainingMode('edit')
+    setEditingTraining(training)
+    setDeleteTrainingId(null)
+    setTrainingForm(trainingToForm(training))
+    setTrainingError(null)
+    setTrainingSheetOpen(true)
   }
 
   function openResult(match: AdminMatchRow) {
@@ -569,6 +724,18 @@ export function CalendarioClient({
     }
   }
 
+  function buildTrainingPayload(): TrainingActionInput {
+    return {
+      teamId: trainingForm.teamId,
+      trainingDate: trainingForm.trainingDate,
+      startTime: trainingForm.startTime,
+      durationHours: Number(trainingForm.durationHours || 0),
+      durationMinutes: Number(trainingForm.durationMinutes || 0),
+      location: trainingForm.location,
+      notes: trainingForm.notes.trim(),
+    }
+  }
+
   function validateForm() {
     if (!form.teamId) return 'Selecciona un equipo.'
     if (!form.opponentName.trim()) return 'Introduce el rival.'
@@ -577,6 +744,20 @@ export function CalendarioClient({
     if (form.status === 'played' && (!form.homeScore.trim() || !form.awayScore.trim())) {
       return 'Introduce el resultado para marcar el partido como jugado.'
     }
+    return null
+  }
+
+  function validateTrainingForm() {
+    const durationHours = Number(trainingForm.durationHours || 0)
+    const durationMinutes = Number(trainingForm.durationMinutes || 0)
+
+    if (!trainingForm.teamId) return 'Selecciona un equipo.'
+    if (!trainingForm.trainingDate) return 'Introduce la fecha del entrenamiento.'
+    if (!trainingForm.startTime) return 'Introduce la hora del entrenamiento.'
+    if (!TRAINING_LOCATIONS.includes(trainingForm.location)) return 'Selecciona un lugar válido.'
+    if (durationHours <= 0 && durationMinutes <= 0) return 'Introduce una duración mayor que cero.'
+    if (durationMinutes > 59) return 'Los minutos deben estar entre 0 y 59.'
+
     return null
   }
 
@@ -876,6 +1057,32 @@ export function CalendarioClient({
     })
   }
 
+  function handleTrainingSubmit() {
+    const validationError = validateTrainingForm()
+    if (validationError) {
+      setTrainingError(validationError)
+      return
+    }
+
+    const createTraining = calendarActions.createTraining ?? adminCreateTrainingAction
+    const updateTraining = calendarActions.updateTraining ?? adminUpdateTrainingAction
+    const payload = buildTrainingPayload()
+
+    startTransition(async () => {
+      try {
+        if (trainingMode === 'create') {
+          await createTraining(payload)
+        } else if (editingTraining) {
+          await updateTraining({ ...payload, id: editingTraining.id })
+        }
+        setTrainingSheetOpen(false)
+        setEditingTraining(null)
+      } catch (error) {
+        setTrainingError(error instanceof Error ? error.message : 'No se ha podido guardar el entrenamiento.')
+      }
+    })
+  }
+
   function handleResultSubmit(forceSave = false) {
     if (!resultMatch) return
     const hasClubScore = Boolean(resultForm.clubScore.trim())
@@ -1055,6 +1262,19 @@ export function CalendarioClient({
     })
   }
 
+  function handleTrainingDelete(id: string) {
+    const deleteTraining = calendarActions.deleteTraining ?? adminDeleteTrainingAction
+
+    startTransition(async () => {
+      try {
+        await deleteTraining(id)
+        setDeleteTrainingId(null)
+      } catch (error) {
+        setTrainingError(error instanceof Error ? error.message : 'No se ha podido eliminar el entrenamiento.')
+      }
+    })
+  }
+
   const eventPlayer = eventPlayerId ? playerForm.find((player) => player.athleteId === eventPlayerId) ?? null : null
   const eventGoalCount = eventPlayer ? parseRequiredStat(eventPlayer.goals) : 0
   const eventYellowCount = eventPlayer ? parseRequiredStat(eventPlayer.yellowCards) : 0
@@ -1064,10 +1284,222 @@ export function CalendarioClient({
 
   return (
     <div className="space-y-5">
+      {showCoordinatorSections ? (
+        <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones del calendario">
+          {[
+            { id: 'horario', label: 'Horario' },
+            { id: 'entrenamientos', label: 'Entrenamientos' },
+            { id: 'partidos', label: 'Partidos' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeCoordinatorTab === tab.id}
+              onClick={() => setActiveCoordinatorTab(tab.id as CoordinatorCalendarTab)}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-black uppercase transition-colors',
+                activeCoordinatorTab === tab.id
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-white/75 text-muted-foreground ring-1 ring-foreground/10 hover:bg-primary/10 hover:text-primary',
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {showCoordinatorSections && activeCoordinatorTab === 'horario' ? (
+        <CoordinatorPendingSection title="Horario" />
+      ) : null}
+
+      {showCoordinatorSections && activeCoordinatorTab === 'entrenamientos' ? (
+        <section className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button size="sm" onClick={openTrainingCreate} disabled={selectableTeams.length === 0}>
+              <Plus className="size-4" aria-hidden="true" />
+              Nuevo entrenamiento
+            </Button>
+          </div>
+
+          {selectableTeams.length === 0 ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
+              Crea al menos un equipo antes de programar entrenamientos.
+            </p>
+          ) : null}
+
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={trainingSearch}
+                onChange={(event) => setTrainingSearch(event.target.value)}
+                placeholder="Buscar entrenamientos"
+                className="pl-9"
+              />
+            </div>
+            {trainingSearch || hasTrainingFilters ? (
+              <Button variant="outline" size="sm" onClick={clearTrainingFilters}>
+                <X className="size-3.5" />
+                Limpiar
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="grid gap-3 rounded-xl bg-white p-4 ring-1 ring-foreground/10 md:grid-cols-2 xl:grid-cols-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="training-filter-week">Semana</Label>
+              <select
+                id="training-filter-week"
+                value={trainingFilters.week}
+                onChange={(event) => setTrainingFilter('week', event.target.value)}
+                className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="">Todas</option>
+                {trainingWeekOptions.map((option) => {
+                  const [weekLabel, weekRangeLabel] = option.split('|')
+                  return (
+                    <option key={option} value={option}>
+                      {weekLabel} · {weekRangeLabel}
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="training-filter-date">Fecha</Label>
+              <Input
+                id="training-filter-date"
+                value={trainingFilters.date}
+                onChange={(event) => setTrainingFilter('date', event.target.value)}
+                placeholder="dd/mm/aaaa"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="training-filter-team">Equipo</Label>
+              <select
+                id="training-filter-team"
+                value={trainingFilters.team}
+                onChange={(event) => setTrainingFilter('team', event.target.value)}
+                className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="">Todos</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="training-filter-location">Lugar</Label>
+              <select
+                id="training-filter-location"
+                value={trainingFilters.location}
+                onChange={(event) => setTrainingFilter('location', event.target.value)}
+                className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="">Todos</option>
+                {TRAINING_LOCATIONS.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {trainingError && !trainingSheetOpen ? (
+            <div className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {trainingError}
+            </div>
+          ) : null}
+
+          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+            <table className="w-full text-center text-sm">
+              <thead>
+                <tr className="border-b border-border bg-blue-50 text-xs font-bold text-blue-950">
+                  <th className="px-4 py-2.5 text-center">Semana</th>
+                  <th className="px-4 py-2.5 text-center">Fecha</th>
+                  <th className="px-4 py-2.5 text-center">Equipo</th>
+                  <th className="px-4 py-2.5 text-center">Hora</th>
+                  <th className="px-4 py-2.5 text-center">Duración</th>
+                  <th className="px-4 py-2.5 text-center">Lugar</th>
+                  <th className="px-4 py-2.5 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {filteredTrainings.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-14 text-center text-sm text-muted-foreground">
+                      No hay entrenamientos registrados todavía.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTrainings.map((training) => {
+                    const isDeleting = deleteTrainingId === training.id
+
+                    return (
+                      <tr key={training.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-foreground">{training.weekLabel}</div>
+                          <div className="text-xs font-semibold text-muted-foreground">{training.weekRangeLabel}</div>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{training.dateLabel}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-foreground">{training.teamName}</div>
+                          <div className="text-xs font-semibold text-muted-foreground">{training.categoryName}</div>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{training.timeLabel}</td>
+                        <td className="px-4 py-3 font-semibold text-foreground">{training.durationLabel}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{training.location}</td>
+                        <td className="px-4 py-3">
+                          {isDeleting ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                              <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleTrainingDelete(training.id)}>
+                                Sí, eliminar
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setDeleteTrainingId(null)}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-center gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => openTrainingEdit(training)}>
+                                <Pencil className="size-3.5" aria-hidden="true" />
+                                Editar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => setDeleteTrainingId(training.id)}
+                              >
+                                <Trash2 className="size-3.5" aria-hidden="true" />
+                                Eliminar
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {!showCoordinatorSections || activeCoordinatorTab === 'partidos' ? (
+      <section className="space-y-5">
+
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {matches.length} {matches.length === 1 ? 'partido' : 'partidos'}
-        </span>
         <Button size="sm" onClick={openCreate} disabled={selectableTeams.length === 0}>
           <Plus className="size-4" aria-hidden="true" />
           Nuevo partido
@@ -1331,6 +1763,126 @@ export function CalendarioClient({
           </tbody>
         </table>
       </div>
+      </section>
+      ) : null}
+
+      <AdminFormDialog
+        open={trainingSheetOpen}
+        onOpenChange={setTrainingSheetOpen}
+        title={trainingMode === 'create' ? 'Nuevo entrenamiento' : 'Editar entrenamiento'}
+        description="Programa el equipo, hora, duración y campo del entrenamiento."
+        maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setTrainingSheetOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleTrainingSubmit} disabled={isPending}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : trainingMode === 'create' ? <Plus className="size-4" /> : <Pencil className="size-4" />}
+              {trainingMode === 'create' ? 'Crear entrenamiento' : 'Guardar cambios'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="training-team">Equipo</Label>
+            <select
+              id="training-team"
+              value={trainingForm.teamId}
+              onChange={(event) => setTrainingField('teamId', event.target.value)}
+              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="">Selecciona equipo</option>
+              {selectableTeams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="training-location">Lugar</Label>
+            <select
+              id="training-location"
+              value={trainingForm.location}
+              onChange={(event) => setTrainingField('location', event.target.value as TrainingLocation)}
+              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              {TRAINING_LOCATIONS.map((location) => (
+                <option key={location} value={location}>
+                  {location}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="training-date">Fecha</Label>
+            <Input
+              id="training-date"
+              type="date"
+              value={trainingForm.trainingDate}
+              onChange={(event) => setTrainingField('trainingDate', event.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="training-time">Hora</Label>
+            <Input
+              id="training-time"
+              type="time"
+              value={trainingForm.startTime}
+              onChange={(event) => setTrainingField('startTime', event.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="training-duration-hours">Duración horas</Label>
+              <Input
+                id="training-duration-hours"
+                type="number"
+                min="0"
+                max="6"
+                step="1"
+                value={trainingForm.durationHours}
+                onChange={(event) => setTrainingField('durationHours', event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="training-duration-minutes">Duración minutos</Label>
+              <Input
+                id="training-duration-minutes"
+                type="number"
+                min="0"
+                max="59"
+                step="1"
+                value={trainingForm.durationMinutes}
+                onChange={(event) => setTrainingField('durationMinutes', event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5 md:col-span-2">
+            <Label htmlFor="training-notes">Notas</Label>
+            <textarea
+              id="training-notes"
+              value={trainingForm.notes}
+              onChange={(event) => setTrainingField('notes', event.target.value)}
+              className="min-h-24 rounded-lg border border-input bg-white px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              placeholder="Observaciones internas"
+            />
+          </div>
+        </div>
+
+        {trainingError ? (
+          <div className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {trainingError}
+          </div>
+        ) : null}
+      </AdminFormDialog>
 
       <AdminFormDialog
         open={sheetOpen}

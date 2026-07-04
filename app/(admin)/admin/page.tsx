@@ -240,7 +240,7 @@ export default async function AdminDashboardPage() {
           <KpiCard
             label="Ingresos recientes"
             value={moneyFormatter.format(ingresosRecientes)}
-            detail={`${data.recentPayments.length} pagos pagados en el resumen`}
+            detail="Cobros pagados en el resumen"
             icon={WalletCards}
             tone="green"
           />

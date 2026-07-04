@@ -92,12 +92,7 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            {seasons.length} temporadas
-          </span>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Button
           type="button"
           onClick={() => {

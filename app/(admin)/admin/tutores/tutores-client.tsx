@@ -227,7 +227,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
         {[
           { id: 'tutores', label: 'Tutores' },
           { id: 'socios', label: 'Socios' },
-          { id: 'pendientes', label: `Tutores pendientes${pendingTutors.length ? ` (${pendingTutors.length})` : ''}` },
+          { id: 'pendientes', label: 'Tutores pendientes' },
           { id: 'rechazados', label: 'Tutores rechazados' },
         ].map((tab) => (
           <button
@@ -345,11 +345,6 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
           </Dialog.Root>
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {tutors.filter((tutor) => tutor.isApproved).length} tutores
-              </span>
-            </div>
             <div className="relative mb-4">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} placeholder="Buscar por tutor, email, teléfono o ciudad" className="pl-9" />
@@ -479,11 +474,6 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'pendientes' ? (
         <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-              {pendingTutors.length} pendientes
-            </span>
-          </div>
           {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
           <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
             <table className="w-full text-sm">
@@ -545,11 +535,6 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'rechazados' ? (
         <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
-              {rejectedTutors.length} rechazados
-            </span>
-          </div>
           {toggleMessage?.message ? <FormMessage state={toggleMessage} /> : null}
           <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
             <table className="w-full text-sm">
@@ -596,10 +581,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'socios' ? (
         <section className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {members.length} socios
-            </span>
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <Button
               type="button"
               onClick={() => {

@@ -2,13 +2,16 @@ import 'server-only'
 
 import { CLUB, MATRICULA_IMPORTE, MEMBERSHIP_IMPORTE } from '@/lib/club'
 import { formatSpanishDate, formatSpanishDateTime } from '@/lib/format'
+import { getAdminRoleLabel, type AdminRole } from '@/lib/admin-permissions'
 import { getPrivateViewer } from '@/lib/private-app'
 import type { PlayerPosition, PrivateViewer } from '@/lib/private-app-shared'
 import { getSponsorTierFromSortOrder, type SponsorTier } from '@/lib/sponsors'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
 export type AdminViewer = PrivateViewer & {
+  role: AdminRole
   roleLabel: string
 }
 
@@ -64,7 +67,7 @@ export type AdminUserRow = {
   id: string
   nombre: string
   email: string
-  rol: 'Tutor' | 'Administrador'
+  rol: 'Tutor' | 'Administrador' | 'Coordinador deportivo'
   estado: 'Activo'
   fechaAlta: string
 }
@@ -246,6 +249,38 @@ export type AdminMatchRow = {
   playerStats: AdminMatchPlayerStat[]
 }
 
+export type TrainingLocation = 'Campo 1' | 'Campo 2' | 'Anexo'
+
+export type AdminTrainingSessionRow = {
+  id: string
+  teamId: string
+  teamName: string
+  categoryName: string
+  seasonId: string
+  seasonName: string
+  trainingDate: string
+  startTime: string
+  dateLabel: string
+  timeLabel: string
+  weekLabel: string
+  weekRangeLabel: string
+  durationMinutes: number
+  durationLabel: string
+  location: TrainingLocation
+  notes: string
+}
+
+type StoredTrainingSession = {
+  id: string
+  teamId: string
+  seasonId: string
+  trainingDate: string
+  startTime: string
+  durationMinutes: number
+  location: TrainingLocation
+  notes: string
+}
+
 export type AdminSeasonRow = {
   id: string
   nombre: string
@@ -338,6 +373,7 @@ export type AdminManagerRow = {
   id: string
   nombre: string
   email: string
+  role: AdminRole
   rol: string
   estado: 'Activo'
   fechaAlta: string
@@ -489,13 +525,13 @@ function mapStatusLabel(
   return 'Pendiente'
 }
 
-export async function getAdminViewer(userId: string): Promise<AdminViewer> {
+export async function getAdminViewer(userId: string, role: AdminRole = 'admin'): Promise<AdminViewer> {
   const viewer = await getPrivateViewer(userId)
-  return { ...viewer, roleLabel: 'Administrador' }
+  return { ...viewer, role, roleLabel: getAdminRoleLabel(role) }
 }
 
 async function getAdminCollections() {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const [
     { data: profiles },
@@ -794,13 +830,22 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 export async function getAdminUsers(): Promise<AdminUserRow[]> {
   const { profiles, roles } = await getAdminCollections()
   const adminIds = new Set(roles.filter((role) => role.role === 'admin').map((role) => role.user_id))
+  const sportsCoordinatorIds = new Set(
+    roles.filter((role) => role.role === 'sports_coordinator').map((role) => role.user_id),
+  )
 
   return profiles
     .map((profile) => ({
       id: profile.id,
       nombre: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Usuario',
       email: profile.email,
-      rol: (adminIds.has(profile.id) ? 'Administrador' : 'Tutor') as AdminUserRow['rol'],
+      rol: (
+        adminIds.has(profile.id)
+          ? 'Administrador'
+          : sportsCoordinatorIds.has(profile.id)
+            ? 'Coordinador deportivo'
+            : 'Tutor'
+      ) as AdminUserRow['rol'],
       estado: 'Activo' as const,
       fechaAlta: formatSpanishDate(profile.created_at),
     }))
@@ -1223,6 +1268,72 @@ export async function getAdminMatches(): Promise<AdminMatchRow[]> {
   })
 }
 
+function formatDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  const parts = []
+
+  if (hours > 0) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`)
+  if (remainingMinutes > 0) parts.push(`${remainingMinutes} min`)
+
+  return parts.join(' ') || '0 min'
+}
+
+export async function getAdminTrainingSessions(): Promise<AdminTrainingSessionRow[]> {
+  const supabase = createAdminClient()
+  const [{ data: setting }, { data: teams }, { data: categories }, { data: seasons }] =
+    await Promise.all([
+      supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'coordinator_training_sessions')
+        .maybeSingle(),
+      supabase.from('teams').select('id, name, category_id, season_id'),
+      supabase.from('categories').select('id, name'),
+      supabase.from('seasons').select('id, name'),
+    ])
+
+  let trainings: StoredTrainingSession[] = []
+  try {
+    trainings = JSON.parse(setting?.value ?? '[]') as StoredTrainingSession[]
+  } catch {
+    trainings = []
+  }
+
+  const teamById = new Map((teams ?? []).map((team) => [team.id, team]))
+  const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
+  const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+
+  return trainings
+    .sort((a, b) => b.trainingDate.localeCompare(a.trainingDate) || b.startTime.localeCompare(a.startTime))
+    .map((training) => {
+    const team = teamById.get(training.teamId)
+    const categoryName = team ? categoryById.get(team.category_id) ?? 'Sin categoría' : 'Sin categoría'
+    const sortInfo = getTeamCategorySortInfo(team?.name ?? '', categoryName)
+    const weekInfo = getMatchWeekInfo(training.trainingDate)
+    const durationMinutes = training.durationMinutes ?? 0
+
+    return {
+      id: training.id,
+      teamId: training.teamId,
+      teamName: team?.name ?? 'Equipo no disponible',
+      categoryName: sortInfo.label,
+      seasonId: training.seasonId,
+      seasonName: seasonById.get(training.seasonId) ?? 'Temporada no disponible',
+      trainingDate: training.trainingDate,
+      startTime: training.startTime ?? '',
+      dateLabel: formatSpanishDate(training.trainingDate),
+      timeLabel: formatMatchTime(training.startTime),
+      weekLabel: weekInfo.weekLabel,
+      weekRangeLabel: weekInfo.weekRangeLabel,
+      durationMinutes,
+      durationLabel: formatDuration(durationMinutes),
+      location: training.location as TrainingLocation,
+      notes: training.notes ?? '',
+    }
+  })
+}
+
 export async function getAdminSponsors(): Promise<AdminSponsorRow[]> {
   const supabase = await createClient()
   const { data } = await supabase
@@ -1599,12 +1710,13 @@ export async function getAdminConsents(): Promise<AdminConsentRow[]> {
 export async function getAdminManagers(): Promise<AdminManagerRow[]> {
   const users = await getAdminUsers()
   return users
-    .filter((user) => user.rol === 'Administrador')
+    .filter((user) => user.rol === 'Administrador' || user.rol === 'Coordinador deportivo')
     .map((user) => ({
       id: user.id,
       nombre: user.nombre,
       email: user.email,
-      rol: 'Administrador',
+      role: user.rol === 'Administrador' ? 'admin' : 'sports_coordinator',
+      rol: user.rol,
       estado: 'Activo',
       fechaAlta: user.fechaAlta,
     }))

@@ -14,6 +14,7 @@ import {
   Home,
   Menu,
   Newspaper,
+  ShoppingBag,
   Shield,
   User,
   UsersRound,
@@ -57,6 +58,8 @@ const PUBLIC_ICONS: Partial<Record<string, DrawerItem['icon']>> = {
   '/equipos': UsersRound,
   '/club': Shield,
   '/patrocinadores': Handshake,
+  '/cluber': User,
+  '/tienda': ShoppingBag,
 }
 
 const PRIVATE_ICONS: Partial<Record<PrivateNavItem['icon'], DrawerItem['icon']>> = {
@@ -67,9 +70,21 @@ const PRIVATE_ICONS: Partial<Record<PrivateNavItem['icon'], DrawerItem['icon']>>
 }
 
 const AUTH_HREFS = new Set(['/registro', '/iniciar-sesion'])
+const NON_NAVIGABLE_HREFS = new Set(['/club', '/cluber', '/tienda'])
 const PRIVATE_MENU_HREFS = new Set(['/app/perfil', '/app/portal-socio', '/app/deportistas', '/app/matriculacion'])
 
 function getDropdownItems(href: string, navData: PublicNavData): DropdownItem[] {
+  if (href === '/club') {
+    return [
+      { href: '/club/organizacion', label: 'Organización', description: 'Estructura del club' },
+      {
+        href: '/club/la-historia-continua',
+        label: 'La historia continúa',
+        description: 'Historia del CD Santiponce',
+      },
+    ]
+  }
+
   if (href === '/equipos') {
     return navData.teams.map((team) => ({
       href: `/equipos/${team.id}`,
@@ -147,39 +162,80 @@ function NavLinks({
         const active = isActivePath(pathname, item.href)
         const expanded = openVerticalHref === item.href
         const Icon = item.icon
+        const isNonNavigable = NON_NAVIGABLE_HREFS.has(item.href)
+        const itemContent = (
+          <span className="flex min-w-0 items-center gap-3">
+            {orientation === 'vertical' ? <Icon className="size-4 shrink-0" aria-hidden={true} /> : null}
+            <span className="truncate">{item.label}</span>
+          </span>
+        )
+        const itemClassName = cn(
+          'flex min-h-9 items-center gap-2 rounded-md px-3 py-1.5 text-[0.84rem] font-semibold uppercase tracking-[0.14em] outline-none transition-all duration-150',
+          'focus-visible:ring-2 focus-visible:ring-white/80',
+          orientation === 'horizontal' &&
+            (active
+              ? 'text-white drop-shadow-[0_1px_6px_rgba(255,255,255,0.34)]'
+              : 'text-white/88 drop-shadow-[0_1px_2px_rgba(0,0,0,0.24)] hover:bg-white/8 hover:text-white hover:drop-shadow-[0_1px_5px_rgba(255,255,255,0.2)]'),
+          orientation === 'vertical' &&
+            'flex-1 px-0 py-4 text-foreground hover:text-primary focus-visible:ring-ring',
+          orientation === 'vertical' && active && 'text-primary',
+          isNonNavigable && dropdownItems.length === 0 && 'cursor-default hover:bg-transparent',
+        )
 
         return (
           <li key={item.href}>
             <div className={cn('flex items-center', orientation === 'vertical' && 'border-b border-border')}>
-              <Link
-                href={href}
-                onClick={onNavigate}
-                onMouseEnter={() => {
-                  if (orientation !== 'horizontal') return
-                  onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
-                }}
-                onFocus={() => {
-                  if (orientation !== 'horizontal') return
-                  onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
-                }}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'flex min-h-9 items-center gap-2 rounded-md px-3 py-1.5 text-[0.84rem] font-semibold uppercase tracking-[0.14em] outline-none transition-all duration-150',
-                  'focus-visible:ring-2 focus-visible:ring-white/80',
-                  orientation === 'horizontal' &&
-                    (active
-                      ? 'text-white drop-shadow-[0_1px_6px_rgba(255,255,255,0.34)]'
-                      : 'text-white/88 drop-shadow-[0_1px_2px_rgba(0,0,0,0.24)] hover:bg-white/8 hover:text-white hover:drop-shadow-[0_1px_5px_rgba(255,255,255,0.2)]'),
-                  orientation === 'vertical' &&
-                    'flex-1 px-0 py-4 text-foreground hover:text-primary focus-visible:ring-ring',
-                  orientation === 'vertical' && active && 'text-primary',
-                )}
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  {orientation === 'vertical' ? <Icon className="size-4 shrink-0" aria-hidden={true} /> : null}
-                  <span className="truncate">{item.label}</span>
-                </span>
-              </Link>
+              {isNonNavigable ? (
+                dropdownItems.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (orientation === 'vertical') {
+                        setOpenVerticalHref?.((current) => (current === item.href ? null : item.href))
+                        return
+                      }
+                      onMegaOpen?.(item.href)
+                    }}
+                    onMouseEnter={() => {
+                      if (orientation !== 'horizontal') return
+                      onMegaOpen?.(item.href)
+                    }}
+                    onFocus={() => {
+                      if (orientation !== 'horizontal') return
+                      onMegaOpen?.(item.href)
+                    }}
+                    aria-current={active ? 'page' : undefined}
+                    aria-expanded={dropdownItems.length > 0 ? expanded : undefined}
+                    className={cn(itemClassName, orientation === 'vertical' && 'text-left')}
+                  >
+                    {itemContent}
+                  </button>
+                ) : (
+                  <span
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(itemClassName, 'select-none')}
+                  >
+                    {itemContent}
+                  </span>
+                )
+              ) : (
+                <Link
+                  href={href}
+                  onClick={onNavigate}
+                  onMouseEnter={() => {
+                    if (orientation !== 'horizontal') return
+                    onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
+                  }}
+                  onFocus={() => {
+                    if (orientation !== 'horizontal') return
+                    onMegaOpen?.(dropdownItems.length > 0 ? item.href : null)
+                  }}
+                  aria-current={active ? 'page' : undefined}
+                  className={itemClassName}
+                >
+                  {itemContent}
+                </Link>
+              )}
               {dropdownItems.length > 0 ? (
                 <button
                   type="button"
@@ -241,10 +297,9 @@ function MenuDrawer({
           <Button
             variant="ghost"
             aria-label="Abrir menú"
-            className="h-12 min-w-16 flex-col gap-0.5 rounded-none bg-transparent px-3 text-white hover:bg-white/10 hover:text-white"
+            className="grid size-12 place-items-center rounded-none bg-transparent p-0 text-white hover:bg-white/10 hover:text-white"
           >
-            <Menu className="size-5" aria-hidden="true" />
-            <span className="text-[0.58rem] font-bold uppercase leading-none tracking-[0.2em]">Menú</span>
+            <Menu className="size-6" aria-hidden="true" />
           </Button>
         }
       />
@@ -300,14 +355,14 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
     ...item,
     icon: PUBLIC_ICONS[item.href] ?? Shield,
   }))
-  const leftNav = primaryNav.slice(0, 3)
-  const rightNav = primaryNav.slice(3)
+  const leftNav = primaryNav.slice(0, 4)
+  const rightNav = primaryNav.slice(4)
   const drawerItems = buildDrawerItems(navItems)
   const megaItems = activeMegaHref ? getDropdownItems(activeMegaHref, navData) : []
-  const megaTitle = activeMegaHref === '/equipos' ? 'Equipos' : 'Noticias'
+  const megaTitle = activeMegaHref === '/equipos' ? 'Equipos' : activeMegaHref === '/club' ? 'Club' : 'Noticias'
   const megaPrimaryHref = activeMegaHref === '/equipos' ? '/equipos' : '/noticias'
   const megaPrimaryLabel = activeMegaHref === '/equipos' ? 'Ver todos los equipos' : 'Ver todas las noticias'
-  const showMegaPrimary = activeMegaHref !== '/equipos'
+  const showMegaPrimary = activeMegaHref === '/noticias'
   const megaVisibleItems = activeMegaHref === '/noticias' ? megaItems.slice(1) : megaItems
   const megaGroups =
     activeMegaHref === '/equipos'
@@ -319,7 +374,9 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
             return groups
           }, new Map<string, DropdownItem[]>()),
         ).map(([title, items]) => ({ title, items }))
-      : [{ title: 'Secciones de noticias', items: megaVisibleItems }]
+      : activeMegaHref === '/club'
+        ? [{ title: null, items: megaVisibleItems }]
+        : [{ title: 'Secciones de noticias', items: megaVisibleItems }]
 
   return (
     <header
@@ -364,15 +421,15 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
           <MenuDrawer open={open} setOpen={setOpen} pathname={pathname} navData={navData} items={drawerItems} />
         </div>
 
-        <div className="mx-auto grid min-h-16 max-w-7xl grid-cols-1 items-center gap-4 px-4 py-1.5 md:grid-cols-[1fr_148px_1fr] md:px-8 lg:px-10">
-          <nav aria-label="Navegación principal izquierda" className="hidden justify-self-end md:block">
+        <div className="mx-auto grid min-h-16 max-w-[1500px] grid-cols-1 items-center gap-4 px-4 py-1.5 lg:grid-cols-[1fr_148px_1fr] lg:px-8 xl:px-10">
+          <nav aria-label="Navegación principal izquierda" className="hidden justify-self-end lg:block">
             <NavLinks pathname={pathname} navData={navData} onMegaOpen={setActiveMegaHref} items={leftNav} />
           </nav>
 
           <Link
             href="/"
             aria-label={`${CLUB.shortName} - Inicio`}
-            className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:pointer-events-none md:invisible"
+            className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 lg:pointer-events-none lg:invisible"
           >
             <Image
               src={CLUB.crest}
@@ -388,7 +445,7 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
             </span>
           </Link>
 
-          <nav aria-label="Navegación principal derecha" className="hidden justify-self-start md:block">
+          <nav aria-label="Navegación principal derecha" className="hidden justify-self-start lg:block">
             <NavLinks pathname={pathname} navData={navData} onMegaOpen={setActiveMegaHref} items={rightNav} />
           </nav>
         </div>
@@ -418,10 +475,12 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
               <p className="py-5 text-sm font-bold text-muted-foreground">No hay elementos disponibles.</p>
             ) : (
               <div className="grid content-start gap-x-12 gap-y-7 lg:grid-cols-3">
-                {megaGroups.map((group) => (
-                  <section key={group.title}>
-                    <h3 className="border-b border-border pb-3 text-xs font-black uppercase text-muted-foreground">{group.title}</h3>
-                    <div className="mt-2">
+                {megaGroups.map((group, groupIndex) => (
+                  <section key={group.title ?? `club-${groupIndex}`}>
+                    {group.title ? (
+                      <h3 className="border-b border-border pb-3 text-xs font-black uppercase text-muted-foreground">{group.title}</h3>
+                    ) : null}
+                    <div className={cn(group.title ? 'mt-2' : 'mt-0')}>
                       {group.items.map((item) => (
                         <Link
                           key={item.href}

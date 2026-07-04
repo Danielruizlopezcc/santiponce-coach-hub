@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { requireAdminAction } from '@/lib/auth'
+import { requireAdminAction, requireSportsAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   createTutorFeeStripeSchedule,
@@ -11,7 +11,7 @@ import {
 } from '@/lib/tutor-fee-billing'
 
 async function getAdminSupabase() {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   return createAdminClient()
 }
 
@@ -192,7 +192,7 @@ export async function createAthleteAction(
   _prev: CreateAthleteState,
   formData: FormData,
 ): Promise<CreateAthleteState> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsed = createAthleteSchema.safeParse({
     guardianId: formData.get('guardianId'),
     nombre: formData.get('nombre'),

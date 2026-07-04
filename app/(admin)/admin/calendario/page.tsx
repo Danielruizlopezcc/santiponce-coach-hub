@@ -1,11 +1,14 @@
 import { PageContainer } from '@/components/page-container'
-import { getAdminMatches, getAdminTeams } from '@/lib/admin-app'
+import { getAdminMatches, getAdminTeams, getAdminTrainingSessions } from '@/lib/admin-app'
+import { requireAdmin } from '@/lib/auth'
 import { CalendarioClient } from './calendario-client'
 
 export default async function AdminCalendarioPage() {
-  const [matches, teams] = await Promise.all([
+  const [{ role }, matches, teams, trainings] = await Promise.all([
+    requireAdmin(),
     getAdminMatches(),
     getAdminTeams(),
+    getAdminTrainingSessions(),
   ])
 
   return (
@@ -14,7 +17,12 @@ export default async function AdminCalendarioPage() {
       description="Programa partidos del club y actualiza resultados desde administración."
       className="max-w-7xl"
     >
-      <CalendarioClient matches={matches} teams={teams} />
+      <CalendarioClient
+        matches={matches}
+        teams={teams}
+        trainings={trainings}
+        showCoordinatorSections={role === 'sports_coordinator'}
+      />
     </PageContainer>
   )
 }

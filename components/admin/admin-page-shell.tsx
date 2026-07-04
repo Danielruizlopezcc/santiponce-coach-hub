@@ -22,7 +22,6 @@ type AdminPageShellProps = {
   filters?: FilterConfig[]
   emptyTitle: string
   emptyDescription: string
-  counterLabel: string
 }
 
 export function AdminPageShell({
@@ -36,7 +35,6 @@ export function AdminPageShell({
   filters,
   emptyTitle,
   emptyDescription,
-  counterLabel,
 }: AdminPageShellProps) {
   const [loading, setLoading] = useState(false)
 
@@ -64,16 +62,7 @@ export function AdminPageShell({
 
   return (
     <PageContainer title={title} description={description} className="max-w-7xl">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            {data.length} {counterLabel}
-          </span>
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-            Visual
-          </span>
-        </div>
-
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || data.length === 0}>
             <Download className="size-4" aria-hidden="true" />

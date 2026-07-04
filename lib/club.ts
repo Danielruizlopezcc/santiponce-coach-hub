@@ -36,6 +36,8 @@ export const PUBLIC_NAV: NavItem[] = [
   { label: 'Equipos', href: '/equipos' },
   { label: 'Club', href: '/club' },
   { label: 'Patrocinadores', href: '/patrocinadores' },
+  { label: 'Cluber', href: '/cluber' },
+  { label: 'Tienda', href: '/tienda' },
   { label: 'Registrarse', href: '/registro' },
   { label: 'Iniciar sesión', href: '/iniciar-sesion' },
 ]

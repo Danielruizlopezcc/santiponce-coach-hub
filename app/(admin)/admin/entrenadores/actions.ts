@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createAdminAuditLog } from '@/lib/audit'
-import { requireAdminAction } from '@/lib/auth'
+import { requireSportsAdminAction } from '@/lib/auth'
 import { normalizeEmail } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -32,7 +32,7 @@ export async function createCoachAction(
   _prev: CoachActionState,
   formData: FormData,
 ): Promise<CoachActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
 
   const parsed = coachSchema.safeParse({
     nombre: formData.get('nombre'),
@@ -137,7 +137,7 @@ export async function createCoachAction(
 }
 
 export async function updateCoachAction(input: unknown): Promise<void> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
 
   const parsed = updateCoachSchema.safeParse(input)
   if (!parsed.success) {
@@ -231,7 +231,7 @@ export async function updateCoachAction(input: unknown): Promise<void> {
 }
 
 export async function deleteCoachAction(coachId: string): Promise<void> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
 
   const parsedCoachId = z.string().uuid('No se ha podido identificar el entrenador.').parse(coachId)
   const supabase = createAdminClient()

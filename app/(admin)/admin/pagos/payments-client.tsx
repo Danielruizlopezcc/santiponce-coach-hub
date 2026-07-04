@@ -520,7 +520,6 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   const currentMovementCategories = getMovementCategories(editingMovement?.tipo ?? movementFormType)
   const tabMovements = financeMovements.filter((movement) => movement.tipo === currentMovementType)
   const tabMovementTotal = sumMovements(tabMovements)
-  const confirmedTabMovements = tabMovements.filter((movement) => movement.estado === 'confirmed')
   const pendingTabMovements = tabMovements.filter((movement) => movement.estado === 'pending')
   const reportIncomeTotal = sumMovements(reportMovements.filter((movement) => movement.tipo === 'ingreso'))
   const reportExpenseTotal = sumMovements(reportMovements.filter((movement) => movement.tipo === 'gasto'))
@@ -587,7 +586,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           <SummaryCard
             title="Gastos"
             value={formatEuro(summary.manualExpenseTotal)}
-            detail={`${summary.manualExpenses.length} registro${summary.manualExpenses.length !== 1 ? 's' : ''} de salida`}
+            detail="Salidas confirmadas del club"
             icon={TrendingDown}
             tone="amber"
           />
@@ -687,9 +686,6 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
         <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {payments.length} pagos
-            </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
               <ReceiptText className="size-3.5" aria-hidden="true" />
               Histórico
@@ -899,9 +895,6 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
             <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  {visibleFeeTemplates.length} de {feeTemplates.length} cuotas
-                </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                   <Tags className="size-3.5" aria-hidden="true" />
                   Configuradas
@@ -1289,23 +1282,16 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           <SummaryCard
             title={currentMovementType === 'ingreso' ? 'Ingresos confirmados' : 'Gastos confirmados'}
             value={formatEuro(tabMovementTotal)}
-            detail={`${confirmedTabMovements.length} registro${confirmedTabMovements.length !== 1 ? 's' : ''} confirmado${confirmedTabMovements.length !== 1 ? 's' : ''}`}
+            detail="Movimientos confirmados"
             icon={currentMovementType === 'ingreso' ? TrendingUp : TrendingDown}
             tone={currentMovementType === 'ingreso' ? 'green' : 'amber'}
           />
           <SummaryCard
             title="Pendientes"
             value={formatEuro(pendingTabMovements.reduce((sum, movement) => sum + movement.importe, 0))}
-            detail={`${pendingTabMovements.length} registro${pendingTabMovements.length !== 1 ? 's' : ''} pendiente${pendingTabMovements.length !== 1 ? 's' : ''}`}
+            detail="Pendiente de revisión"
             icon={ShieldAlert}
             tone="amber"
-          />
-          <SummaryCard
-            title="Total registros"
-            value={String(tabMovements.length)}
-            detail="Incluye confirmados, pendientes y anulados"
-            icon={ReceiptText}
-            tone="blue"
           />
         </div>
 
@@ -1506,9 +1492,6 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {tabMovements.length} {currentMovementType === 'ingreso' ? 'ingresos' : 'gastos'}
-              </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                 <ReceiptText className="size-3.5" aria-hidden="true" />
                 Tesorería

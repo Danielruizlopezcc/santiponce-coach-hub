@@ -108,10 +108,7 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {coaches.length} entrenadores
-        </span>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Button type="button" onClick={() => setFormOpen(true)}>
           <Plus className="size-4" />
           Crear entrenador
