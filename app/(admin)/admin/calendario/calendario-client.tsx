@@ -34,6 +34,7 @@ type Props = {
 
 type SheetMode = 'create' | 'edit'
 type CoordinatorCalendarTab = 'horario' | 'entrenamientos' | 'partidos'
+type ScheduleViewMode = 'week' | 'day'
 
 type MatchFormState = {
   teamId: string
@@ -281,6 +282,7 @@ const SCHEDULE_START_HOUR = 8
 const SCHEDULE_END_HOUR = 22
 const SCHEDULE_STEP_MINUTES = 15
 const SCHEDULE_ROW_HEIGHT = 24
+const SCHEDULE_TIME_COLUMN_WIDTH = 72
 const FULL_FIELD_CATEGORIES = ['infantil', 'cadete', 'juvenil', 'senior']
 const SCHEDULE_CATEGORY_HUES = [211, 156, 276, 18, 188, 332, 43, 246, 126, 6, 225, 168]
 const STANDARD_TEAM_COLORS = ['#000000', '#ffffff', '#4d86f7', '#ea4335', '#f4b400', '#34a853', '#ff6d01', '#46bdc6']
@@ -669,6 +671,11 @@ export function CalendarioClient({
 }: Props) {
   const [activeCoordinatorTab, setActiveCoordinatorTab] = useState<CoordinatorCalendarTab>('horario')
   const [scheduleWeekStart, setScheduleWeekStart] = useState(() => getWeekStart(new Date()))
+  const [scheduleViewMode, setScheduleViewMode] = useState<ScheduleViewMode>('week')
+  const [scheduleDayIndex, setScheduleDayIndex] = useState(() => {
+    const today = new Date().getDay() || 7
+    return today - 1
+  })
   const [scheduleSlot, setScheduleSlot] = useState<ScheduleSlot | null>(null)
   const [teamColorMap, setTeamColorMap] = useState<AdminTeamColorMap>(teamColors)
   const [teamColorsOpen, setTeamColorsOpen] = useState(false)
@@ -764,7 +771,15 @@ export function CalendarioClient({
     () => Array.from({ length: 7 }, (_, index) => addDays(scheduleWeekStart, index)),
     [scheduleWeekStart],
   )
+  const visibleScheduleDays = useMemo(
+    () => scheduleViewMode === 'day' ? [scheduleDays[scheduleDayIndex] ?? scheduleDays[0]] : scheduleDays,
+    [scheduleDayIndex, scheduleDays, scheduleViewMode],
+  )
   const scheduleDateKeys = useMemo(() => scheduleDays.map(getDateKey), [scheduleDays])
+  const scheduleGridColumns = useMemo(
+    () => `${SCHEDULE_TIME_COLUMN_WIDTH}px repeat(${visibleScheduleDays.length}, minmax(0, 1fr))`,
+    [visibleScheduleDays.length],
+  )
   const scheduleSlots = useMemo(
     () =>
       Array.from(
@@ -937,6 +952,36 @@ export function CalendarioClient({
       team: '',
       location: '',
     })
+  }
+
+  function goToTodayInSchedule() {
+    const today = new Date()
+    const dayIndex = (today.getDay() || 7) - 1
+    setScheduleWeekStart(getWeekStart(today))
+    setScheduleDayIndex(dayIndex)
+  }
+
+  function moveSchedule(direction: -1 | 1) {
+    if (scheduleViewMode === 'day') {
+      const nextIndex = scheduleDayIndex + direction
+
+      if (nextIndex < 0) {
+        setScheduleWeekStart((current) => addDays(current, -7))
+        setScheduleDayIndex(6)
+        return
+      }
+
+      if (nextIndex > 6) {
+        setScheduleWeekStart((current) => addDays(current, 7))
+        setScheduleDayIndex(0)
+        return
+      }
+
+      setScheduleDayIndex(nextIndex)
+      return
+    }
+
+    setScheduleWeekStart((current) => addDays(current, direction * 7))
   }
 
   function openCreate() {
@@ -1744,62 +1789,93 @@ export function CalendarioClient({
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setScheduleWeekStart(getWeekStart(new Date()))}>
+              <Button variant="outline" size="sm" onClick={goToTodayInSchedule}>
                 Hoy
               </Button>
               <Button
                 variant="outline"
                 size="icon-sm"
-                aria-label="Semana anterior"
-                onClick={() => setScheduleWeekStart((current) => addDays(current, -7))}
+                aria-label={scheduleViewMode === 'day' ? 'Dia anterior' : 'Semana anterior'}
+                onClick={() => moveSchedule(-1)}
               >
                 <ChevronLeft className="size-4" />
               </Button>
               <Button
                 variant="outline"
                 size="icon-sm"
-                aria-label="Semana siguiente"
-                onClick={() => setScheduleWeekStart((current) => addDays(current, 7))}
+                aria-label={scheduleViewMode === 'day' ? 'Dia siguiente' : 'Semana siguiente'}
+                onClick={() => moveSchedule(1)}
               >
                 <ChevronRight className="size-4" />
               </Button>
-              <h2 className="ml-2 text-xl font-black text-foreground">{formatWeekTitle(scheduleWeekStart)}</h2>
+              <h2 className="ml-2 text-xl font-black text-foreground">
+                {scheduleViewMode === 'day'
+                  ? `${formatShortDay(visibleScheduleDays[0])}, ${formatDayNumber(visibleScheduleDays[0])}`
+                  : formatWeekTitle(scheduleWeekStart)}
+              </h2>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setTeamColorsOpen(true)}>
                 <Palette className="size-4 text-primary" aria-hidden="true" />
                 Colores
               </Button>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-black uppercase text-muted-foreground ring-1 ring-foreground/10">
-                <CalendarDays className="size-4 text-primary" aria-hidden="true" />
-                Semana
+              <div className="inline-flex rounded-full bg-white/80 p-1 ring-1 ring-foreground/10">
+                <button
+                  type="button"
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-black uppercase transition-colors',
+                    scheduleViewMode === 'week' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-primary',
+                  )}
+                  onClick={() => setScheduleViewMode('week')}
+                >
+                  Semana
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-black uppercase transition-colors',
+                    scheduleViewMode === 'day' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-primary',
+                  )}
+                  onClick={() => setScheduleViewMode('day')}
+                >
+                  Dia
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl bg-white/82 shadow-sm ring-1 ring-foreground/10 backdrop-blur lg:overflow-visible">
-            <div className="min-w-[1330px]">
-              <div className="sticky top-12 z-20 grid grid-cols-[72px_repeat(7,minmax(180px,1fr))] border-b border-border bg-white/95 shadow-sm backdrop-blur">
+          <div className="overflow-visible rounded-xl bg-white/82 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+            <div className="min-w-0">
+              <div
+                className="sticky top-12 z-20 grid border-b border-border bg-white/95 shadow-sm backdrop-blur"
+                style={{ gridTemplateColumns: scheduleGridColumns }}
+              >
                 <div className="border-r border-border bg-white/95" />
-                {scheduleDays.map((day) => {
+                {visibleScheduleDays.map((day) => {
                   const isToday = getDateKey(day) === getDateKey(new Date())
+                  const realDayIndex = scheduleDays.findIndex((scheduleDay) => getDateKey(scheduleDay) === getDateKey(day))
 
                   return (
-                    <div
+                    <button
                       key={getDateKey(day)}
+                      type="button"
                       className={cn(
-                        'border-r border-border px-3 py-3 last:border-r-0',
+                        'border-r border-border px-3 py-3 text-left transition-colors last:border-r-0 hover:bg-primary/5',
                         isToday ? 'bg-primary/10 text-primary' : 'bg-white/95 text-foreground',
                       )}
+                      onClick={() => {
+                        if (realDayIndex >= 0) setScheduleDayIndex(realDayIndex)
+                        setScheduleViewMode('day')
+                      }}
                     >
                       <p className="text-sm font-black capitalize">{formatShortDay(day)}</p>
                       <p className="mt-1 text-lg font-black">{formatDayNumber(day)}</p>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
 
-              <div className="grid grid-cols-[72px_repeat(7,minmax(180px,1fr))]">
+              <div className="grid" style={{ gridTemplateColumns: scheduleGridColumns }}>
                 <div className="border-r border-border bg-muted/20">
                   {scheduleSlots.map((slot) => (
                     <div
@@ -1815,9 +1891,10 @@ export function CalendarioClient({
                   ))}
                 </div>
 
-                {scheduleDays.map((day) => {
+                {visibleScheduleDays.map((day) => {
                   const date = getDateKey(day)
                   const dayEvents = positionedScheduleEventsByDate.get(date) ?? []
+                  const isDayView = scheduleViewMode === 'day'
 
                   return (
                     <div
@@ -1849,7 +1926,7 @@ export function CalendarioClient({
                       {dayEvents.map((event) => {
                         const top = ((event.startMinute - SCHEDULE_START_HOUR * 60) / SCHEDULE_STEP_MINUTES) * SCHEDULE_ROW_HEIGHT
                         const height = Math.max(22, (event.durationMinutes / SCHEDULE_STEP_MINUTES) * SCHEDULE_ROW_HEIGHT - 4)
-                        const gap = 4
+                        const gap = isDayView ? 8 : 4
                         const width = `calc((100% - ${gap * (event.laneCount + 1)}px) / ${event.laneCount})`
                         const left = `calc(${event.lane} * ((100% - ${gap * (event.laneCount + 1)}px) / ${event.laneCount}) + ${gap * (event.lane + 1)}px)`
                         const eventColor = getScheduleEventColor(event, teamColorMap)
@@ -1859,18 +1936,28 @@ export function CalendarioClient({
                             key={`${event.kind}-${event.id}`}
                             type="button"
                             className={cn(
-                              'absolute z-10 overflow-y-auto rounded-md border px-2 py-1 text-left text-white transition-transform hover:z-20 hover:-translate-y-0.5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              'absolute z-10 overflow-hidden rounded-md border text-left text-white transition-transform hover:z-20 hover:-translate-y-0.5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              isDayView ? 'px-3 py-2' : 'px-1.5 py-1',
                               event.kind === 'training' && 'border-dashed',
                             )}
                             style={{ top, height, width, left, ...eventColor }}
                             onClick={() => (event.kind === 'match' && event.match ? openEdit(event.match) : event.training ? openTrainingEdit(event.training) : null)}
                             title={`${event.title} · ${minutesToTime(event.startMinute)}-${addMinutesToTime(event.startTime, event.durationMinutes)} · ${event.location}`}
                           >
-                            <p className="whitespace-normal break-words text-[11px] font-black leading-tight">{event.title}</p>
-                            <p className="mt-0.5 whitespace-normal break-words text-[10px] font-bold leading-tight opacity-95">
+                            <p className={cn('font-black leading-tight', isDayView ? 'text-sm' : 'text-[10px]')}>
+                              {event.title}
+                            </p>
+                            <p className={cn('mt-0.5 font-bold leading-tight opacity-95', isDayView ? 'text-xs' : 'text-[10px]')}>
                               {minutesToTime(event.startMinute)}-{addMinutesToTime(event.startTime, event.durationMinutes)}
                             </p>
-                            <p className="mt-0.5 whitespace-normal break-words text-[10px] font-semibold leading-tight opacity-95">{event.subtitle}</p>
+                            <p className={cn('mt-0.5 font-semibold leading-tight opacity-95', isDayView ? 'text-xs' : 'text-[10px]')}>
+                              {event.subtitle}
+                            </p>
+                            {isDayView ? (
+                              <p className="mt-1 text-xs font-semibold leading-tight opacity-90">
+                                {event.kind === 'match' ? 'Partido' : 'Entrenamiento'} · {event.location}
+                              </p>
+                            ) : null}
                           </button>
                         )
                       })}

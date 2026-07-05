@@ -29,6 +29,20 @@ export async function loginAction(
     })
 
     if (signInError || !signInData.user) {
+      const message = signInError?.message?.toLowerCase() ?? ''
+      if (
+        message.includes('fetch') ||
+        message.includes('network') ||
+        message.includes('timeout') ||
+        message.includes('econnreset') ||
+        message.includes('socket')
+      ) {
+        return {
+          ok: false,
+          message: 'No se ha podido conectar con Supabase. Revisa la conexión e inténtalo de nuevo.',
+        }
+      }
+
       return { ok: false, message: 'Correo o contraseña incorrectos.' }
     }
 

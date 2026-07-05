@@ -2,14 +2,14 @@
 
 import { useActionState, useMemo, useState, useTransition } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
-import { Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Loader2, Mail, Pencil, Plus, Search, Send, Trash2, X } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { AdminCoachRow, AdminCoachTeamOption } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
-import { createCoachAction, deleteCoachAction, type CoachActionState, updateCoachAction } from './actions'
+import { createCoachAction, deleteCoachAction, sendCoachNoticeAction, type CoachActionState, updateCoachAction } from './actions'
 
 type Props = {
   coaches: AdminCoachRow[]
@@ -38,12 +38,18 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
   const [formOpen, setFormOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [noticeCoach, setNoticeCoach] = useState<AdminCoachRow | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [draft, setDraft] = useState({
     nombre: '',
     apellidos: '',
     email: '',
     teamId: '',
+  })
+  const [noticeDraft, setNoticeDraft] = useState({
+    subject: '',
+    body: '',
   })
   const [state, action, pending] = useActionState(createCoachAction, initialState)
 
@@ -66,13 +72,27 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
   function openEdit(coach: AdminCoachRow) {
     const [nombre, ...apellidos] = coach.nombre.split(' ')
     setDeleteId(null)
+    setNoticeCoach(null)
     setActionError(null)
+    setActionSuccess(null)
     setEditId(coach.id)
     setDraft({
       nombre: nombre ?? '',
       apellidos: apellidos.join(' '),
       email: coach.email,
       teamId: getCoachTeamId(coach),
+    })
+  }
+
+  function openNotice(coach: AdminCoachRow) {
+    setEditId(null)
+    setDeleteId(null)
+    setActionError(null)
+    setActionSuccess(null)
+    setNoticeCoach(coach)
+    setNoticeDraft({
+      subject: '',
+      body: '',
     })
   }
 
@@ -91,6 +111,25 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
         setEditId(null)
       } catch (error) {
         setActionError(error instanceof Error ? error.message : 'Error al actualizar el entrenador.')
+      }
+    })
+  }
+
+  function handleSendNotice() {
+    if (!noticeCoach) return
+    setActionError(null)
+    setActionSuccess(null)
+    startTransition(async () => {
+      try {
+        await sendCoachNoticeAction({
+          coachId: noticeCoach.id,
+          subject: noticeDraft.subject,
+          body: noticeDraft.body,
+        })
+        setNoticeCoach(null)
+        setActionSuccess(`Aviso enviado correctamente a ${noticeCoach.email}.`)
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'No se ha podido enviar el aviso.')
       }
     })
   }
@@ -224,6 +263,12 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
       </AdminFormDialog>
 
       <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+        {actionSuccess ? (
+          <p className="mb-4 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-700">
+            {actionSuccess}
+          </p>
+        ) : null}
+
         <div className="relative mb-4">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -283,6 +328,9 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
                           </div>
                         ) : (
                           <div className="flex justify-end gap-1">
+                            <Button size="icon-sm" variant="ghost" aria-label="Enviar aviso al entrenador" onClick={() => openNotice(coach)}>
+                              <Mail className="size-4" />
+                            </Button>
                             <Button size="icon-sm" variant="ghost" aria-label="Editar entrenador" onClick={() => openEdit(coach)}>
                               <Pencil className="size-4" />
                             </Button>
@@ -308,6 +356,50 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
           </table>
         </div>
       </section>
+
+      <AdminFormDialog
+        open={Boolean(noticeCoach)}
+        onOpenChange={(open) => {
+          if (!open) setNoticeCoach(null)
+        }}
+        title="Enviar aviso"
+        description={noticeCoach ? `Se enviará un email a ${noticeCoach.email}.` : undefined}
+        maxWidth="md"
+        footer={
+          <>
+            <Button type="button" variant="outline" disabled={isPending} onClick={() => setNoticeCoach(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" disabled={isPending} onClick={handleSendNotice}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              Enviar aviso
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <label className="grid gap-2 text-sm font-black text-foreground">
+            Asunto
+            <Input
+              value={noticeDraft.subject}
+              onChange={(event) => setNoticeDraft((current) => ({ ...current, subject: event.target.value }))}
+              placeholder="Asunto del aviso"
+              maxLength={120}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-black text-foreground">
+            Cuerpo
+            <textarea
+              value={noticeDraft.body}
+              onChange={(event) => setNoticeDraft((current) => ({ ...current, body: event.target.value }))}
+              placeholder="Escribe el aviso que recibirá el entrenador"
+              rows={8}
+              maxLength={3000}
+              className="min-h-48 rounded-lg border border-input bg-white px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+          </label>
+        </div>
+      </AdminFormDialog>
 
       <AdminErrorDialog
         message={state.message && !state.ok ? state.message : actionError}

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createAdminAuditLog } from '@/lib/audit'
 import { requireSportsAdminAction } from '@/lib/auth'
+import { sendEmail } from '@/lib/email'
 import { normalizeEmail } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -26,6 +27,12 @@ const updateCoachSchema = z.object({
   apellidos: z.string().trim().min(2, 'Introduce los apellidos.').max(80),
   email: z.string().trim().email('Correo no válido.').max(120),
   teamId: z.string().uuid('Selecciona un equipo válido.').optional(),
+})
+
+const coachNoticeSchema = z.object({
+  coachId: z.string().uuid('No se ha podido identificar el entrenador.'),
+  subject: z.string().trim().min(3, 'Introduce un asunto.').max(120, 'El asunto es demasiado largo.'),
+  body: z.string().trim().min(5, 'Introduce el cuerpo del aviso.').max(3000, 'El aviso es demasiado largo.'),
 })
 
 export async function createCoachAction(
@@ -258,4 +265,54 @@ export async function deleteCoachAction(coachId: string): Promise<void> {
   })
 
   revalidatePath('/admin/entrenadores')
+}
+
+export async function sendCoachNoticeAction(input: unknown): Promise<void> {
+  const admin = await requireSportsAdminAction()
+  const parsed = coachNoticeSchema.safeParse(input)
+
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Revisa los datos del aviso.')
+  }
+
+  const values = parsed.data
+  const supabase = createAdminClient()
+
+  const [{ data: coachRole, error: roleLookupError }, { data: profile, error: profileError }] = await Promise.all([
+    supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('user_id', values.coachId)
+      .eq('role', 'coach')
+      .maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('email, first_name, last_name')
+      .eq('id', values.coachId)
+      .maybeSingle(),
+  ])
+
+  if (roleLookupError) throw new Error(roleLookupError.message)
+  if (profileError) throw new Error(profileError.message)
+  if (!coachRole || !profile?.email) throw new Error('No se ha encontrado el email del entrenador.')
+
+  await sendEmail({
+    to: normalizeEmail(profile.email),
+    subject: values.subject,
+    text: values.body,
+  })
+
+  const coachName = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || profile.email
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'coach.notice',
+    entityType: 'profile',
+    entityId: values.coachId,
+    summary: `Envió un aviso al entrenador ${coachName}.`,
+    metadata: {
+      email: normalizeEmail(profile.email),
+      subject: values.subject,
+    },
+  })
 }

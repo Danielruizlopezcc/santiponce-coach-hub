@@ -18,6 +18,7 @@ const ACTION_LABELS: Record<string, string> = {
   'coach.create': 'Entrenador creado',
   'coach.update': 'Entrenador actualizado',
   'coach.delete': 'Entrenador eliminado',
+  'coach.notice': 'Aviso enviado a entrenador',
   'tutor.create': 'Tutor creado',
   'tutor.update': 'Tutor actualizado',
   'tutor.approve': 'Tutor aprobado',

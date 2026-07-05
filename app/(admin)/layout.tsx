@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <div className="flex min-h-svh bg-muted/30">
       <AdminSidebar role={role} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col md:pl-52">
         <AdminHeader viewer={viewer} />
         <main className="flex-1">{children}</main>
       </div>

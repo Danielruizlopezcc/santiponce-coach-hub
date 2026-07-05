@@ -486,6 +486,7 @@ function fieldsConflict(left: z.infer<typeof fieldLocationSchema>, right: z.infe
 async function assertFieldIsAvailable(input: {
   kind: 'match' | 'training'
   id?: string
+  teamId: string
   date: string
   startTime: string
   durationMinutes: number
@@ -524,6 +525,10 @@ async function assertFieldIsAvailable(input: {
     if (matchStart === null) continue
     const durationMinutes = matchDurationById.get(match.id) ?? DEFAULT_MATCH_DURATION_MINUTES
 
+    if (match.team_id === input.teamId && rangesOverlap(start, input.durationMinutes, matchStart, durationMinutes)) {
+      throw new Error(`Ese equipo ya tiene el partido contra ${match.opponent_name ?? 'otro rival'} en esa franja.`)
+    }
+
     if (!fieldsConflict(input.location, location)) continue
     if (!rangesOverlap(start, input.durationMinutes, matchStart, durationMinutes)) continue
 
@@ -537,6 +542,10 @@ async function assertFieldIsAvailable(input: {
     const trainingStart = timeToMinutes(training.startTime)
 
     if (!location.success || trainingStart === null) continue
+    if (training.teamId === input.teamId && rangesOverlap(start, input.durationMinutes, trainingStart, training.durationMinutes)) {
+      throw new Error('Ese equipo ya tiene un entrenamiento en esa franja.')
+    }
+
     if (!fieldsConflict(input.location, location.data)) continue
     if (!rangesOverlap(start, input.durationMinutes, trainingStart, training.durationMinutes)) continue
 
@@ -663,6 +672,7 @@ export async function createMatchAction(input: MatchInput): Promise<void> {
 
   await assertFieldIsAvailable({
     kind: 'match',
+    teamId: parsed.teamId,
     date: parsed.matchDate,
     startTime: parsed.matchTime ?? '',
     durationMinutes: getMatchDurationMinutes(parsed),
@@ -689,6 +699,7 @@ export async function createTrainingAction(input: TrainingInput): Promise<void> 
 
   await assertFieldIsAvailable({
     kind: 'training',
+    teamId: parsed.teamId,
     date: parsed.trainingDate,
     startTime: parsed.startTime,
     durationMinutes,
@@ -713,6 +724,7 @@ export async function updateTrainingAction(input: TrainingInput & { id: string }
   await assertFieldIsAvailable({
     kind: 'training',
     id: parsed.id,
+    teamId: parsed.teamId,
     date: parsed.trainingDate,
     startTime: parsed.startTime,
     durationMinutes,
@@ -751,6 +763,7 @@ export async function updateMatchAction(input: MatchInput & { id: string }): Pro
   await assertFieldIsAvailable({
     kind: 'match',
     id: parsed.id,
+    teamId: parsed.teamId,
     date: parsed.matchDate,
     startTime: parsed.matchTime ?? '',
     durationMinutes: getMatchDurationMinutes(parsed),

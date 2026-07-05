@@ -536,6 +536,23 @@ function mapStatusLabel(
   return 'Pendiente'
 }
 
+async function withSupabaseRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, 300 * attempt))
+      }
+    }
+  }
+
+  throw lastError
+}
+
 export async function getAdminViewer(userId: string, role: AdminRole = 'admin'): Promise<AdminViewer> {
   const viewer = await getPrivateViewer(userId)
   return { ...viewer, role, roleLabel: getAdminRoleLabel(role) }
@@ -544,47 +561,69 @@ export async function getAdminViewer(userId: string, role: AdminRole = 'admin'):
 async function getAdminCollections() {
   const supabase = createAdminClient()
 
+  // Supabase infers a different row shape for each table in this shared collection loader.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const read = (operation: () => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>, label: string): Promise<any[]> =>
+    withSupabaseRetry(async () => {
+      const { data, error } = await operation()
+      if (error) throw new Error(`${label}: ${error.message}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []) as any[]
+    })
+
   const [
-    { data: profiles },
-    { data: roles },
-    { data: athletes },
-    { data: categories },
-    { data: teams },
-    { data: seasons },
-    { data: consents },
-    { data: consentDocuments },
-    { data: payments },
-    { data: sponsors },
-    { data: news },
-    { data: coachTeamAssignments },
+    profiles,
+    roles,
+    athletes,
+    categories,
+    teams,
+    seasons,
+    consents,
+    consentDocuments,
+    payments,
+    sponsors,
+    news,
+    coachTeamAssignments,
   ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select(
-        'id, email, first_name, last_name, is_paid_member, membership_paid_at, stripe_payment_method_id, payment_method_exp_month, payment_method_exp_year, payment_method_saved_at, created_at',
-      ),
-    supabase.from('user_roles').select('user_id, role'),
-    supabase
-      .from('athletes')
-      .select(
-        'id, guardian_id, first_name, last_name, status, requested_category_id, assigned_team_id, position, season_id, created_at',
-      ),
-    supabase.from('categories').select('id, name, sort_order, is_active'),
-    supabase.from('teams').select('id, name, category_id, season_id, is_active, notes'),
-    supabase.from('seasons').select('id, name, starts_at, ends_at, is_active'),
-    supabase
-      .from('consents')
-      .select('id, guardian_id, athlete_id, document_id, accepted, signer_full_name, accepted_at, revoked_at'),
-    supabase.from('consent_documents').select('id, code, title, version, is_required'),
-    supabase
-      .from('payments')
-      .select(
-        'id, user_id, guardian_id, athlete_id, season_id, payment_type, provider, status, amount_cents, description, stripe_payment_intent_id, paid_at, created_at',
-      )
-      .order('created_at', { ascending: false }),
-    supabase.from('sponsors').select('id, is_active'),
-    supabase.from('news').select('id'),
-    supabase.from('coach_team_assignments').select('coach_user_id, team_id'),
+    read(
+      () => supabase
+        .from('profiles')
+        .select(
+          'id, email, first_name, last_name, is_paid_member, membership_paid_at, stripe_payment_method_id, payment_method_exp_month, payment_method_exp_year, payment_method_saved_at, created_at',
+        ),
+      'profiles',
+    ),
+    read(() => supabase.from('user_roles').select('user_id, role'), 'user_roles'),
+    read(
+      () => supabase
+        .from('athletes')
+        .select(
+          'id, guardian_id, first_name, last_name, status, requested_category_id, assigned_team_id, position, season_id, created_at',
+        ),
+      'athletes',
+    ),
+    read(() => supabase.from('categories').select('id, name, sort_order, is_active'), 'categories'),
+    read(() => supabase.from('teams').select('id, name, category_id, season_id, is_active, notes'), 'teams'),
+    read(() => supabase.from('seasons').select('id, name, starts_at, ends_at, is_active'), 'seasons'),
+    read(
+      () => supabase
+        .from('consents')
+        .select('id, guardian_id, athlete_id, document_id, accepted, signer_full_name, accepted_at, revoked_at'),
+      'consents',
+    ),
+    read(() => supabase.from('consent_documents').select('id, code, title, version, is_required'), 'consent_documents'),
+    read(
+      () => supabase
+        .from('payments')
+        .select(
+          'id, user_id, guardian_id, athlete_id, season_id, payment_type, provider, status, amount_cents, description, stripe_payment_intent_id, paid_at, created_at',
+        )
+        .order('created_at', { ascending: false }),
+      'payments',
+    ),
+    read(() => supabase.from('sponsors').select('id, is_active'), 'sponsors'),
+    read(() => supabase.from('news').select('id'), 'news'),
+    read(() => supabase.from('coach_team_assignments').select('coach_user_id, team_id'), 'coach_team_assignments'),
   ])
 
   const guardiansWithApproval = await supabase
