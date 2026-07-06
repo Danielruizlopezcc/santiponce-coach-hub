@@ -1,8 +1,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, CalendarDays, Newspaper, Share2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Newspaper, Share2 } from 'lucide-react'
 import { CLUB } from '@/lib/club'
 import { sanitizeNewsHtml } from '@/lib/news-content'
+import { NewsRowCarousel } from '@/components/news-row-carousel'
 import type { PrivateNewsDetail, PrivateNewsItem } from '@/lib/private-app-shared'
 
 type NewsDetailProps = {
@@ -52,16 +53,7 @@ export function NewsDetail({ item, backHref, relatedNews = [] }: NewsDetailProps
               <h1 className="mt-4 text-4xl font-black leading-[0.98] tracking-tight md:text-5xl xl:text-6xl">
                 {item.title}
               </h1>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ring-1 ring-white/15">
-                  <Newspaper className="size-4 text-primary" aria-hidden="true" />
-                  Actualidad oficial
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ring-1 ring-white/15">
-                  <Share2 className="size-4 text-primary" aria-hidden="true" />
-                  {CLUB.shortName}
-                </span>
-              </div>
+
             </div>
           </div>
 
@@ -107,51 +99,7 @@ export function NewsDetail({ item, backHref, relatedNews = [] }: NewsDetailProps
       {relatedNews.length > 0 ? (
         <section className="border-t border-border bg-white">
           <div className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-14">
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.3em] text-primary">
-                  {item.sectionName}
-                </p>
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-foreground">
-                  Noticias relacionadas
-                </h2>
-              </div>
-              <span className="text-sm font-bold text-muted-foreground">
-                {relatedNews.length} {relatedNews.length === 1 ? 'publicacion' : 'publicaciones'}
-              </span>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {relatedNews.map((relatedItem) => (
-                <Link
-                  key={relatedItem.id}
-                  href={`${backHref}/${relatedItem.id}`}
-                  className="group block overflow-hidden rounded-lg bg-[#f4f6f8] shadow-sm ring-1 ring-black/5 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <div className="relative aspect-[16/10] bg-muted">
-                    <Image
-                      src={relatedItem.imageUrl}
-                      alt={relatedItem.title}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    />
-                  </div>
-                  <div className="p-5">
-                    <h3 className="line-clamp-3 text-xl font-black leading-tight text-foreground transition-colors group-hover:text-primary">
-                      {relatedItem.title}
-                    </h3>
-                    <p className="mt-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-tight">
-                      <span className="text-primary">{relatedItem.sectionName}</span>
-                      <span className="h-px w-5 bg-border" aria-hidden="true" />
-                      <span className="font-semibold text-muted-foreground">
-                        {formatNewsDate(relatedItem.createdAt)}
-                      </span>
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <NewsRowCarousel items={relatedNews} basePath={backHref} title="Noticias relacionadas" />
           </div>
         </section>
       ) : null}

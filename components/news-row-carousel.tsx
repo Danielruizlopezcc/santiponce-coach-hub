@@ -3,13 +3,14 @@
 import { useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { PrivateNewsItem } from '@/lib/private-app-shared'
 
 type NewsRowCarouselProps = {
   items: PrivateNewsItem[]
   basePath: string
   title: string
+  showMoreHref?: string
 }
 
 function formatNewsDate(value: string) {
@@ -24,7 +25,7 @@ function getNewsHref(basePath: string, itemId: string) {
   return `${basePath}/${itemId}`
 }
 
-export function NewsRowCarousel({ items, basePath, title }: NewsRowCarouselProps) {
+export function NewsRowCarousel({ items, basePath, title, showMoreHref }: NewsRowCarouselProps) {
   const scrollerRef = useRef<HTMLDivElement>(null)
 
   function move(direction: -1 | 1) {
@@ -56,6 +57,12 @@ export function NewsRowCarousel({ items, basePath, title }: NewsRowCarouselProps
           >
             <ChevronRight className="size-5" aria-hidden="true" />
           </button>
+          {showMoreHref && (
+            <Link href={showMoreHref} className="inline-flex items-center gap-2 text-sm font-black text-foreground ml-2">
+              Ver más
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          )}
         </div>
       </div>
 

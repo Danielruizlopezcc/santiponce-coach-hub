@@ -185,8 +185,8 @@ export function NewsListing({
     ? news
     : news.filter((item) => item.sectionId === activeSectionId)
   const [mainNews, ...restNews] = visibleNews
-  const headlineNews = restNews.slice(0, 4)
-  const regularNews = restNews
+  const headlineNews = restNews.slice(0, 3)
+  const regularNews = restNews.slice(3)
   const activeSectionName = activeSectionId === 'todas'
     ? 'Todas las secciones'
     : sections.find((section) => section.id === activeSectionId)?.name ?? 'Noticias'
@@ -267,8 +267,8 @@ export function NewsListing({
                 <p className="text-xs font-black uppercase tracking-[0.3em] text-primary">
                   {activeSectionName}
                 </p>
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-foreground md:text-4xl">
-                  Ultima actualidad
+                <h2 className="font-serif mt-2 text-3xl font-black uppercase tracking-tight text-foreground md:text-4xl">
+                  ULTIMA ACTUALIDAD
                 </h2>
               </div>
               <p className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
@@ -300,7 +300,7 @@ export function NewsListing({
             </div>
 
             {regularNews.length > 0 ? (
-              <NewsRowCarousel items={regularNews} basePath={basePath} title={activeSectionName} />
+              <NewsRowCarousel items={regularNews} basePath={basePath} title="NOTICIAS ANTERIORES" showMoreHref={getSectionHref(basePath, activeSectionId !== 'todas' ? activeSectionId : undefined)} />
             ) : null}
           </div>
         )}

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { ComponentType } from 'react'
 import { ArrowRight, Award, CalendarDays, ChevronLeft, ChevronRight, CreditCard, Newspaper, Shield, Users } from 'lucide-react'
 import { HomeNewsCarousel } from '@/components/home-news-carousel'
+import { ClubShopBanner } from '@/components/club-shop-banner'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateSponsor, PrivateTeamSummary } from '@/lib/private-app-shared'
 
@@ -163,6 +164,8 @@ export function LandingHero({
         )}
         </div>
       </section>
+
+      <ClubShopBanner />
 
       <section className="relative overflow-hidden bg-[#071c44] text-white">
         <div
