@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/auth'
 import { CalendarioClient } from './calendario-client'
 
 export default async function AdminCalendarioPage() {
-  const [{ role }, matches, teams, trainings, teamColors] = await Promise.all([
+  const [, matches, teams, trainings, teamColors] = await Promise.all([
     requireAdmin(),
     getAdminMatches(),
     getAdminTeams(),
@@ -23,7 +23,7 @@ export default async function AdminCalendarioPage() {
         teams={teams}
         trainings={trainings}
         teamColors={teamColors}
-        showCoordinatorSections={role === 'sports_coordinator'}
+        showCoordinatorSections
       />
     </PageContainer>
   )

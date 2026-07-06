@@ -93,7 +93,7 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-start gap-3">
         <Button
           type="button"
           onClick={() => {

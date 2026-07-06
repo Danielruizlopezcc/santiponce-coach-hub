@@ -179,7 +179,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
       description="Listado visual de deportistas, categoría solicitada y estado de matrícula."
       className="max-w-7xl"
     >
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
+      <div className="mb-6 flex flex-wrap items-center justify-start gap-3">
         <Button onClick={() => setShowCreate((current) => !current)}>
           <Plus className="size-4" aria-hidden="true" />
           Añadir jugador

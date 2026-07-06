@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import type { ComponentType } from 'react'
-import { ArrowRight, Award, CalendarDays, CreditCard, Newspaper, Shield, Users } from 'lucide-react'
+import { ArrowRight, Award, CalendarDays, ChevronLeft, ChevronRight, CreditCard, Newspaper, Shield, Users } from 'lucide-react'
 import { HomeNewsCarousel } from '@/components/home-news-carousel'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateSponsor, PrivateTeamSummary } from '@/lib/private-app-shared'
@@ -30,17 +30,12 @@ export const PUBLIC_QUICK_LINKS: QuickLink[] = [
   { label: 'Registro tutores', href: '/registro', icon: Users },
 ]
 
-function formatRelativeDate(value: string) {
-  const date = new Date(value)
-  const today = new Date()
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diffDays = Math.round((startOfToday.getTime() - startOfDate.getTime()) / 86_400_000)
-
-  if (diffDays <= 0) return 'hoy'
-  if (diffDays === 1) return 'ayer'
-  if (diffDays === 2) return 'anteayer'
-  return `hace ${diffDays} días`
+function formatNewsDate(value: string) {
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
 }
 
 function SectionTitle({ label, title }: { label: string; title: string }) {
@@ -81,9 +76,8 @@ export function LandingHero({
   sponsorsHref = '/patrocinadores',
   showAuthCta = true,
 }: LandingHeroProps) {
-  const featuredNews = news[0]
-  const moreNews = news.slice(1, 4)
   const carouselNews = news.slice(0, 3)
+  const latestNews = news.slice(0, 8)
   const featuredTeams = teams.slice(0, 6)
   const featuredSponsors = sponsors.slice(0, 8)
 
@@ -114,80 +108,60 @@ export function LandingHero({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-20">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <SectionTitle label="Actualidad" title="Últimas noticias" />
-          <Link href={newsHref} className="inline-flex items-center gap-2 text-sm font-black uppercase text-primary">
-            Todas las noticias
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
-        </div>
-
-        {featuredNews ? (
-          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <Link href={`${newsHref}/${featuredNews.id}`} className="group block overflow-hidden rounded-lg bg-[#071c44] text-white shadow-sm">
-              <div className="relative aspect-[16/9] bg-muted">
-                <Image
-                  src={featuredNews.imageUrl}
-                  alt={featuredNews.title}
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  sizes="(max-width: 1024px) 100vw, 60vw"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-5 md:p-7">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">
-                    {featuredNews.sectionName} · {formatRelativeDate(featuredNews.createdAt)}
-                  </p>
-                  <h3 className="mt-3 max-w-3xl text-3xl font-black leading-tight md:text-5xl">
-                    {featuredNews.title}
-                  </h3>
-                </div>
+      <section className="px-4 py-14 sm:px-6 md:py-16">
+        <div className="mx-auto max-w-[1800px]">
+          <div className="mb-7 flex items-start justify-between gap-4">
+            <h2 className="font-serif text-3xl font-black uppercase tracking-tight text-foreground md:text-4xl">
+              Últimas Noticias
+            </h2>
+            <div className="flex items-center gap-5 pt-1">
+              <div className="hidden items-center gap-3 text-muted-foreground sm:flex" aria-hidden="true">
+                <ChevronLeft className="size-5 opacity-45" />
+                <ChevronRight className="size-5 text-foreground" />
               </div>
-            </Link>
+              <Link href={newsHref} className="inline-flex items-center gap-2 text-sm font-black text-foreground">
+                Ver más
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
 
-            <div className="grid gap-4">
-              {moreNews.length > 0 ? (
-                moreNews.map((item) => (
+          {latestNews.length > 0 ? (
+            <div>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                {latestNews.map((item) => (
                   <Link
                     key={item.id}
                     href={`${newsHref}/${item.id}`}
-                    className="group grid grid-cols-[128px_1fr] overflow-hidden rounded-lg bg-[#f3f6fa] transition-colors hover:bg-blue-50"
+                    className="group block min-w-0"
                   >
-                    <div className="relative min-h-32 bg-muted">
+                    <div className="relative aspect-[16/9] overflow-hidden bg-muted">
                       <Image
                         src={item.imageUrl}
                         alt={item.title}
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        sizes="128px"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                       />
                     </div>
-                    <div className="p-4">
-                      <p className="text-[11px] font-black uppercase text-primary">
-                        {item.sectionName}
-                      </p>
-                      <h3 className="mt-2 line-clamp-3 text-lg font-black leading-snug text-foreground">
-                        {item.title}
-                      </h3>
-                      <p className="mt-3 text-xs font-semibold text-muted-foreground">
-                        {formatRelativeDate(item.createdAt)}
-                      </p>
-                    </div>
+                    <h3 className="mt-3 line-clamp-2 text-sm font-black uppercase leading-snug text-foreground transition-colors group-hover:text-primary md:text-base">
+                      {item.title}
+                    </h3>
+                    <p className="mt-3 text-xs font-bold uppercase text-muted-foreground">
+                      <span className="text-red-600">{item.sectionName}</span>
+                      <span className="mx-2 text-border">|</span>
+                      {formatNewsDate(item.createdAt)}
+                    </p>
                   </Link>
-                ))
-              ) : (
-                <div className="rounded-lg bg-[#f3f6fa] p-6">
-                  <p className="font-bold text-foreground">Más noticias próximamente.</p>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
         ) : (
           <div className="rounded-lg bg-[#f3f6fa] p-8 text-center">
             <p className="font-bold text-foreground">Aún no hay noticias publicadas.</p>
           </div>
         )}
+        </div>
       </section>
 
       <section className="relative overflow-hidden bg-[#071c44] text-white">

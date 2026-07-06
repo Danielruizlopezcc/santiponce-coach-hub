@@ -487,6 +487,7 @@ async function assertFieldIsAvailable(input: {
   kind: 'match' | 'training'
   id?: string
   teamId: string
+  isHomeMatch?: boolean
   date: string
   startTime: string
   durationMinutes: number
@@ -499,7 +500,7 @@ async function assertFieldIsAvailable(input: {
   const [{ data: matches, error: matchesError }, { data: teams, error: teamsError }, { data: categories, error: categoriesError }, trainings, matchScheduleMeta] = await Promise.all([
     supabase
       .from('matches')
-      .select('id, team_id, match_date, match_time, location, opponent_name')
+      .select('id, team_id, match_date, match_time, location, opponent_name, is_home')
       .eq('match_date', input.date),
     supabase.from('teams').select('id, category_id'),
     supabase.from('categories').select('id, name'),
@@ -514,6 +515,7 @@ async function assertFieldIsAvailable(input: {
   const teamCategoryIdById = new Map((teams ?? []).map((team) => [team.id, team.category_id]))
   const categoryNameById = new Map((categories ?? []).map((category) => [category.id, category.name]))
   const matchDurationById = new Map(matchScheduleMeta.map((row) => [row.matchId, row.durationMinutes]))
+  const inputUsesClubField = input.kind === 'training' || input.isHomeMatch === true
 
   for (const match of matches ?? []) {
     if (input.kind === 'match' && match.id === input.id) continue
@@ -529,6 +531,7 @@ async function assertFieldIsAvailable(input: {
       throw new Error(`Ese equipo ya tiene el partido contra ${match.opponent_name ?? 'otro rival'} en esa franja.`)
     }
 
+    if (!inputUsesClubField || !match.is_home) continue
     if (!fieldsConflict(input.location, location)) continue
     if (!rangesOverlap(start, input.durationMinutes, matchStart, durationMinutes)) continue
 
@@ -546,6 +549,7 @@ async function assertFieldIsAvailable(input: {
       throw new Error('Ese equipo ya tiene un entrenamiento en esa franja.')
     }
 
+    if (!inputUsesClubField) continue
     if (!fieldsConflict(input.location, location.data)) continue
     if (!rangesOverlap(start, input.durationMinutes, trainingStart, training.durationMinutes)) continue
 
@@ -673,6 +677,7 @@ export async function createMatchAction(input: MatchInput): Promise<void> {
   await assertFieldIsAvailable({
     kind: 'match',
     teamId: parsed.teamId,
+    isHomeMatch: parsed.isHome,
     date: parsed.matchDate,
     startTime: parsed.matchTime ?? '',
     durationMinutes: getMatchDurationMinutes(parsed),
@@ -764,6 +769,7 @@ export async function updateMatchAction(input: MatchInput & { id: string }): Pro
     kind: 'match',
     id: parsed.id,
     teamId: parsed.teamId,
+    isHomeMatch: parsed.isHome,
     date: parsed.matchDate,
     startTime: parsed.matchTime ?? '',
     durationMinutes: getMatchDurationMinutes(parsed),

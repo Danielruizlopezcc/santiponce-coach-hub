@@ -29,6 +29,9 @@ type Props = {
   actions?: CalendarActions
   emptyTeamsMessage?: string
   showCoordinatorSections?: boolean
+  readOnly?: boolean
+  visibleCoordinatorTabs?: CoordinatorCalendarTab[]
+  initialCoordinatorTab?: CoordinatorCalendarTab
   teamColors?: AdminTeamColorMap
 }
 
@@ -667,9 +670,16 @@ export function CalendarioClient({
   actions,
   emptyTeamsMessage = 'Crea al menos un equipo antes de programar partidos.',
   showCoordinatorSections = false,
+  readOnly = false,
+  visibleCoordinatorTabs,
+  initialCoordinatorTab = 'horario',
   teamColors = {},
 }: Props) {
-  const [activeCoordinatorTab, setActiveCoordinatorTab] = useState<CoordinatorCalendarTab>('horario')
+  const allCoordinatorTabs: CoordinatorCalendarTab[] = ['horario', 'entrenamientos', 'partidos']
+  const coordinatorTabs = visibleCoordinatorTabs ?? allCoordinatorTabs
+  const [activeCoordinatorTab, setActiveCoordinatorTab] = useState<CoordinatorCalendarTab>(
+    coordinatorTabs.includes(initialCoordinatorTab) ? initialCoordinatorTab : coordinatorTabs[0] ?? 'horario',
+  )
   const [scheduleWeekStart, setScheduleWeekStart] = useState(() => getWeekStart(new Date()))
   const [scheduleViewMode, setScheduleViewMode] = useState<ScheduleViewMode>('week')
   const [scheduleDayIndex, setScheduleDayIndex] = useState(() => {
@@ -800,6 +810,7 @@ export function CalendarioClient({
     const eventsByDate = new Map<string, ScheduleEvent[]>()
 
     for (const match of matches) {
+      if (!match.isHome) continue
       if (!match.matchTime) continue
       if (!scheduleDateKeys.includes(match.matchDate)) continue
       const startMinute = timeToMinutes(match.matchTime)
@@ -1759,13 +1770,13 @@ export function CalendarioClient({
 
   return (
     <div className="space-y-5">
-      {showCoordinatorSections ? (
+      {showCoordinatorSections && coordinatorTabs.length > 1 ? (
         <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones del calendario">
           {[
-            { id: 'horario', label: 'Horario' },
-            { id: 'entrenamientos', label: 'Entrenamientos' },
-            { id: 'partidos', label: 'Partidos' },
-          ].map((tab) => (
+            { id: 'horario' as const, label: 'Horario' },
+            { id: 'entrenamientos' as const, label: 'Entrenamientos' },
+            { id: 'partidos' as const, label: 'Partidos' },
+          ].filter((tab) => coordinatorTabs.includes(tab.id)).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -1815,10 +1826,12 @@ export function CalendarioClient({
               </h2>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setTeamColorsOpen(true)}>
-                <Palette className="size-4 text-primary" aria-hidden="true" />
-                Colores
-              </Button>
+              {!readOnly ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setTeamColorsOpen(true)}>
+                  <Palette className="size-4 text-primary" aria-hidden="true" />
+                  Colores
+                </Button>
+              ) : null}
               <div className="inline-flex rounded-full bg-white/80 p-1 ring-1 ring-foreground/10">
                 <button
                   type="button"
@@ -1910,15 +1923,20 @@ export function CalendarioClient({
                             key={`${date}-${time}`}
                             type="button"
                             className={cn(
-                              'absolute left-0 right-0 border-b border-dotted border-border/70 transition-colors hover:bg-primary/5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              'absolute left-0 right-0 border-b border-dotted border-border/70 transition-colors',
+                              !readOnly && 'hover:bg-primary/5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               slot % 60 === 0 && 'border-b-border',
                             )}
                             style={{
                               top: ((slot - SCHEDULE_START_HOUR * 60) / SCHEDULE_STEP_MINUTES) * SCHEDULE_ROW_HEIGHT,
                               height: SCHEDULE_ROW_HEIGHT,
                             }}
-                            aria-label={`Crear el ${date} a las ${time}`}
-                            onClick={() => setScheduleSlot({ date, time })}
+                            aria-label={readOnly ? `${date} a las ${time}` : `Crear el ${date} a las ${time}`}
+                            disabled={readOnly}
+                            tabIndex={readOnly ? -1 : undefined}
+                            onClick={() => {
+                              if (!readOnly) setScheduleSlot({ date, time })
+                            }}
                           />
                         )
                       })}
@@ -1936,12 +1954,19 @@ export function CalendarioClient({
                             key={`${event.kind}-${event.id}`}
                             type="button"
                             className={cn(
-                              'absolute z-10 overflow-hidden rounded-md border text-left text-white transition-transform hover:z-20 hover:-translate-y-0.5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                              'absolute z-10 overflow-hidden rounded-md border text-left text-white transition-transform',
+                              !readOnly && 'hover:z-20 hover:-translate-y-0.5 focus-visible:z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               isDayView ? 'px-3 py-2' : 'px-1.5 py-1',
                               event.kind === 'training' && 'border-dashed',
                             )}
                             style={{ top, height, width, left, ...eventColor }}
-                            onClick={() => (event.kind === 'match' && event.match ? openEdit(event.match) : event.training ? openTrainingEdit(event.training) : null)}
+                            disabled={readOnly}
+                            tabIndex={readOnly ? -1 : undefined}
+                            onClick={() => {
+                              if (readOnly) return
+                              if (event.kind === 'match' && event.match) openEdit(event.match)
+                              else if (event.training) openTrainingEdit(event.training)
+                            }}
                             title={`${event.title} · ${minutesToTime(event.startMinute)}-${addMinutesToTime(event.startTime, event.durationMinutes)} · ${event.location}`}
                           >
                             <p className={cn('font-black leading-tight', isDayView ? 'text-sm' : 'text-[10px]')}>
@@ -2149,7 +2174,7 @@ export function CalendarioClient({
       {!showCoordinatorSections || activeCoordinatorTab === 'partidos' ? (
       <section className="space-y-5">
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-start gap-3">
         <Button size="sm" onClick={openCreate} disabled={selectableTeams.length === 0}>
           <Plus className="size-4" aria-hidden="true" />
           Nuevo partido

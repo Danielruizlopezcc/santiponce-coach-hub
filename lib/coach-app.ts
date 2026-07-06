@@ -6,6 +6,22 @@ import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchT
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+type StoredMatchScheduleMeta = {
+  matchId: string
+  durationMinutes: number
+}
+
+function formatDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  const parts = []
+
+  if (hours > 0) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`)
+  if (remainingMinutes > 0) parts.push(`${remainingMinutes} min`)
+
+  return parts.join(' ') || '0 min'
+}
+
 function formatMatchTime(value: string | null) {
   if (!value) return 'Hora por confirmar'
   return value.slice(0, 5)
@@ -121,7 +137,7 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
     'id, team_id, season_id, opponent_name, match_date, match_time, location, is_home, match_type, round_label, status, home_score, away_score, home_possession, away_possession, home_offsides, away_offsides, home_corners, away_corners, home_total_shots, away_total_shots, home_shots, away_shots, home_shots_on_target, away_shots_on_target, home_blocked_shots, away_blocked_shots, home_goalkeeper_saves, away_goalkeeper_saves, home_tackles, away_tackles, home_passes, away_passes, home_completed_passes, away_completed_passes, home_fouls, away_fouls, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, notes'
   const fallbackMatchSelect =
     'id, team_id, season_id, opponent_name, match_date, match_time, location, is_home, match_type, round_label, status, home_score, away_score, notes'
-  const [{ data: matchesWithStats, error: matchesError }, { data: teams }, { data: categories }, { data: seasons }] = await Promise.all([
+  const [{ data: matchesWithStats, error: matchesError }, { data: teams }, { data: categories }, { data: seasons }, { data: scheduleMetaSetting }] = await Promise.all([
     supabase
       .from('matches')
       .select(matchSelect)
@@ -131,6 +147,11 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
     supabase.from('teams').select('id, name, category_id, season_id').in('id', teamIds),
     supabase.from('categories').select('id, name'),
     supabase.from('seasons').select('id, name'),
+    supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'coordinator_match_schedule_meta')
+      .maybeSingle(),
   ])
 
   const matches = matchesError
@@ -163,6 +184,15 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
   const athletesByTeamId = new Map<string, NonNullable<typeof athletes>>()
   const playerStatsByMatchAndAthlete = new Map<string, NonNullable<typeof savedPlayerStats>[number]>()
+  let scheduleMeta: StoredMatchScheduleMeta[] = []
+
+  try {
+    scheduleMeta = JSON.parse(scheduleMetaSetting?.value ?? '[]') as StoredMatchScheduleMeta[]
+  } catch {
+    scheduleMeta = []
+  }
+
+  const matchDurationById = new Map(scheduleMeta.map((row) => [row.matchId, row.durationMinutes]))
 
   for (const athlete of athletes ?? []) {
     if (!athlete.assigned_team_id) continue
@@ -183,6 +213,7 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
     const categoryName = team ? categoryById.get(team.category_id) ?? 'Sin categoría' : 'Sin categoría'
     const sortInfo = getTeamCategorySortInfo(team?.name ?? '', categoryName)
     const weekInfo = getMatchWeekInfo(match.match_date)
+    const durationMinutes = matchDurationById.get(match.id) ?? 120
     const playerStats: AdminMatchPlayerStat[] = (athletesByTeamId.get(match.team_id) ?? []).map((athlete) => {
       const saved = playerStatsByMatchAndAthlete.get(`${match.id}:${athlete.id}`)
 
@@ -223,8 +254,8 @@ export async function getCoachMatches(userId: string): Promise<AdminMatchRow[]> 
       timeLabel: formatMatchTime(match.match_time),
       weekLabel: weekInfo.weekLabel,
       weekRangeLabel: weekInfo.weekRangeLabel,
-      durationMinutes: 120,
-      durationLabel: '2 horas',
+      durationMinutes,
+      durationLabel: formatDuration(durationMinutes),
       location: match.location ?? '',
       isHome: Boolean(match.is_home),
       matchType: (match.match_type ?? 'league') as AdminMatchType,

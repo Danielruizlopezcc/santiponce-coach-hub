@@ -1136,8 +1136,8 @@ function getMatchWeekInfo(value: string) {
 }
 
 export async function getAdminMatches(): Promise<AdminMatchRow[]> {
-  const supabase = await createClient()
-  const adminSupabase = createAdminClient()
+  const supabase = createAdminClient()
+  const adminSupabase = supabase
   const matchSelect =
     'id, team_id, season_id, opponent_name, match_date, match_time, location, is_home, match_type, round_label, status, home_score, away_score, home_possession, away_possession, home_offsides, away_offsides, home_corners, away_corners, home_total_shots, away_total_shots, home_shots, away_shots, home_shots_on_target, away_shots_on_target, home_blocked_shots, away_blocked_shots, home_goalkeeper_saves, away_goalkeeper_saves, home_tackles, away_tackles, home_passes, away_passes, home_completed_passes, away_completed_passes, home_fouls, away_fouls, home_yellow_cards, away_yellow_cards, home_red_cards, away_red_cards, notes'
   const fallbackMatchSelect =

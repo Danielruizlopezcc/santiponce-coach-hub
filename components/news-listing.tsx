@@ -1,7 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { CalendarDays, Newspaper } from 'lucide-react'
+import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Newspaper } from 'lucide-react'
 import { BrandedPageHero } from '@/components/branded-page-hero'
+import { NewsRowCarousel } from '@/components/news-row-carousel'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateNewsSection } from '@/lib/private-app-shared'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,14 @@ function getSectionHref(basePath: string, sectionId?: string) {
 
 function getNewsHref(basePath: string, itemId: string) {
   return `${basePath}/${itemId}`
+}
+
+function formatNewsDate(value: string) {
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
 }
 
 function NewsMeta({ item, compact = false }: { item: PrivateNewsItem; compact?: boolean }) {
@@ -75,11 +84,6 @@ function FeaturedNewsCard({ item, href }: { item: PrivateNewsItem; href: string 
         <h2 className="mt-5 text-4xl font-black leading-[0.98] tracking-tight text-white md:text-6xl">
           {item.title}
         </h2>
-        {item.body ? (
-          <p className="mt-5 max-w-2xl line-clamp-3 text-base leading-7 text-white/82 md:text-lg">
-            {item.body}
-          </p>
-        ) : null}
         <NewsMeta item={item} compact />
       </div>
     </Link>
@@ -105,25 +109,65 @@ function HeadlineCard({ item, index, href }: { item: PrivateNewsItem; index: num
   )
 }
 
-function NewsCard({ item, href }: { item: PrivateNewsItem; href: string }) {
+function CompactNewsCard({ item, href }: { item: PrivateNewsItem; href: string }) {
   return (
-    <Link href={href} className="group block overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl">
-      <div className="relative aspect-[16/10] bg-muted">
+    <Link href={href} className="group block min-w-0">
+      <div className="relative aspect-[16/9] overflow-hidden bg-muted">
         <Image
           src={item.imageUrl}
           alt={item.title}
           fill
-          className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
         />
       </div>
-      <div className="p-5">
-        <h2 className="line-clamp-3 text-xl font-black leading-tight text-foreground transition-colors group-hover:text-primary">
-          {item.title}
-        </h2>
-        <NewsMeta item={item} compact />
-      </div>
+      <h3 className="mt-3 line-clamp-2 text-sm font-black uppercase leading-snug text-foreground transition-colors group-hover:text-primary md:text-base">
+        {item.title}
+      </h3>
+      <p className="mt-3 text-xs font-bold uppercase text-muted-foreground">
+        <span className="text-red-600">{item.sectionName}</span>
+        <span className="mx-2 text-border">|</span>
+        {formatNewsDate(item.createdAt)}
+      </p>
     </Link>
+  )
+}
+
+function SectionNewsRow({
+  title,
+  items,
+  href,
+  basePath,
+}: {
+  title: string
+  items: PrivateNewsItem[]
+  href: string
+  basePath: string
+}) {
+  return (
+    <section className="space-y-7">
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="font-serif text-3xl font-black uppercase tracking-tight text-foreground md:text-4xl">
+          {title}
+        </h2>
+        <div className="flex items-center gap-5 pt-1">
+          <div className="hidden items-center gap-3 text-muted-foreground sm:flex" aria-hidden="true">
+            <ChevronLeft className="size-5 opacity-45" />
+            <ChevronRight className="size-5 text-foreground" />
+          </div>
+          <Link href={href} className="inline-flex items-center gap-2 text-sm font-black text-foreground">
+            Ver más
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {items.slice(0, 4).map((item) => (
+          <CompactNewsCard key={item.id} item={item} href={getNewsHref(basePath, item.id)} />
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -142,10 +186,16 @@ export function NewsListing({
     : news.filter((item) => item.sectionId === activeSectionId)
   const [mainNews, ...restNews] = visibleNews
   const headlineNews = restNews.slice(0, 4)
-  const regularNews = restNews.slice(4)
+  const regularNews = restNews
   const activeSectionName = activeSectionId === 'todas'
     ? 'Todas las secciones'
     : sections.find((section) => section.id === activeSectionId)?.name ?? 'Noticias'
+  const sectionRows = sections
+    .map((section) => ({
+      section,
+      items: news.filter((item) => item.sectionId === section.id),
+    }))
+    .filter((group) => group.items.length > 0)
 
   return (
     <section className="bg-[#f4f6f8]">
@@ -188,7 +238,19 @@ export function NewsListing({
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-12">
-        {visibleNews.length === 0 ? (
+        {activeSectionId === 'todas' && sectionRows.length > 0 ? (
+          <div className="space-y-14">
+            {sectionRows.map(({ section, items }) => (
+              <SectionNewsRow
+                key={section.id}
+                title={section.name}
+                items={items}
+                href={getSectionHref(basePath, section.id)}
+                basePath={basePath}
+              />
+            ))}
+          </div>
+        ) : visibleNews.length === 0 ? (
           <div className="flex min-h-80 flex-col items-center justify-center rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
             <span className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Newspaper className="size-7" aria-hidden="true" />
@@ -238,21 +300,7 @@ export function NewsListing({
             </div>
 
             {regularNews.length > 0 ? (
-              <div>
-                <div className="mb-5 flex items-center justify-between border-b border-border pb-4">
-                  <h2 className="text-2xl font-black tracking-tight text-foreground">
-                    Mas noticias
-                  </h2>
-                  <span className="text-sm font-bold text-muted-foreground">
-                    {regularNews.length} publicaciones
-                  </span>
-                </div>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {regularNews.map((item) => (
-                    <NewsCard key={item.id} item={item} href={getNewsHref(basePath, item.id)} />
-                  ))}
-                </div>
-              </div>
+              <NewsRowCarousel items={regularNews} basePath={basePath} title={activeSectionName} />
             ) : null}
           </div>
         )}

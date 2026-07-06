@@ -87,7 +87,7 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
   const content = (
     <>
       {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className="mb-6 flex items-center justify-end gap-3">
+      <div className="mb-6 flex items-center justify-start gap-3">
         <Button size="sm" onClick={openCreate}>
           <Plus className="size-4" aria-hidden="true" />
           Nueva categoría

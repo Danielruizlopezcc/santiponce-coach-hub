@@ -236,6 +236,7 @@ type MatchInput = z.infer<typeof matchSchema>
 function revalidateCoachCalendarPaths() {
   revalidatePath('/entrenador')
   revalidatePath('/entrenador/calendario')
+  revalidatePath('/entrenador/partidos')
   revalidatePath('/calendario')
   revalidatePath('/admin/calendario')
   revalidatePath('/admin')

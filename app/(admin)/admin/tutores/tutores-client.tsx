@@ -251,12 +251,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'tutores' ? (
         <section className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-muted-foreground">
-                Alta, revisión y seguimiento administrativo de tutores.
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center justify-start gap-3">
             <Button
               type="button"
               onClick={() => {
@@ -267,6 +262,9 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
               <Plus className="size-4" />
               Crear tutor
             </Button>
+            <p className="text-sm font-bold text-muted-foreground">
+              Alta, revisión y seguimiento administrativo de tutores.
+            </p>
           </div>
 
           <Dialog.Root
@@ -582,7 +580,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'socios' ? (
         <section className="space-y-5">
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-start gap-3">
             <Button
               type="button"
               onClick={() => {

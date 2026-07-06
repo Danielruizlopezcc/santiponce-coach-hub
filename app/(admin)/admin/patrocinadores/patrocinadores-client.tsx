@@ -116,7 +116,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
       description="Gestiona los patrocinadores visibles para las familias del club."
       className="max-w-7xl"
     >
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
+      <div className="mb-6 flex flex-wrap items-center justify-start gap-3">
         <Button size="sm" onClick={openCreate}>
           <Plus className="size-4" aria-hidden="true" />
           Nuevo patrocinador

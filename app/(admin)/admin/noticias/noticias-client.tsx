@@ -203,7 +203,7 @@ export function NoticiasClient({ news, sections }: Props) {
       description="Crea y gestiona noticias del club con imagen, título y cuerpo opcional."
       className="max-w-7xl"
     >
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
+      <div className="mb-6 flex flex-wrap items-center justify-start gap-3">
         <Button size="sm" onClick={openCreate} disabled={sections.length === 0}>
           <Plus className="size-4" aria-hidden="true" />
           Nueva noticia

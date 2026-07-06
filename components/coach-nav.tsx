@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 
 const ITEMS = [
   { label: 'Calendario', href: '/entrenador/calendario', icon: CalendarDays },
+  { label: 'Partidos', href: '/entrenador/partidos', icon: CalendarDays },
   { label: 'Estadísticas', href: '/entrenador/estadisticas', icon: BarChart3 },
 ]
 
