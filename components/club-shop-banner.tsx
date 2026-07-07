@@ -27,7 +27,7 @@ export function ClubShopBanner() {
           <div className="flex flex-col justify-between text-white">
             {/* Club branding */}
             <div>
-              <div className="flex items-center gap-4 mb-8">
+              <div className="flex items-center gap-5 mb-8">
                 <div className="relative h-20 w-20 flex-shrink-0">
                   <Image
                     src="/images/Escudo_Santiponce_transparente.png"
@@ -36,17 +36,17 @@ export function ClubShopBanner() {
                     className="object-contain"
                   />
                 </div>
-                <div>
-                  <h2 className="text-3xl font-black md:text-4xl">{CLUB.name}</h2>
-                  <p className="mt-1 text-sm font-bold text-white/80">Temporada {CLUB.season}</p>
+                <div className="flex h-20 flex-col justify-center">
+                  <h2 className="font-serif text-[2.45rem] font-black uppercase leading-[0.82] tracking-tight text-white md:text-[2.9rem]">
+                    TIENDA
+                    <br />
+                    OFICIAL
+                  </h2>
                 </div>
               </div>
 
               {/* Main heading */}
               <div className="mb-8">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/70 mb-2">
-                  Tienda Oficial
-                </p>
                 <h3 className="text-4xl font-black leading-tight md:text-5xl">
                   Apoya a tu pueblo
                 </h3>
@@ -61,7 +61,7 @@ export function ClubShopBanner() {
             {/* CTA Button */}
             <Link
               href="/tienda"
-              className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-black uppercase text-green-600 transition-transform hover:scale-105"
+              className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-black uppercase text-blue-700 transition-transform hover:scale-105 hover:text-blue-800"
             >
               Accede a nuestra tienda
               <ArrowRight className="size-5" aria-hidden="true" />
