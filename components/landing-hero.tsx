@@ -87,7 +87,7 @@ export function LandingHero({
     <div className="bg-white">
       <HomeNewsCarousel news={carouselNews} linkHref={newsHref} />
 
-      <ScrollReveal variant="fade-up">
+      <ScrollReveal variant="pop">
         <section className="relative z-10 mx-auto -mt-4 max-w-7xl px-4 sm:px-6">
           <div className="grid overflow-hidden rounded-lg bg-white shadow-xl ring-1 ring-black/5 sm:grid-cols-2 lg:grid-cols-4">
             {quickLinks.map((item) => (
@@ -112,7 +112,7 @@ export function LandingHero({
         </section>
       </ScrollReveal>
 
-      <ScrollReveal delay="short" variant="slide-right">
+      <ScrollReveal delay="short" variant="curtain">
         <section className="px-4 py-14 sm:px-6 md:py-16">
           <div className="mx-auto max-w-[1800px]">
             <div className="mb-7 flex items-start justify-between gap-4">
@@ -170,11 +170,11 @@ export function LandingHero({
         </section>
       </ScrollReveal>
 
-      <ScrollReveal variant="slide-left">
+      <ScrollReveal variant="tilt">
         <ClubShopBanner />
       </ScrollReveal>
 
-      <ScrollReveal variant="zoom">
+      <ScrollReveal variant="drift">
         <section className="relative overflow-hidden bg-[#071c44] text-white">
           <div
             aria-hidden="true"
@@ -225,7 +225,7 @@ export function LandingHero({
         </section>
       </ScrollReveal>
 
-      <ScrollReveal variant="soft-rise">
+      <ScrollReveal variant="wipe">
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-20">
           <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <SectionTitle label="Apoyo" title="Patrocinadores" />
@@ -255,7 +255,7 @@ export function LandingHero({
       </ScrollReveal>
 
       {showAuthCta ? (
-        <ScrollReveal variant="soft-rise">
+        <ScrollReveal variant="fade-up">
           <section className="bg-primary text-white">
             <div className="mx-auto grid max-w-7xl gap-6 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto] md:items-center">
               <div>
