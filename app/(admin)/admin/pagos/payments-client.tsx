@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { BarChart3, CreditCard, Download, FileText, Landmark, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
 import {
   AdminTable,
@@ -13,10 +14,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatEuro } from '@/lib/format'
-import type { AdminEnrollmentRow, AdminFeeTemplateRow, AdminFinanceMovementRow, AdminPaymentRow, AdminSeasonRow, AdminTutorFeeAssignmentRow } from '@/lib/admin-app'
+import type { AdminAthleteRow, AdminEnrollmentRow, AdminFeeTemplateRow, AdminFinanceMovementRow, AdminPaymentRow, AdminSeasonRow, AdminTutorFeeAssignmentRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import { MatriculasClient } from '../matriculas/matriculas-client'
 import {
+  assignAthleteFeeAction,
   createFinanceMovementAction,
   createFeeTemplateAction,
   cancelPaymentAction,
@@ -24,6 +26,7 @@ import {
   deleteFinanceMovementAction,
   markPaymentPendingAction,
   refundStripePaymentAction,
+  type AthleteFeeAssignmentState,
   type FeeTemplateActionState,
   type FinanceMovementActionState,
 } from './actions'
@@ -35,7 +38,53 @@ type AdminPaymentsClientProps = {
   feeTemplates: AdminFeeTemplateRow[]
   seasons: AdminSeasonRow[]
   feeAssignments: AdminTutorFeeAssignmentRow[]
+  athletes: AdminAthleteRow[]
 }
+
+type PaymentsTab = 'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'programadas' | 'pendientes' | 'ingresos' | 'gastos' | 'informes'
+
+const TAB_GROUPS: Array<{
+  title: string
+  description: string
+  tone: 'blue' | 'green' | 'amber'
+  tabs: Array<{ id: PaymentsTab; label: string }>
+}> = [
+  {
+    title: 'Vista general',
+    description: 'Foto rápida del dinero cobrado, pendiente y balance.',
+    tone: 'blue',
+    tabs: [{ id: 'resumen', label: 'Resumen' }],
+  },
+  {
+    title: 'Cobros a familias',
+    description: 'Pagos reales de matrículas y socios vinculados a tutores/deportistas.',
+    tone: 'green',
+    tabs: [
+      { id: 'cobros', label: 'Cobros realizados' },
+      { id: 'matriculas', label: 'Matrículas' },
+      { id: 'pendientes', label: 'Pendientes' },
+    ],
+  },
+  {
+    title: 'Cuotas de deportistas',
+    description: 'Plantillas de cuota y cargos programados para asignar a jugadores.',
+    tone: 'amber',
+    tabs: [
+      { id: 'cuotas', label: 'Cuotas configuradas' },
+      { id: 'programadas', label: 'Cuotas programadas' },
+    ],
+  },
+  {
+    title: 'Contabilidad del club',
+    description: 'Ingresos y gastos manuales que completan el balance contable.',
+    tone: 'blue',
+    tabs: [
+      { id: 'ingresos', label: 'Ingresos manuales' },
+      { id: 'gastos', label: 'Gastos manuales' },
+      { id: 'informes', label: 'Informes' },
+    ],
+  },
+]
 
 const columns: Column[] = [
   { key: 'operacion', label: 'Operación' },
@@ -188,6 +237,7 @@ const initialFeeState: FeeTemplateActionState = {
   ok: false,
   message: '',
 }
+const initialFeeAssignmentState: AthleteFeeAssignmentState = { ok: false, message: '' }
 
 const INCOME_CATEGORIES = ['Socios', 'Matrículas', 'Cuotas deportivas', 'Patrocinadores', 'Lotería / eventos', 'Subvenciones', 'Otros']
 const EXPENSE_CATEGORIES = ['Material deportivo', 'Árbitros', 'Federación', 'Equipaciones', 'Instalaciones', 'Transporte', 'Administración', 'Otros']
@@ -208,6 +258,114 @@ const MOVEMENT_STATUS_STYLES: Record<AdminFinanceMovementRow['estado'], string> 
   confirmed: 'bg-emerald-100 text-emerald-700',
   pending: 'bg-amber-100 text-amber-700',
   void: 'bg-slate-100 text-slate-600',
+}
+
+const ASSIGNMENT_SELECT_CLASS =
+  'h-10 w-full rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
+
+function AssignmentStep({
+  step,
+  title,
+  description,
+  children,
+}: {
+  step: string
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-amber-100 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-black text-amber-700">
+          {step}
+        </span>
+        <div>
+          <p className="text-sm font-black text-foreground">{title}</p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function AssignmentMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string | number
+  tone: 'amber' | 'green' | 'blue'
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg px-3 py-2',
+        tone === 'amber' && 'bg-amber-50',
+        tone === 'green' && 'bg-emerald-50',
+        tone === 'blue' && 'bg-primary/5',
+      )}
+    >
+      <p
+        className={cn(
+          'text-xl font-black',
+          tone === 'amber' && 'text-amber-700',
+          tone === 'green' && 'text-emerald-700',
+          tone === 'blue' && 'text-primary',
+        )}
+      >
+        {value}
+      </p>
+      <p
+        className={cn(
+          'text-[0.68rem] font-black uppercase',
+          tone === 'amber' && 'text-amber-700/70',
+          tone === 'green' && 'text-emerald-700/70',
+          tone === 'blue' && 'text-primary/70',
+        )}
+      >
+        {label}
+      </p>
+    </div>
+  )
+}
+
+function FeeFormSection({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string
+  description: string
+  icon: typeof Tags
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-foreground">{title}</p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function MovementField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-black text-foreground">{label}</span>
+      {children}
+    </label>
+  )
 }
 
 function getMovementCategories(type: 'ingreso' | 'gasto') {
@@ -240,8 +398,8 @@ function downloadCsv(filename: string, headers: string[], rows: Array<Array<stri
   URL.revokeObjectURL(url)
 }
 
-export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments }: AdminPaymentsClientProps) {
-  const [activeTab, setActiveTab] = useState<'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'pendientes' | 'ingresos' | 'gastos' | 'informes'>('resumen')
+export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments, athletes }: AdminPaymentsClientProps) {
+  const [activeTab, setActiveTab] = useState<PaymentsTab>('resumen')
   const [editingMovement, setEditingMovement] = useState<AdminFinanceMovementRow | null>(null)
   const [editingFee, setEditingFee] = useState<AdminFeeTemplateRow | null>(null)
   const [movementFormType, setMovementFormType] = useState<'ingreso' | 'gasto'>('ingreso')
@@ -255,8 +413,9 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   const [feeTypeFilter, setFeeTypeFilter] = useState('todos')
   const [feeVisibilityFilter, setFeeVisibilityFilter] = useState<'todos' | 'publica' | 'privada'>('todos')
   const [feeSplitFilter, setFeeSplitFilter] = useState<'todos' | 'unico' | 'repartido'>('todos')
+  const [assignmentAthleteFilter, setAssignmentAthleteFilter] = useState('')
   const [pendingSearch, setPendingSearch] = useState('')
-  const [pendingStatusFilter, setPendingStatusFilter] = useState<'todos' | 'pendiente' | 'fallido' | 'programada'>('todos')
+  const [pendingStatusFilter, setPendingStatusFilter] = useState<'todos' | 'pendiente' | 'fallido'>('todos')
   const [reportSearch, setReportSearch] = useState('')
   const [reportSeasonFilter, setReportSeasonFilter] = useState('todos')
   const [confirmDeleteMovementId, setConfirmDeleteMovementId] = useState<string | null>(null)
@@ -271,8 +430,13 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
     initialMovementState,
   )
   const [feeState, feeAction, feePending] = useActionState(createFeeTemplateAction, initialFeeState)
+  const [feeAssignmentState, feeAssignmentAction, feeAssignmentPending] = useActionState(
+    assignAthleteFeeAction,
+    initialFeeAssignmentState,
+  )
   const movementFormRef = useRef<HTMLFormElement>(null)
   const feeFormRef = useRef<HTMLFormElement>(null)
+  const assignmentFormRef = useRef<HTMLFormElement>(null)
 
   const summary = useMemo(() => {
     const paid = payments.filter((payment) => payment.estado === 'pagado')
@@ -389,12 +553,31 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
     })
   }, [feeSearch, feeSplitFilter, feeTemplates, feeTypeFilter, feeVisibilityFilter])
 
+  const assignableAthletes = useMemo(() => {
+    const q = assignmentAthleteFilter.trim().toLowerCase()
+    return athletes
+      .filter((athlete) => athlete.guardianId)
+      .filter((athlete) => {
+        if (!q) return true
+        return [
+          athlete.nombre,
+          athlete.tutor,
+          athlete.categoriaSolicitada,
+          athlete.equipoAsignado,
+          athlete.temporada,
+          athlete.estadoMatricula,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+      })
+  }, [athletes, assignmentAthleteFilter])
+
   const pendingPayments = useMemo(() => [...summary.pending, ...summary.failed], [summary.failed, summary.pending])
 
   const visiblePendingPayments = useMemo(() => {
     const q = pendingSearch.trim().toLowerCase()
     return pendingPayments.filter((payment) => {
-      if (pendingStatusFilter === 'programada') return false
       if (pendingStatusFilter !== 'todos' && payment.estado !== pendingStatusFilter) return false
       if (!q) return true
 
@@ -407,7 +590,6 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
   const visibleFeeAssignments = useMemo(() => {
     const q = pendingSearch.trim().toLowerCase()
-    if (pendingStatusFilter === 'pendiente' || pendingStatusFilter === 'fallido') return []
     return feeAssignments.filter((assignment) => {
       if (!q) return true
       return [assignment.feeName, assignment.feeType, assignment.athleteName, assignment.nextChargeDate, String(assignment.chargeDay), String(assignment.scheduledCharges)]
@@ -415,7 +597,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
         .toLowerCase()
         .includes(q)
     })
-  }, [feeAssignments, pendingSearch, pendingStatusFilter])
+  }, [feeAssignments, pendingSearch])
 
   const reportMovements = useMemo(
     () =>
@@ -445,6 +627,13 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
       setSplitFee(false)
     }
   }, [feeState.ok, feeState.message])
+
+  useEffect(() => {
+    if (feeAssignmentState.ok) {
+      assignmentFormRef.current?.reset()
+      setAssignmentAthleteFilter('')
+    }
+  }, [feeAssignmentState.ok, feeAssignmentState.message])
 
   async function handleDeleteMovement(movement: AdminFinanceMovementRow) {
     setDeletePendingId(movement.id)
@@ -522,57 +711,114 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   const tabMovements = financeMovements.filter((movement) => movement.tipo === currentMovementType)
   const tabMovementTotal = sumMovements(tabMovements)
   const pendingTabMovements = tabMovements.filter((movement) => movement.estado === 'pending')
+  const visibleMovementTotal = sumMovements(visibleMovements)
+  const visibleMovementPendingTotal = visibleMovements
+    .filter((movement) => movement.estado === 'pending')
+    .reduce((sum, movement) => sum + movement.importe, 0)
   const reportIncomeTotal = sumMovements(reportMovements.filter((movement) => movement.tipo === 'ingreso'))
   const reportExpenseTotal = sumMovements(reportMovements.filter((movement) => movement.tipo === 'gasto'))
+  const reportBalance = reportIncomeTotal - reportExpenseTotal
   const reportCashTotal = sumMovements(reportMovements.filter((movement) => movement.metodoPago === 'cash'))
   const reportBankTotal = sumMovements(reportMovements.filter((movement) => ['transfer', 'bizum', 'card'].includes(movement.metodoPago)))
+  const reportConfirmedCount = reportMovements.filter((movement) => movement.estado === 'confirmed').length
+  const reportPendingTotal = reportMovements
+    .filter((movement) => movement.estado === 'pending')
+    .reduce((sum, movement) => sum + movement.importe, 0)
+  const activeGroup = TAB_GROUPS.find((group) => group.tabs.some((tab) => tab.id === activeTab))
+  const publicFeeTemplates = feeTemplates.filter((fee) => fee.isPublic)
+  const splitFeeTemplates = feeTemplates.filter((fee) => fee.splitPayment)
+  const activeFeeAssignments = feeAssignments.filter((assignment) => assignment.status === 'active')
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones de pagos">
-        {[
-          { id: 'resumen', label: 'Resumen' },
-          { id: 'cobros', label: 'Cobros realizados' },
-          { id: 'matriculas', label: 'Matrículas' },
-          { id: 'cuotas', label: 'Cuotas' },
-          { id: 'pendientes', label: 'Pendientes' },
-          { id: 'ingresos', label: 'Ingresos' },
-          { id: 'gastos', label: 'Gastos' },
-          { id: 'informes', label: 'Informes' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            onClick={() => {
-              setActiveTab(tab.id as typeof activeTab)
-              if (tab.id === 'ingresos' || tab.id === 'gastos') {
-                setMovementFormType(tab.id === 'gastos' ? 'gasto' : 'ingreso')
-                setEditingMovement(null)
-                setConfirmDeleteMovementId(null)
-              }
-            }}
-            className={cn(
-              'rounded-full px-4 py-2 text-sm font-black uppercase transition-colors',
-              activeTab === tab.id
-                ? 'bg-primary text-white shadow-sm'
-                : 'bg-white/75 text-muted-foreground ring-1 ring-foreground/10 hover:bg-primary/10 hover:text-primary',
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <section className="rounded-xl border border-border bg-white/80 p-4 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">
+              Mapa del módulo
+            </p>
+            <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+              Cobros, cuotas y contabilidad separados
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Los cobros son operaciones reales a familias; las cuotas son plantillas y cargos
+              programados para deportistas; la contabilidad recoge movimientos manuales del club.
+            </p>
+          </div>
+          {activeGroup ? (
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary">
+              {activeGroup.title}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-4 grid gap-3 xl:grid-cols-4" role="tablist" aria-label="Secciones de cuotas y contabilidad">
+          {TAB_GROUPS.map((group) => (
+            <div
+              key={group.title}
+              className={cn(
+                'rounded-lg border p-3',
+                group.tabs.some((tab) => tab.id === activeTab)
+                  ? 'border-primary/30 bg-primary/5'
+                  : 'border-border bg-white',
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className={cn(
+                    'mt-0.5 size-2.5 shrink-0 rounded-full',
+                    group.tone === 'green' && 'bg-emerald-500',
+                    group.tone === 'amber' && 'bg-amber-500',
+                    group.tone === 'blue' && 'bg-primary',
+                  )}
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
+                  <p className="font-black text-foreground">{group.title}</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">
+                    {group.description}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {group.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id)
+                      if (tab.id === 'ingresos' || tab.id === 'gastos') {
+                        setMovementFormType(tab.id === 'gastos' ? 'gasto' : 'ingreso')
+                        setEditingMovement(null)
+                        setConfirmDeleteMovementId(null)
+                      }
+                    }}
+                    className={cn(
+                      'rounded-full px-3 py-1.5 text-xs font-black uppercase transition-colors',
+                      activeTab === tab.id
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-white text-muted-foreground ring-1 ring-foreground/10 hover:bg-primary/10 hover:text-primary',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {activeTab === 'resumen' ? (
       <section aria-labelledby="pagos-resumen" className="space-y-5" role="tabpanel">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-            Zona principal
-          </p>
-          <h2 id="pagos-resumen" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-            Resumen de pagos
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+              Vista general
+            </p>
+            <h2 id="pagos-resumen" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+            Resumen financiero del módulo
           </h2>
         </div>
 
@@ -670,10 +916,10 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-              Zona de operaciones
+              Cobros a familias
             </p>
             <h2 id="pagos-historico" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-              Cobros realizados
+              Cobros realizados y pasarela de pago
             </h2>
           </div>
 
@@ -777,87 +1023,164 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
       {activeTab === 'cuotas' ? (
         <section aria-labelledby="pagos-cuotas" className="space-y-5" role="tabpanel">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-              Configuración de cobros
-            </p>
-            <h2 id="pagos-cuotas" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-              Cuotas
-            </h2>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+                Cuotas de deportistas
+              </p>
+              <h2 id="pagos-cuotas" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+                Plantillas de cuotas
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+                Define importes reutilizables para después asignarlos a deportistas o familias. Las
+                cuotas no son cobros por sí mismas hasta que se programan/asignan.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab('programadas')}>
+              <Tags className="size-4" aria-hidden="true" />
+              Ver asignaciones
+            </Button>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-4">
+            <SummaryCard
+              title="Plantillas"
+              value={String(feeTemplates.length)}
+              detail={`${visibleFeeTemplates.length} visibles con los filtros actuales`}
+              icon={Tags}
+              tone="blue"
+            />
+            <SummaryCard
+              title="Públicas"
+              value={String(publicFeeTemplates.length)}
+              detail="Disponibles para flujos visibles o reutilizables"
+              icon={ShieldAlert}
+              tone="green"
+            />
+            <SummaryCard
+              title="Fraccionadas"
+              value={String(splitFeeTemplates.length)}
+              detail="Repartidas en varios cargos"
+              icon={CreditCard}
+              tone="amber"
+            />
+            <SummaryCard
+              title="Asignaciones"
+              value={String(activeFeeAssignments.length)}
+              detail="Cuotas activas vinculadas a deportistas/familias"
+              icon={ReceiptText}
+              tone="green"
+            />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
             <Card className="bg-white/88 shadow-sm backdrop-blur">
               <CardHeader>
-                <CardTitle className="text-lg font-black">{editingFee ? 'Editar cuota' : 'Nueva cuota'}</CardTitle>
+                <CardTitle className="text-lg font-black">{editingFee ? 'Editar plantilla' : 'Nueva plantilla'}</CardTitle>
+                <p className="text-sm font-semibold leading-6 text-muted-foreground">
+                  Crea el modelo de cuota: nombre, tipo, importe y forma de pago. La asignación al
+                  deportista se gestiona aparte.
+                </p>
               </CardHeader>
               <CardContent>
                 <form key={editingFee?.id ?? 'new-fee'} ref={feeFormRef} action={feeAction} className="space-y-4">
                   <input type="hidden" name="id" value={editingFee?.id ?? ''} />
-                  <div>
-                    <label htmlFor="fee-name" className="text-sm font-black text-foreground">
-                      Nombre
-                    </label>
-                    <Input id="fee-name" name="nombre" className="mt-2" placeholder="Ej. Cuota mensual, campus, equipación..." defaultValue={editingFee?.nombre ?? ''} required />
-                  </div>
-
-                  <div>
-                    <label htmlFor="fee-type" className="text-sm font-black text-foreground">
-                      Tipo
-                    </label>
-                    <Input id="fee-type" name="tipo" className="mt-2" placeholder="Ej. Socio, deportista, campaña..." defaultValue={editingFee?.tipo ?? ''} required />
-                  </div>
-
-                  <div>
-                    <label htmlFor="fee-amount" className="text-sm font-black text-foreground">
-                      Precio total
-                    </label>
-                    <Input id="fee-amount" name="importe" type="number" min="0.01" step="0.01" className="mt-2" placeholder="0,00" defaultValue={editingFee ? String(editingFee.importe) : ''} required />
-                  </div>
-
-                  <label className="flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                    <input type="checkbox" name="isPublic" className="size-4 accent-primary" defaultChecked={editingFee?.isPublic ?? true} />
-                    Esta cuota es pública
-                  </label>
-
-                  <label className="flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                    <input
-                      type="checkbox"
-                      name="splitPayment"
-                      className="size-4 accent-primary"
-                      checked={splitFee}
-                      onChange={(event) => setSplitFee(event.target.checked)}
-                    />
-                    Repartir pago en varios cargos
-                  </label>
-
-                  {splitFee ? (
-                    <div className="grid gap-4 sm:grid-cols-2">
+                  <FeeFormSection
+                    title="Datos de la cuota"
+                    description="Nombre interno, clasificación y precio total antes de posibles descuentos."
+                    icon={Tags}
+                  >
+                    <div className="grid gap-3">
                       <div>
-                        <label htmlFor="fee-frequency" className="text-sm font-black text-foreground">
-                          Frecuencia de cargos
+                        <label htmlFor="fee-name" className="text-sm font-black text-foreground">
+                          Nombre
                         </label>
-                        <select
-                          id="fee-frequency"
-                          name="chargeFrequency"
-                          className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                          defaultValue={editingFee?.chargeFrequency || 'cada_mes'}
-                          required
-                        >
-                          <option value="cada_mes">Cada mes</option>
-                          <option value="cada_2_meses">Cada 2 meses</option>
-                          <option value="cada_3_meses">Cada 3 meses</option>
-                          <option value="cada_6_meses">Cada 6 meses</option>
-                        </select>
+                        <Input id="fee-name" name="nombre" className="mt-2" placeholder="Ej. Cuota mensual, campus, equipación..." defaultValue={editingFee?.nombre ?? ''} required />
                       </div>
                       <div>
-                        <label htmlFor="fee-count" className="text-sm font-black text-foreground">
-                          Número total de cargos
+                        <label htmlFor="fee-type" className="text-sm font-black text-foreground">
+                          Tipo
                         </label>
-                        <Input id="fee-count" name="chargeCount" type="number" min="2" step="1" className="mt-2" placeholder="12" defaultValue={editingFee?.chargeCount ?? ''} required />
+                        <Input id="fee-type" name="tipo" className="mt-2" placeholder="Ej. Socio, deportista, campaña..." defaultValue={editingFee?.tipo ?? ''} required />
+                      </div>
+                      <div>
+                        <label htmlFor="fee-amount" className="text-sm font-black text-foreground">
+                          Precio total
+                        </label>
+                        <Input id="fee-amount" name="importe" type="number" min="0.01" step="0.01" className="mt-2" placeholder="0,00" defaultValue={editingFee ? String(editingFee.importe) : ''} required />
                       </div>
                     </div>
-                  ) : null}
+                  </FeeFormSection>
+
+                  <FeeFormSection
+                    title="Visibilidad"
+                    description="Controla si esta plantilla queda disponible como opción reutilizable."
+                    icon={ShieldAlert}
+                  >
+                    <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-3 py-3 text-sm font-semibold">
+                      <input type="checkbox" name="isPublic" className="mt-0.5 size-4 accent-primary" defaultChecked={editingFee?.isPublic ?? true} />
+                      <span>
+                        <span className="block font-black text-foreground">Plantilla pública</span>
+                        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                          Visible en los flujos administrativos donde se seleccionan cuotas.
+                        </span>
+                      </span>
+                    </label>
+                  </FeeFormSection>
+
+                  <FeeFormSection
+                    title="Fraccionamiento"
+                    description="Decide si se cobra de una vez o se reparte en varios cargos programados."
+                    icon={CreditCard}
+                  >
+                    <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-3 py-3 text-sm font-semibold">
+                      <input
+                        type="checkbox"
+                        name="splitPayment"
+                        className="mt-0.5 size-4 accent-primary"
+                        checked={splitFee}
+                        onChange={(event) => setSplitFee(event.target.checked)}
+                      />
+                      <span>
+                        <span className="block font-black text-foreground">Repartir pago en varios cargos</span>
+                        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                          Si lo desactivas, se generará un único cargo al asignar esta cuota.
+                        </span>
+                      </span>
+                    </label>
+
+                    {splitFee ? (
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="fee-frequency" className="text-sm font-black text-foreground">
+                            Frecuencia de cargos
+                          </label>
+                          <select
+                            id="fee-frequency"
+                            name="chargeFrequency"
+                            className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                            defaultValue={editingFee?.chargeFrequency || 'cada_mes'}
+                            required
+                          >
+                            <option value="cada_mes">Cada mes</option>
+                            <option value="cada_2_meses">Cada 2 meses</option>
+                            <option value="cada_3_meses">Cada 3 meses</option>
+                            <option value="cada_6_meses">Cada 6 meses</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor="fee-count" className="text-sm font-black text-foreground">
+                            Número total de cargos
+                          </label>
+                          <Input id="fee-count" name="chargeCount" type="number" min="2" step="1" className="mt-2" placeholder="12" defaultValue={editingFee?.chargeCount ?? ''} required />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 rounded-lg bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+                        Pago único: al asignarla se programará un solo cargo.
+                      </p>
+                    )}
+                  </FeeFormSection>
 
                   {feeState.message && feeState.ok ? (
                     <p
@@ -887,7 +1210,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                     ) : null}
                     <Button type="submit" className={editingFee ? '' : 'sm:col-span-2'} disabled={feePending}>
                       {feePending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : editingFee ? <Pencil className="size-4" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
-                      {editingFee ? 'Guardar cambios' : 'Guardar cuota'}
+                      {editingFee ? 'Guardar cambios' : 'Guardar plantilla'}
                     </Button>
                   </div>
                 </form>
@@ -895,10 +1218,18 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             </Card>
 
             <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-black tracking-tight text-foreground">
+                    Plantillas registradas
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-muted-foreground">
+                    Catálogo de cuotas que luego pueden convertirse en cargos programados.
+                  </p>
+                </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                   <Tags className="size-3.5" aria-hidden="true" />
-                  Configuradas
+                  {visibleFeeTemplates.length} de {feeTemplates.length}
                 </span>
               </div>
 
@@ -933,7 +1264,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+              <div className="space-y-3">
                 {feeDeleteMessage?.message && feeDeleteMessage.ok ? (
                   <p
                     className={cn(
@@ -944,89 +1275,94 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                     {feeDeleteMessage.message}
                   </p>
                 ) : null}
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
-                      <th className="px-4 py-2.5">Nombre</th>
-                      <th className="px-4 py-2.5">Tipo</th>
-                      <th className="px-4 py-2.5">Importe</th>
-                      <th className="hidden px-4 py-2.5 md:table-cell">Reparto</th>
-                      <th className="hidden px-4 py-2.5 lg:table-cell">Estado</th>
-                      <th className="px-4 py-2.5 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-card">
-                    {visibleFeeTemplates.length === 0 ? (
-                      <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                          No hay cuotas que coincidan con los filtros.
-                        </td>
-                      </tr>
-                    ) : (
-                      visibleFeeTemplates.map((fee) => (
-                        <tr key={fee.id} className="transition-colors hover:bg-muted/30">
-                          <td className="px-4 py-3 font-semibold text-foreground">{fee.nombre}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{fee.tipo}</td>
-                          <td className="px-4 py-3 font-semibold text-foreground">{formatEuro(fee.importe)}</td>
-                          <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                            {fee.splitPayment ? `${fee.chargeCount} cargos · ${fee.chargeFrequency}` : 'Pago único'}
-                          </td>
-                          <td className="hidden px-4 py-3 lg:table-cell">
-                            <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', fee.isPublic ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
-                              {fee.isPublic ? 'Pública' : 'Privada'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {confirmDeleteFeeId === fee.id ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <span className="text-xs text-muted-foreground">¿Eliminar?</span>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  disabled={deletePendingId === fee.id}
-                                  onClick={() => handleDeleteFee(fee)}
-                                >
-                                  {deletePendingId === fee.id ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
-                                  Sí, eliminar
-                                </Button>
-                                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDeleteFeeId(null)}>
-                                  Cancelar
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={`Editar ${fee.nombre}`}
-                                  onClick={() => {
-                                    setEditingFee(fee)
-                                    setSplitFee(fee.splitPayment)
-                                    setConfirmDeleteFeeId(null)
-                                  }}
-                                >
-                                  <Pencil className="size-4" aria-hidden="true" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="icon-sm"
-                                  aria-label={`Eliminar ${fee.nombre}`}
-                                  disabled={deletePendingId === fee.id}
-                                  onClick={() => setConfirmDeleteFeeId(fee.id)}
-                                >
-                                  {deletePendingId === fee.id ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />}
-                                </Button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                {visibleFeeTemplates.length === 0 ? (
+                  <p className="rounded-xl bg-muted px-4 py-12 text-center text-sm text-muted-foreground">
+                    No hay cuotas que coincidan con los filtros.
+                  </p>
+                ) : (
+                  <div className="grid gap-3">
+                    {visibleFeeTemplates.map((fee) => (
+                      <div key={fee.id} className="rounded-xl border border-border bg-white p-4 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', fee.isPublic ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
+                                {fee.isPublic ? 'Pública' : 'Privada'}
+                              </span>
+                              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                                {fee.tipo}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-lg font-black leading-tight text-foreground">{fee.nombre}</p>
+                            <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                              {fee.splitPayment ? `${fee.chargeCount} cargos · ${fee.chargeFrequency}` : 'Pago único'}
+                            </p>
+                          </div>
+
+                          <div className="text-left sm:text-right">
+                            <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                              Importe
+                            </p>
+                            <p className="mt-1 text-2xl font-black text-foreground">{formatEuro(fee.importe)}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2">
+                          <p className="text-xs font-semibold text-muted-foreground">
+                            {fee.splitPayment
+                              ? 'Al asignarla se crearán cargos programados según esta frecuencia.'
+                              : 'Al asignarla se creará un único cargo programado.'}
+                          </p>
+                          {confirmDeleteFeeId === fee.id ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletePendingId === fee.id}
+                                onClick={() => handleDeleteFee(fee)}
+                              >
+                                {deletePendingId === fee.id ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                                Sí, eliminar
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDeleteFeeId(null)}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                aria-label={`Editar ${fee.nombre}`}
+                                onClick={() => {
+                                  setEditingFee(fee)
+                                  setSplitFee(fee.splitPayment)
+                                  setConfirmDeleteFeeId(null)
+                                }}
+                              >
+                                <Pencil className="size-4" aria-hidden="true" />
+                                Editar
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon-sm"
+                                aria-label={`Eliminar ${fee.nombre}`}
+                                disabled={deletePendingId === fee.id}
+                                onClick={() => setConfirmDeleteFeeId(fee.id)}
+                              >
+                                {deletePendingId === fee.id ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1040,8 +1376,12 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               Seguimiento de cobros
             </p>
             <h2 id="pagos-pendientes" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-              Pendientes de cobro
+              Pagos pendientes y fallidos
             </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Revisa operaciones reales que aún no se han cobrado o han fallado. Las cuotas ya
+              asignadas viven ahora en su propia pestaña de cuotas programadas.
+            </p>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
@@ -1069,6 +1409,12 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           </div>
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-black text-foreground">Filtro común</p>
+              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                Solo pagos reales pendientes/fallidos
+              </span>
+            </div>
             <div className="grid gap-3 md:grid-cols-[1fr_220px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -1081,18 +1427,27 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 />
               </div>
               <select value={pendingStatusFilter} onChange={(event) => setPendingStatusFilter(event.target.value as typeof pendingStatusFilter)} className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-                <option value="todos">Todos los pendientes</option>
+                <option value="todos">Todos los pagos</option>
                 <option value="pendiente">Pagos pendientes</option>
                 <option value="fallido">Pagos fallidos</option>
-                <option value="programada">Cuotas programadas</option>
               </select>
             </div>
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid gap-5">
             <Card className="bg-white/88 shadow-sm backdrop-blur">
               <CardHeader>
-                <CardTitle className="text-lg font-black">Pagos pendientes o fallidos</CardTitle>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg font-black">Pagos pendientes o fallidos</CardTitle>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-muted-foreground">
+                      Operaciones de pago ya generadas que necesitan confirmación, reintento o revisión.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-700">
+                    {visiblePendingPayments.length} visibles
+                  </span>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
@@ -1131,61 +1486,311 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 </div>
               </CardContent>
             </Card>
-
-            <Card className="bg-white/88 shadow-sm backdrop-blur">
-              <CardHeader>
-                <CardTitle className="text-lg font-black">Cuotas asignadas</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {visibleFeeAssignments.length === 0 ? (
-                  <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
-                    No hay cuotas programadas que coincidan con los filtros.
-                  </p>
-                ) : (
-                  visibleFeeAssignments.map((assignment) => (
-                    <div key={assignment.id} className="rounded-lg border border-border bg-white p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="font-black text-foreground">{assignment.feeName}</p>
-                          <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
-                            {assignment.athleteName}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
-                          Próximo: {assignment.nextChargeDate}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {assignment.scheduledCharges} pendientes · {assignment.paidCharges} pagados · día {assignment.chargeDay}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
           </div>
+        </section>
+      ) : null}
+
+      {activeTab === 'programadas' ? (
+        <section aria-labelledby="pagos-programadas" className="space-y-5" role="tabpanel">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+                Cuotas de deportistas
+              </p>
+              <h2 id="pagos-programadas" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+                Cuotas programadas
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+                Asignaciones activas vinculadas a deportistas o familias. Aquí se revisan los
+                próximos cargos, los pagos ya completados y el día programado de cobro.
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab('cuotas')}>
+              <Tags className="size-4" aria-hidden="true" />
+              Ver plantillas
+            </Button>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <SummaryCard
+              title="Asignaciones activas"
+              value={String(feeAssignments.length)}
+              detail="Cuotas vinculadas a deportistas/familias"
+              icon={Tags}
+              tone="blue"
+            />
+            <SummaryCard
+              title="Cargos pendientes"
+              value={String(feeAssignments.reduce((sum, assignment) => sum + assignment.scheduledCharges, 0))}
+              detail="Cargos programados todavía no pagados"
+              icon={CreditCard}
+              tone="amber"
+            />
+            <SummaryCard
+              title="Cargos pagados"
+              value={String(feeAssignments.reduce((sum, assignment) => sum + assignment.paidCharges, 0))}
+              detail="Cargos completados dentro de estas asignaciones"
+              icon={ReceiptText}
+              tone="green"
+            />
+          </div>
+
+          <Card className="border-amber-100 bg-amber-50/60 shadow-sm backdrop-blur">
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                    Administración
+                  </p>
+                  <CardTitle className="mt-1 text-lg font-black">Asignar cuota a deportista</CardTitle>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-muted-foreground">
+                    La cuota se vincula al jugador, pero el cobro se programa al tutor pagador asignado.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-amber-700 ring-1 ring-amber-200">
+                  {assignableAthletes.length} deportistas con tutor
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form ref={assignmentFormRef} action={feeAssignmentAction} className="space-y-4">
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <AssignmentStep
+                    step="1"
+                    title="Deportista y tutor"
+                    description="Solo aparecen jugadores con tutor, porque el cobro se hace a la familia."
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <label htmlFor="assignment-athlete-filter" className="text-sm font-black text-foreground">
+                          Buscar deportista
+                        </label>
+                        <div className="relative mt-2">
+                          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                          <Input
+                            id="assignment-athlete-filter"
+                            type="search"
+                            value={assignmentAthleteFilter}
+                            onChange={(event) => setAssignmentAthleteFilter(event.target.value)}
+                            placeholder="Jugador, tutor, equipo o categoría"
+                            className="bg-white pl-9"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label htmlFor="assignment-athlete" className="text-sm font-black text-foreground">
+                          Deportista
+                        </label>
+                        <select id="assignment-athlete" name="athleteId" className={cn('mt-2', ASSIGNMENT_SELECT_CLASS)} required>
+                          <option value="">Selecciona deportista</option>
+                          {assignableAthletes.map((athlete) => (
+                            <option key={athlete.id} value={athlete.id}>
+                              {athlete.nombre} · {athlete.tutor} · {athlete.equipoAsignado}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </AssignmentStep>
+
+                  <AssignmentStep
+                    step="2"
+                    title="Cuota"
+                    description="Elige una plantilla ya configurada. Aquí no se crea la cuota, se programa."
+                  >
+                    <label htmlFor="assignment-fee-template" className="text-sm font-black text-foreground">
+                      Plantilla de cuota
+                    </label>
+                    <select id="assignment-fee-template" name="feeTemplateId" className={cn('mt-2', ASSIGNMENT_SELECT_CLASS)} required>
+                      <option value="">Selecciona cuota</option>
+                      {feeTemplates.map((fee) => (
+                        <option key={fee.id} value={fee.id}>
+                          {fee.nombre} · {formatEuro(fee.importe)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800">
+                      Si la matrícula ya está pagada, se descuenta automáticamente del importe programado.
+                    </p>
+                  </AssignmentStep>
+
+                  <AssignmentStep
+                    step="3"
+                    title="Calendario de cobro"
+                    description="Define cuándo empieza y qué día del mes se intentará cobrar."
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                      <div>
+                        <label htmlFor="assignment-start-month" className="text-sm font-black text-foreground">
+                          Mes de inicio
+                        </label>
+                        <Input id="assignment-start-month" name="startMonth" type="month" className="mt-2 bg-white" required />
+                      </div>
+                      <div>
+                        <label htmlFor="assignment-charge-day" className="text-sm font-black text-foreground">
+                          Día de cargo
+                        </label>
+                        <select id="assignment-charge-day" name="chargeDay" className={cn('mt-2', ASSIGNMENT_SELECT_CLASS)} defaultValue="1" required>
+                          {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
+                            <option key={day} value={day}>
+                              Día {day}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </AssignmentStep>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-100 bg-white px-4 py-3">
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    Revisa la selección antes de programar: se crearán los cargos y se intentará sincronizar con Stripe.
+                  </p>
+                  <Button type="submit" disabled={feeAssignmentPending || feeTemplates.length === 0 || assignableAthletes.length === 0} className="w-full bg-amber-600 text-white hover:bg-amber-700 sm:w-auto">
+                    {feeAssignmentPending ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+                    Programar cuota
+                  </Button>
+                </div>
+
+                {feeAssignmentState.message && feeAssignmentState.ok ? (
+                  <p className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-700">
+                    {feeAssignmentState.message}
+                  </p>
+                ) : null}
+              </form>
+            </CardContent>
+          </Card>
+
+          <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-black text-foreground">Buscar asignaciones</p>
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                {visibleFeeAssignments.length} visibles
+              </span>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                type="search"
+                value={pendingSearch}
+                onChange={(event) => setPendingSearch(event.target.value)}
+                placeholder="Buscar por cuota, tipo, deportista, fecha o día de cargo"
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          <Card className="bg-white/88 shadow-sm backdrop-blur">
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg font-black">Asignaciones con cargos futuros</CardTitle>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-muted-foreground">
+                    Cada tarjeta representa una cuota ya asignada. Las plantillas se gestionan en
+                    `Cuotas configuradas`.
+                  </p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                  {visibleFeeAssignments.length} visibles
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {visibleFeeAssignments.length === 0 ? (
+                <p className="rounded-lg bg-muted px-3 py-8 text-center text-sm text-muted-foreground">
+                  No hay cuotas programadas que coincidan con la búsqueda.
+                </p>
+              ) : (
+                visibleFeeAssignments.map((assignment) => (
+                  <div key={assignment.id} className="rounded-xl border border-border bg-white p-4 shadow-sm">
+                    <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr_auto]">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black uppercase text-primary">
+                            {assignment.status === 'active' ? 'Activa' : assignment.status}
+                          </span>
+                          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-700">
+                            Próximo: {assignment.nextChargeDate}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-lg font-black leading-tight text-foreground">{assignment.athleteName}</p>
+                        <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                          Deportista con cuota programada
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/40 px-3 py-3">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                          Cuota
+                        </p>
+                        <p className="mt-1 font-black text-foreground">{assignment.feeName}</p>
+                        <p className="mt-1 text-sm font-semibold text-muted-foreground">{assignment.feeType}</p>
+                        <p className="mt-2 text-sm font-black text-foreground">{formatEuro(assignment.totalAmount)}</p>
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-3 xl:min-w-96">
+                        <AssignmentMetric label="Pendientes" value={assignment.scheduledCharges} tone="amber" />
+                        <AssignmentMetric label="Pagados" value={assignment.paidCharges} tone="green" />
+                        <AssignmentMetric label="Día cargo" value={assignment.chargeDay} tone="blue" />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </section>
       ) : null}
 
       {activeTab === 'informes' ? (
         <section aria-labelledby="pagos-informes" className="space-y-5" role="tabpanel">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-                Revisión de directiva
-              </p>
-              <h2 id="pagos-informes" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-                Informes
-              </h2>
+          <div className="rounded-xl border border-border bg-white/84 p-5 shadow-sm backdrop-blur">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
+                  Revisión de directiva
+                </p>
+                <h2 id="pagos-informes" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+                  Informes contables
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-muted-foreground">
+                  Lectura rápida de ingresos, gastos y balance filtrado por temporada, método, categoría o concepto.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={exportReportCsv}>
+                <Download className="size-4" aria-hidden="true" />
+                Exportar informe
+              </Button>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={exportReportCsv}>
-              <Download className="size-4" aria-hidden="true" />
-              Exportar informe
-            </Button>
-          </div>
 
-          <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-            <div className="grid gap-3 md:grid-cols-[1fr_240px]">
+            <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_340px]">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl bg-emerald-50 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700/70">Ingresos filtrados</p>
+                  <p className="mt-2 text-2xl font-black text-emerald-700">{formatEuro(reportIncomeTotal)}</p>
+                </div>
+                <div className="rounded-xl bg-amber-50 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700/70">Gastos filtrados</p>
+                  <p className="mt-2 text-2xl font-black text-amber-700">{formatEuro(reportExpenseTotal)}</p>
+                </div>
+                <div className={cn('rounded-xl p-4', reportBalance >= 0 ? 'bg-primary/5' : 'bg-rose-50')}>
+                  <p className={cn('text-xs font-black uppercase tracking-[0.16em]', reportBalance >= 0 ? 'text-primary/70' : 'text-rose-700/70')}>Balance</p>
+                  <p className={cn('mt-2 text-2xl font-black', reportBalance >= 0 ? 'text-primary' : 'text-rose-700')}>{formatEuro(reportBalance)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Alcance del informe</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
+                  {reportConfirmedCount} movimientos confirmados y {formatEuro(reportPendingTotal)} pendiente de confirmar.
+                </p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  {reportMovements.length} movimientos coinciden con los filtros actuales.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-[1fr_240px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                 <Input
@@ -1210,13 +1815,14 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             <SummaryCard title="Efectivo" value={formatEuro(reportCashTotal)} detail="Movimientos confirmados filtrados" icon={Wallet} tone="green" />
             <SummaryCard title="Banco / Bizum" value={formatEuro(reportBankTotal)} detail="Transferencia, Bizum y tarjeta" icon={Landmark} tone="blue" />
             <SummaryCard title="Stripe cobrado" value={formatEuro(summary.stripeTotal)} detail="Cobros confirmados por plataforma" icon={CreditCard} tone="blue" />
-            <SummaryCard title="Balance filtrado" value={formatEuro(reportIncomeTotal - reportExpenseTotal)} detail="Ingresos menos gastos filtrados" icon={BarChart3} tone={reportIncomeTotal - reportExpenseTotal >= 0 ? 'green' : 'amber'} />
+            <SummaryCard title="Balance filtrado" value={formatEuro(reportBalance)} detail="Ingresos menos gastos filtrados" icon={BarChart3} tone={reportBalance >= 0 ? 'green' : 'amber'} />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-3">
             {[
               {
                 title: 'Ingresos por categoría',
+                tone: 'green' as const,
                 rows: INCOME_CATEGORIES.map((category) => ({
                   label: category,
                   value: sumMovements(reportMovements.filter((movement) => movement.tipo === 'ingreso' && movement.categoria === category)),
@@ -1224,6 +1830,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               },
               {
                 title: 'Gastos por categoría',
+                tone: 'amber' as const,
                 rows: EXPENSE_CATEGORIES.map((category) => ({
                   label: category,
                   value: sumMovements(reportMovements.filter((movement) => movement.tipo === 'gasto' && movement.categoria === category)),
@@ -1231,6 +1838,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               },
               {
                 title: 'Movimientos por temporada',
+                tone: 'blue' as const,
                 rows: seasons
                   .filter((season) => reportSeasonFilter === 'todos' || reportSeasonFilter === season.id)
                   .map((season) => ({
@@ -1243,7 +1851,18 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             ].map((block) => (
               <Card key={block.title} className="bg-white/88 shadow-sm backdrop-blur">
                 <CardHeader>
-                  <CardTitle className="text-lg font-black">{block.title}</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-lg font-black">
+                    <span
+                      className={cn(
+                        'size-2.5 rounded-full',
+                        block.tone === 'green' && 'bg-emerald-500',
+                        block.tone === 'amber' && 'bg-amber-500',
+                        block.tone === 'blue' && 'bg-primary',
+                      )}
+                      aria-hidden="true"
+                    />
+                    {block.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {block.rows.filter((row) => row.value !== 0).length === 0 ? (
@@ -1256,7 +1875,15 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                           <span className="font-black text-foreground">{formatEuro(row.value)}</span>
                         </div>
                         <div className="h-2 rounded-full bg-muted">
-                          <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.min(100, Math.max(8, Math.abs(row.value) / Math.max(1, Math.abs(summary.confirmedIncomeTotal), Math.abs(summary.manualExpenseTotal)) * 100))}%` }} />
+                          <div
+                            className={cn(
+                              'h-2 rounded-full',
+                              block.tone === 'green' && 'bg-emerald-500',
+                              block.tone === 'amber' && 'bg-amber-500',
+                              block.tone === 'blue' && 'bg-primary',
+                            )}
+                            style={{ width: `${Math.min(100, Math.max(8, Math.abs(row.value) / Math.max(1, Math.abs(summary.confirmedIncomeTotal), Math.abs(summary.manualExpenseTotal)) * 100))}%` }}
+                          />
                         </div>
                       </div>
                     ))
@@ -1275,11 +1902,14 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             {currentMovementType === 'ingreso' ? 'Entradas del club' : 'Salidas del club'}
           </p>
           <h2 id="pagos-movimientos" className="mt-2 text-2xl font-black tracking-tight text-foreground">
-            {currentMovementType === 'ingreso' ? 'Ingresos' : 'Gastos'}
+            {currentMovementType === 'ingreso' ? 'Ingresos manuales' : 'Gastos manuales'}
           </h2>
+          <p className="mt-1 max-w-2xl text-sm font-semibold text-muted-foreground">
+            Movimientos contables creados desde administración para completar el balance del club fuera de los cobros automáticos a familias.
+          </p>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-4">
           <SummaryCard
             title={currentMovementType === 'ingreso' ? 'Ingresos confirmados' : 'Gastos confirmados'}
             value={formatEuro(tabMovementTotal)}
@@ -1292,6 +1922,20 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
             value={formatEuro(pendingTabMovements.reduce((sum, movement) => sum + movement.importe, 0))}
             detail="Pendiente de revisión"
             icon={ShieldAlert}
+            tone="amber"
+          />
+          <SummaryCard
+            title="Filtrado"
+            value={formatEuro(visibleMovementTotal)}
+            detail={`${visibleMovements.length} movimientos visibles`}
+            icon={ReceiptText}
+            tone={currentMovementType === 'ingreso' ? 'green' : 'blue'}
+          />
+          <SummaryCard
+            title="Pendiente filtrado"
+            value={formatEuro(visibleMovementPendingTotal)}
+            detail="Según búsqueda actual"
+            icon={Wallet}
             tone="amber"
           />
         </div>
@@ -1312,144 +1956,140 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               >
                 <input type="hidden" name="id" value={editingMovement?.id ?? ''} />
                 <input type="hidden" name="tipo" value={editingMovement?.tipo ?? movementFormType} />
-                <div>
-                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary">
-                    {editingMovement?.tipo ?? movementFormType}
-                  </span>
-                </div>
-
-                <div>
-                  <label htmlFor="categoria" className="text-sm font-black text-foreground">
-                    Categoría
-                  </label>
-                  <select
-                    id="categoria"
-                    name="categoria"
-                    defaultValue={editingMovement?.categoria ?? currentMovementCategories[0]}
-                    className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    {currentMovementCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="concepto" className="text-sm font-black text-foreground">
-                    Concepto
-                  </label>
-                  <Input
-                    id="concepto"
-                    name="concepto"
-                    placeholder="Ej. Lotería, material deportivo, efectivo..."
-                    className="mt-2"
-                    defaultValue={editingMovement?.concepto ?? ''}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="detalle" className="text-sm font-black text-foreground">
-                    Detalle <span className="font-semibold text-muted-foreground">(opcional)</span>
-                  </label>
-                  <textarea
-                    id="detalle"
-                    name="detalle"
-                    rows={4}
-                    placeholder="Añade una nota si hace falta."
-                    defaultValue={editingMovement?.detalle ?? ''}
-                    className="mt-2 w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="importe" className="text-sm font-black text-foreground">
-                    Importe
-                  </label>
-                  <Input
-                    id="importe"
-                    name="importe"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="0,00"
-                    className="mt-2"
-                    defaultValue={editingMovement ? String(editingMovement.importe) : ''}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="metodoPago" className="text-sm font-black text-foreground">
-                      Método de pago
-                    </label>
-                    <select
-                      id="metodoPago"
-                      name="metodoPago"
-                      defaultValue={editingMovement?.metodoPago ?? 'cash'}
-                      className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    >
-                      {Object.entries(METHOD_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                <FeeFormSection
+                  title="Clasificación"
+                  description="Define si este movimiento es una entrada o salida y cómo aparecerá agrupado."
+                  icon={Tags}
+                >
+                  <div className="mb-4">
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary">
+                      {editingMovement?.tipo ?? movementFormType}
+                    </span>
                   </div>
-                  <div>
-                    <label htmlFor="estado" className="text-sm font-black text-foreground">
-                      Estado
-                    </label>
-                    <select
-                      id="estado"
-                      name="estado"
-                      defaultValue={editingMovement?.estado ?? 'confirmed'}
-                      className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    >
-                      {Object.entries(MOVEMENT_STATUS_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-4">
+                    <MovementField label="Categoría">
+                      <select
+                        id="categoria"
+                        name="categoria"
+                        defaultValue={editingMovement?.categoria ?? currentMovementCategories[0]}
+                        className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        {currentMovementCategories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    </MovementField>
+
+                    <MovementField label="Concepto">
+                      <Input
+                        id="concepto"
+                        name="concepto"
+                        placeholder="Ej. Lotería, material deportivo, efectivo..."
+                        defaultValue={editingMovement?.concepto ?? ''}
+                        required
+                      />
+                    </MovementField>
+
+                    <MovementField label="Detalle opcional">
+                      <textarea
+                        id="detalle"
+                        name="detalle"
+                        rows={4}
+                        placeholder="Añade una nota si hace falta."
+                        defaultValue={editingMovement?.detalle ?? ''}
+                        className="w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      />
+                    </MovementField>
                   </div>
-                </div>
+                </FeeFormSection>
 
-                <div>
-                  <label htmlFor="seasonId" className="text-sm font-black text-foreground">
-                    Temporada
-                  </label>
-                  <select
-                    id="seasonId"
-                    name="seasonId"
-                    defaultValue={editingMovement?.seasonId ?? ''}
-                    className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    <option value="">Sin temporada</option>
-                    {seasons.map((season) => (
-                      <option key={season.id} value={season.id}>
-                        {season.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <FeeFormSection
+                  title="Importe y estado"
+                  description="Registra la cantidad, el método de pago y si ya está confirmado."
+                  icon={Wallet}
+                >
+                  <div className="space-y-4">
+                    <MovementField label="Importe">
+                      <Input
+                        id="importe"
+                        name="importe"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0,00"
+                        defaultValue={editingMovement ? String(editingMovement.importe) : ''}
+                        required
+                      />
+                    </MovementField>
 
-                <div>
-                  <label htmlFor="justificanteUrl" className="text-sm font-black text-foreground">
-                    Justificante <span className="font-semibold text-muted-foreground">(opcional)</span>
-                  </label>
-                  <Input
-                    id="justificanteUrl"
-                    name="justificanteUrl"
-                    type="url"
-                    placeholder="https://..."
-                    className="mt-2"
-                    defaultValue={editingMovement?.justificanteUrl ?? ''}
-                  />
-                </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <MovementField label="Método de pago">
+                        <select
+                          id="metodoPago"
+                          name="metodoPago"
+                          defaultValue={editingMovement?.metodoPago ?? 'cash'}
+                          className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          {Object.entries(METHOD_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </MovementField>
+                      <MovementField label="Estado">
+                        <select
+                          id="estado"
+                          name="estado"
+                          defaultValue={editingMovement?.estado ?? 'confirmed'}
+                          className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          {Object.entries(MOVEMENT_STATUS_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </MovementField>
+                    </div>
+                  </div>
+                </FeeFormSection>
+
+                <FeeFormSection
+                  title="Archivo y temporada"
+                  description="Relaciona el movimiento con una temporada y añade un justificante si existe."
+                  icon={FileText}
+                >
+                  <div className="space-y-4">
+                    <MovementField label="Temporada">
+                      <select
+                        id="seasonId"
+                        name="seasonId"
+                        defaultValue={editingMovement?.seasonId ?? ''}
+                        className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <option value="">Sin temporada</option>
+                        {seasons.map((season) => (
+                          <option key={season.id} value={season.id}>
+                            {season.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </MovementField>
+
+                    <MovementField label="Justificante opcional">
+                      <Input
+                        id="justificanteUrl"
+                        name="justificanteUrl"
+                        type="url"
+                        placeholder="https://..."
+                        defaultValue={editingMovement?.justificanteUrl ?? ''}
+                      />
+                    </MovementField>
+                  </div>
+                </FeeFormSection>
 
                 {movementState.message && movementState.ok ? (
                   <p
@@ -1554,118 +2194,125 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 </p>
               ) : null}
 
-              <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
-                      <th className="px-4 py-2.5">Concepto</th>
-                      <th className="px-4 py-2.5">Categoría</th>
-                      <th className="hidden px-4 py-2.5 lg:table-cell">Método</th>
-                      <th className="px-4 py-2.5">Estado</th>
-                      <th className="hidden px-4 py-2.5 md:table-cell">Detalle</th>
-                      <th className="px-4 py-2.5">Importe</th>
-                      <th className="hidden px-4 py-2.5 xl:table-cell">Temporada</th>
-                      <th className="hidden px-4 py-2.5 lg:table-cell">Fecha</th>
-                      <th className="px-4 py-2.5 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-card">
-                    {visibleMovements.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                          Aún no hay movimientos que coincidan con los filtros.
-                        </td>
-                      </tr>
-                    ) : (
-                      visibleMovements.map((movement) => (
-                        <tr key={movement.id} className="transition-colors hover:bg-muted/30">
-                          <td className="px-4 py-3 font-semibold text-foreground">{movement.concepto}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{movement.categoria}</td>
-                          <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{METHOD_LABELS[movement.metodoPago]}</td>
-                          <td className="px-4 py-3">
-                            <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', MOVEMENT_STATUS_STYLES[movement.estado])}>
-                              {MOVEMENT_STATUS_LABELS[movement.estado]}
-                            </span>
-                          </td>
-                          <td className="hidden max-w-xs px-4 py-3 text-muted-foreground md:table-cell">
-                            <span className="line-clamp-2">{movement.detalle || '—'}</span>
-                            {movement.justificanteUrl ? (
-                              <a href={movement.justificanteUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs font-black text-primary">
-                                <FileText className="size-3" />
-                                Justificante
-                              </a>
-                            ) : null}
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-foreground">
+              <div className="grid gap-3">
+                {visibleMovements.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
+                    Aún no hay movimientos que coincidan con los filtros.
+                  </div>
+                ) : null}
+                {visibleMovements.map((movement) => (
+                  <article key={movement.id} className="rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20">
+                    <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', MOVEMENT_STATUS_STYLES[movement.estado])}>
+                            {MOVEMENT_STATUS_LABELS[movement.estado]}
+                          </span>
+                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                            {movement.categoria}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {METHOD_LABELS[movement.metodoPago]}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+                          <div className="min-w-0">
+                            <p className="truncate text-lg font-black text-foreground">{movement.concepto}</p>
+                            <p className="mt-1 line-clamp-2 text-sm font-semibold text-muted-foreground">
+                              {movement.detalle || 'Sin detalle añadido.'}
+                            </p>
+                          </div>
+                          <p className={cn(
+                            'text-2xl font-black tracking-tight',
+                            movement.tipo === 'ingreso' ? 'text-emerald-700' : 'text-amber-700',
+                          )}>
                             {formatEuro(movement.importe)}
-                          </td>
-                          <td className="hidden px-4 py-3 text-muted-foreground xl:table-cell">
-                            {movement.temporada}
-                          </td>
-                          <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">
-                            {movement.fecha}
-                          </td>
-                          <td className="px-4 py-3">
-                            {confirmDeleteMovementId === movement.id ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <span className="text-xs text-muted-foreground">¿Eliminar?</span>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  disabled={deletePendingId === movement.id}
-                                  onClick={() => handleDeleteMovement(movement)}
-                                >
-                                  {deletePendingId === movement.id ? (
-                                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                                  ) : null}
-                                  Sí, eliminar
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setConfirmDeleteMovementId(null)}
-                                >
-                                  Cancelar
-                                </Button>
-                              </div>
+                          </p>
+                        </div>
+
+                        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                          <div className="rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Temporada</p>
+                            <p className="mt-1 truncate font-semibold text-foreground">{movement.temporada}</p>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Fecha</p>
+                            <p className="mt-1 font-semibold text-foreground">{movement.fecha}</p>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Justificante</p>
+                            {movement.justificanteUrl ? (
+                              <a href={movement.justificanteUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-sm font-black text-primary">
+                                <FileText className="size-3.5" />
+                                Ver justificante
+                              </a>
                             ) : (
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Editar ${movement.concepto}`}
-                                onClick={() => {
-                                  setEditingMovement(movement)
-                                  setMovementFormType(movement.tipo)
-                                }}
-                              >
-                                <Pencil className="size-4" aria-hidden="true" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="icon-sm"
-                                aria-label={`Eliminar ${movement.concepto}`}
-                                disabled={deletePendingId === movement.id}
-                                onClick={() => setConfirmDeleteMovementId(movement.id)}
-                              >
-                                {deletePendingId === movement.id ? (
-                                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                                ) : (
-                                  <Trash2 className="size-4" aria-hidden="true" />
-                                )}
-                              </Button>
-                            </div>
+                              <p className="mt-1 font-semibold text-foreground">No adjunto</p>
                             )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-start xl:justify-end">
+                        {confirmDeleteMovementId === movement.id ? (
+                          <div className="flex flex-wrap items-center justify-start gap-2 rounded-lg bg-rose-50 p-2 xl:justify-end">
+                            <span className="text-xs font-semibold text-rose-700">¿Eliminar movimiento?</span>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletePendingId === movement.id}
+                              onClick={() => handleDeleteMovement(movement)}
+                            >
+                              {deletePendingId === movement.id ? (
+                                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                              ) : null}
+                              Sí, eliminar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setConfirmDeleteMovementId(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Editar ${movement.concepto}`}
+                              onClick={() => {
+                                setEditingMovement(movement)
+                                setMovementFormType(movement.tipo)
+                              }}
+                            >
+                              <Pencil className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon-sm"
+                              aria-label={`Eliminar ${movement.concepto}`}
+                              disabled={deletePendingId === movement.id}
+                              onClick={() => setConfirmDeleteMovementId(movement.id)}
+                            >
+                              {deletePendingId === movement.id ? (
+                                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <Trash2 className="size-4" aria-hidden="true" />
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))}
               </div>
             </div>
           </div>
@@ -1675,6 +2322,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
       <AdminErrorDialog
         message={
           (paymentMessage?.message && !paymentMessage.ok ? paymentMessage.message : null) ??
+          (feeAssignmentState.message && !feeAssignmentState.ok ? feeAssignmentState.message : null) ??
           (feeState.message && !feeState.ok ? feeState.message : null) ??
           (feeDeleteMessage?.message && !feeDeleteMessage.ok ? feeDeleteMessage.message : null) ??
           (movementState.message && !movementState.ok ? movementState.message : null) ??

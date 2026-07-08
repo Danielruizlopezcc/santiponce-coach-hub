@@ -1,7 +1,19 @@
 'use client'
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { CreditCard, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import type { ReactNode } from 'react'
+import {
+  Eye,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Shield,
+  Trash2,
+  Trophy,
+  UserCheck,
+  X,
+} from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { PageContainer } from '@/components/page-container'
@@ -11,17 +23,13 @@ import { cn } from '@/lib/utils'
 import type {
   AdminAthleteRow,
   AdminCategoryRow,
-  AdminFeeTemplateRow,
   AdminSeasonRow,
   AdminTeamRow,
-  AdminTutorFeeAssignmentRow,
   AdminTutorOption,
 } from '@/lib/admin-app'
 import {
-  assignAthleteFeeAction,
   createAthleteAction,
   deleteAthleteAction,
-  type AthleteFeeAssignmentState,
   type CreateAthleteState,
   updateAthleteAdminAction,
 } from './actions'
@@ -32,15 +40,122 @@ const ESTADO_STYLES: Record<AdminAthleteRow['estadoMatricula'], string> = {
   Pendiente: 'bg-amber-100 text-amber-700',
 }
 
+const FORM_SELECT_CLASS =
+  'h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
+
+function SportsSummaryCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  tone = 'blue',
+}: {
+  title: string
+  value: string
+  detail: string
+  icon: typeof Trophy
+  tone?: 'blue' | 'green' | 'amber'
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-white/88 p-4 shadow-sm backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+            {title}
+          </p>
+          <p className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</p>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">{detail}</p>
+        </div>
+        <span
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-lg',
+            tone === 'blue' && 'bg-primary/10 text-primary',
+            tone === 'green' && 'bg-emerald-100 text-emerald-700',
+            tone === 'amber' && 'bg-amber-100 text-amber-700',
+          )}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function AthleteFormSection({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string
+  description: string
+  icon: typeof Trophy
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">{title}</h3>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function AthleteField({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={htmlFor} className="text-sm font-black text-foreground">
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function AthleteProfileBlock({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string
+  icon: typeof Trophy
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
+        <h3 className="text-sm font-black uppercase tracking-[0.16em] text-foreground">{title}</h3>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function AthleteProfileItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  )
+}
+
 type Props = {
   athletes: AdminAthleteRow[]
   categories: AdminCategoryRow[]
   teams: AdminTeamRow[]
   seasons: AdminSeasonRow[]
   tutors: AdminTutorOption[]
-  feeTemplates: AdminFeeTemplateRow[]
-  feeAssignments: AdminTutorFeeAssignmentRow[]
-  canManageFees: boolean
 }
 
 type Draft = {
@@ -58,12 +173,11 @@ const STATUS_OPTIONS = [
 ] as const
 
 const initialCreateState: CreateAthleteState = { ok: false, message: '' }
-const initialFeeAssignmentState: AthleteFeeAssignmentState = { ok: false, message: '' }
 
-export function DeportistasClient({ athletes, categories, teams, seasons, tutors, feeTemplates, feeAssignments, canManageFees }: Props) {
+export function DeportistasClient({ athletes, categories, teams, seasons, tutors }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
-  const [assigningAthlete, setAssigningAthlete] = useState<AdminAthleteRow | null>(null)
+  const [viewingAthlete, setViewingAthlete] = useState<AdminAthleteRow | null>(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [teamFilter, setTeamFilter] = useState('')
@@ -75,19 +189,11 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
   const [actionError, setActionError] = useState<string | null>(null)
   const createFormRef = useRef<HTMLFormElement>(null)
   const [createState, createAction, createPending] = useActionState(createAthleteAction, initialCreateState)
-  const [feeAssignmentState, feeAssignmentAction, feeAssignmentPending] = useActionState(assignAthleteFeeAction, initialFeeAssignmentState)
 
   const hasActiveFilters = [search, categoryFilter, teamFilter, statusFilter, seasonFilter].some(Boolean)
-  const assignmentsByAthlete = useMemo(() => {
-    const map = new Map<string, AdminTutorFeeAssignmentRow[]>()
-    for (const assignment of feeAssignments) {
-      if (!assignment.athleteId) continue
-      const current = map.get(assignment.athleteId) ?? []
-      current.push(assignment)
-      map.set(assignment.athleteId, current)
-    }
-    return map
-  }, [feeAssignments])
+  const assignedTeamCount = athletes.filter((athlete) => athlete.assignedTeamId).length
+  const withoutTeamCount = athletes.filter((athlete) => !athlete.assignedTeamId).length
+  const matriculatedCount = athletes.filter((athlete) => athlete.estadoMatricula === 'Matriculado').length
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -176,15 +282,52 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
   return (
     <PageContainer
       title="Deportistas"
-      description="Listado visual de deportistas, categoría solicitada y estado de matrícula."
+      description="Gestión deportiva de jugadores, categorías, equipos y situación de plantilla."
       className="max-w-7xl"
     >
-      <div className="mb-6 flex flex-wrap items-center justify-start gap-3">
-        <Button onClick={() => setShowCreate((current) => !current)}>
-          <Plus className="size-4" aria-hidden="true" />
-          Añadir jugador
-        </Button>
-      </div>
+      <section className="mb-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">
+              Gestión deportiva
+            </p>
+            <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+              Jugadores, categorías y equipos
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Esta vista se centra en la organización deportiva. La asignación de cuotas se gestiona
+              desde Administración para mantener separadas plantilla y contabilidad.
+            </p>
+          </div>
+          <Button onClick={() => setShowCreate((current) => !current)}>
+            <Plus className="size-4" aria-hidden="true" />
+            Añadir jugador
+          </Button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <SportsSummaryCard
+            title="Deportistas"
+            value={String(athletes.length)}
+            detail={`${filtered.length} visibles con los filtros actuales`}
+            icon={Trophy}
+          />
+          <SportsSummaryCard
+            title="Con equipo"
+            value={String(assignedTeamCount)}
+            detail={`${withoutTeamCount} pendientes de asignar`}
+            icon={Shield}
+            tone="green"
+          />
+          <SportsSummaryCard
+            title="Matriculados"
+            value={String(matriculatedCount)}
+            detail="Disponibles administrativamente para competir"
+            icon={UserCheck}
+            tone="green"
+          />
+        </div>
+      </section>
 
       <AdminFormDialog
         open={showCreate}
@@ -205,31 +348,76 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         }
       >
         <form id="create-athlete-form" ref={createFormRef} action={createAction} className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Input name="nombre" placeholder="Nombre" required />
-            <Input name="apellidos" placeholder="Apellidos" required />
-            <Input name="fechaNacimiento" type="date" required />
-            <Input name="documento" placeholder="Documento" required />
-            <select name="guardianId" className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-              <option value="">Sin tutor</option>
-              {tutors.map((tutor) => <option key={tutor.id} value={tutor.id}>{tutor.nombre}</option>)}
-            </select>
-            <select name="categoryId" required className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-              <option value="">Categoría</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
-            </select>
-            <select name="assignedTeamId" className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-              <option value="">Sin equipo</option>
-              {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
-            </select>
-            <select name="seasonId" required className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-              <option value="">Temporada</option>
-              {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
-            </select>
-            <select name="status" defaultValue="pendiente" className="h-9 rounded-lg border border-input bg-white px-3 text-sm">
-              {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-            </select>
+          <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+            <AthleteFormSection
+              title="Datos personales"
+              description="Información básica para identificar al jugador."
+              icon={UserCheck}
+            >
+              <div className="grid gap-3 md:grid-cols-2">
+                <AthleteField label="Nombre" htmlFor="create-athlete-name">
+                  <Input id="create-athlete-name" name="nombre" placeholder="Nombre" required />
+                </AthleteField>
+                <AthleteField label="Apellidos" htmlFor="create-athlete-last-name">
+                  <Input id="create-athlete-last-name" name="apellidos" placeholder="Apellidos" required />
+                </AthleteField>
+                <AthleteField label="Fecha de nacimiento" htmlFor="create-athlete-birth-date">
+                  <Input id="create-athlete-birth-date" name="fechaNacimiento" type="date" required />
+                </AthleteField>
+                <AthleteField label="Documento" htmlFor="create-athlete-document">
+                  <Input id="create-athlete-document" name="documento" placeholder="DNI, NIE o documento" required />
+                </AthleteField>
+              </div>
+            </AthleteFormSection>
+
+            <AthleteFormSection
+              title="Familia"
+              description="Tutor responsable vinculado al deportista."
+              icon={Shield}
+            >
+              <AthleteField label="Tutor" htmlFor="create-athlete-guardian">
+                <select id="create-athlete-guardian" name="guardianId" className={FORM_SELECT_CLASS}>
+                  <option value="">Sin tutor asignado</option>
+                  {tutors.map((tutor) => <option key={tutor.id} value={tutor.id}>{tutor.nombre}</option>)}
+                </select>
+              </AthleteField>
+              <p className="mt-3 rounded-lg bg-muted/50 px-3 py-2 text-xs font-semibold leading-5 text-muted-foreground">
+                Las cuotas se asignan desde Administración cuando el jugador ya tenga tutor pagador.
+              </p>
+            </AthleteFormSection>
           </div>
+
+          <AthleteFormSection
+            title="Organización deportiva"
+            description="Categoría solicitada, equipo, temporada y estado de matrícula."
+            icon={Trophy}
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <AthleteField label="Categoría" htmlFor="create-athlete-category">
+                <select id="create-athlete-category" name="categoryId" required className={FORM_SELECT_CLASS}>
+                  <option value="">Selecciona categoría</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
+                </select>
+              </AthleteField>
+              <AthleteField label="Equipo" htmlFor="create-athlete-team">
+                <select id="create-athlete-team" name="assignedTeamId" className={FORM_SELECT_CLASS}>
+                  <option value="">Sin equipo asignado</option>
+                  {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
+                </select>
+              </AthleteField>
+              <AthleteField label="Temporada" htmlFor="create-athlete-season">
+                <select id="create-athlete-season" name="seasonId" required className={FORM_SELECT_CLASS}>
+                  <option value="">Selecciona temporada</option>
+                  {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
+                </select>
+              </AthleteField>
+              <AthleteField label="Estado" htmlFor="create-athlete-status">
+                <select id="create-athlete-status" name="status" defaultValue="pendiente" className={FORM_SELECT_CLASS}>
+                  {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+                </select>
+              </AthleteField>
+            </div>
+          </AthleteFormSection>
           {createState.message && createState.ok ? (
             <p className={cn('rounded-lg px-3 py-2 text-sm font-semibold', createState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
               {createState.message}
@@ -238,116 +426,77 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         </form>
       </AdminFormDialog>
 
-      {canManageFees ? (
       <AdminFormDialog
-        open={Boolean(assigningAthlete)}
+        open={Boolean(viewingAthlete)}
         onOpenChange={(open) => {
-          if (!open) setAssigningAthlete(null)
+          if (!open) setViewingAthlete(null)
         }}
-        title="Asignar cuota"
-        description="Programa una cuota para el deportista. El cobro se hará al tutor asignado."
-        maxWidth="lg"
+        title="Ficha del deportista"
+        description="Resumen separado de datos deportivos y administración familiar."
+        maxWidth="xl"
         footer={
-          <>
-            <Button type="button" variant="outline" onClick={() => setAssigningAthlete(null)}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              form="assign-athlete-fee-form"
-              disabled={feeAssignmentPending || !assigningAthlete?.guardianId || feeTemplates.length === 0}
-            >
-              {feeAssignmentPending ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
-              Programar cuota
-            </Button>
-          </>
+          viewingAthlete ? (
+            <>
+              <Button type="button" variant="outline" onClick={() => setViewingAthlete(null)}>
+                Cerrar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  openEdit(viewingAthlete)
+                  setViewingAthlete(null)
+                }}
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+                Editar
+              </Button>
+            </>
+          ) : null
         }
       >
-        {assigningAthlete ? (
-          <form id="assign-athlete-fee-form" action={feeAssignmentAction} className="space-y-4">
-            <input type="hidden" name="athleteId" value={assigningAthlete.id} />
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
-              <p className="font-black text-foreground">{assigningAthlete.nombre}</p>
-              <p className="text-muted-foreground">Tutor pagador: {assigningAthlete.tutor}</p>
+        {viewingAthlete ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-700 to-blue-500 p-5 text-white shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-50">
+                    Deportista
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">{viewingAthlete.nombre}</h2>
+                  <p className="mt-2 text-sm font-semibold text-blue-50">
+                    {viewingAthlete.categoriaSolicitada} · {viewingAthlete.temporada}
+                  </p>
+                </div>
+                <span className={cn('rounded-full bg-white px-3 py-1 text-xs font-black', ESTADO_STYLES[viewingAthlete.estadoMatricula])}>
+                  {viewingAthlete.estadoMatricula}
+                </span>
+              </div>
             </div>
 
-            {!assigningAthlete.guardianId ? (
-              <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
-                Este deportista no tiene tutor asignado. Asigna primero un tutor para poder programar una cuota.
-              </p>
-            ) : feeTemplates.length === 0 ? (
-              <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
-                Primero crea una cuota en Contabilidad &gt; Cuotas.
-              </p>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <label htmlFor="athlete-fee-template" className="text-sm font-black text-foreground">
-                    Tipo de cuota
-                  </label>
-                  <select
-                    id="athlete-fee-template"
-                    name="feeTemplateId"
-                    className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    required
-                  >
-                    <option value="">Selecciona cuota</option>
-                    {feeTemplates.map((fee) => (
-                      <option key={fee.id} value={fee.id}>
-                        {fee.nombre} · {fee.importe.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
-                      </option>
-                    ))}
-                  </select>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AthleteProfileBlock title="Deportivo" icon={Trophy}>
+                <div className="grid gap-3">
+                  <AthleteProfileItem label="Categoría" value={viewingAthlete.categoriaSolicitada} />
+                  <AthleteProfileItem label="Equipo" value={viewingAthlete.equipoAsignado} />
+                  <AthleteProfileItem label="Temporada" value={viewingAthlete.temporada} />
                 </div>
-                <div>
-                  <label htmlFor="athlete-start-month" className="text-sm font-black text-foreground">
-                    Mes de inicio
-                  </label>
-                  <Input id="athlete-start-month" name="startMonth" type="month" className="mt-2 bg-white" required />
-                </div>
-                <div>
-                  <label htmlFor="athlete-charge-day" className="text-sm font-black text-foreground">
-                    Día de cobro
-                  </label>
-                  <select
-                    id="athlete-charge-day"
-                    name="chargeDay"
-                    className="mt-2 h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    defaultValue="1"
-                    required
-                  >
-                    {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
-                      <option key={day} value={day}>
-                        Día {day}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+              </AthleteProfileBlock>
 
-            {feeAssignmentState.message && feeAssignmentState.ok ? (
-              <p className={cn('rounded-lg px-3 py-2 text-sm font-semibold', feeAssignmentState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
-                {feeAssignmentState.message}
-              </p>
-            ) : null}
-
-            {(assignmentsByAthlete.get(assigningAthlete.id)?.length ?? 0) > 0 ? (
-              <div className="grid gap-2">
-                {assignmentsByAthlete.get(assigningAthlete.id)?.map((assignment) => (
-                  <div key={assignment.id} className="rounded-lg border border-border bg-white px-3 py-2 text-sm">
-                    <p className="font-black text-foreground">{assignment.feeName}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Próximo cargo: {assignment.nextChargeDate} · {assignment.scheduledCharges} pendientes · {assignment.paidCharges} pagados
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </form>
+              <AthleteProfileBlock title="Administración" icon={UserCheck}>
+                <div className="grid gap-3">
+                  <AthleteProfileItem label="Tutor pagador" value={viewingAthlete.tutor} />
+                  <AthleteProfileItem label="Estado matrícula" value={viewingAthlete.estadoMatricula} />
+                  <AthleteProfileItem
+                    label="Tutor asignado"
+                    value={viewingAthlete.guardianId ? 'Sí' : 'No'}
+                  />
+                </div>
+              </AthleteProfileBlock>
+            </div>
+          </div>
         ) : null}
       </AdminFormDialog>
-      ) : null}
 
       <AdminFormDialog
         open={Boolean(editId)}
@@ -380,56 +529,100 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         }
       >
         {draft ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-black text-foreground">Tutor</label>
-              <select
-                value={draft.guardianId}
-                onChange={(event) => setDraft((prev) => prev && { ...prev, guardianId: event.target.value })}
-                className="h-10 rounded-md border border-input bg-white px-3 text-sm text-foreground"
-              >
-                <option value="">Sin tutor</option>
-                {tutors.map((tutor) => (
-                  <option key={tutor.id} value={tutor.id}>
-                    {tutor.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-black text-foreground">Categoría</label>
-              <select value={draft.categoryId} onChange={(event) => setDraft((prev) => prev && { ...prev, categoryId: event.target.value })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
-                {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-black text-foreground">Equipo</label>
-              <select value={draft.assignedTeamId} onChange={(event) => setDraft((prev) => prev && { ...prev, assignedTeamId: event.target.value })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
-                <option value="">Sin equipo asignado</option>
-                {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-black text-foreground">Temporada</label>
-              <select value={draft.seasonId} onChange={(event) => setDraft((prev) => prev && { ...prev, seasonId: event.target.value })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
-                {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <label className="text-sm font-black text-foreground">Estado</label>
-              <select value={draft.status} onChange={(event) => setDraft((prev) => prev && { ...prev, status: event.target.value as Draft['status'] })} className="h-10 rounded-md border border-input bg-white px-3 text-sm">
-                {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-              </select>
-            </div>
+          <div className="space-y-4">
+            <AthleteFormSection
+              title="Familia y matrícula"
+              description="Tutor vinculado y situación administrativa del jugador."
+              icon={UserCheck}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AthleteField label="Tutor" htmlFor="edit-athlete-guardian">
+                  <select
+                    id="edit-athlete-guardian"
+                    value={draft.guardianId}
+                    onChange={(event) => setDraft((prev) => prev && { ...prev, guardianId: event.target.value })}
+                    className={FORM_SELECT_CLASS}
+                  >
+                    <option value="">Sin tutor asignado</option>
+                    {tutors.map((tutor) => (
+                      <option key={tutor.id} value={tutor.id}>
+                        {tutor.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </AthleteField>
+                <AthleteField label="Estado" htmlFor="edit-athlete-status">
+                  <select
+                    id="edit-athlete-status"
+                    value={draft.status}
+                    onChange={(event) => setDraft((prev) => prev && { ...prev, status: event.target.value as Draft['status'] })}
+                    className={FORM_SELECT_CLASS}
+                  >
+                    {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+                  </select>
+                </AthleteField>
+              </div>
+            </AthleteFormSection>
+
+            <AthleteFormSection
+              title="Organización deportiva"
+              description="Ajusta categoría, equipo y temporada sin mezclarlo con cuotas."
+              icon={Trophy}
+            >
+              <div className="grid gap-3 sm:grid-cols-3">
+                <AthleteField label="Categoría" htmlFor="edit-athlete-category">
+                  <select
+                    id="edit-athlete-category"
+                    value={draft.categoryId}
+                    onChange={(event) => setDraft((prev) => prev && { ...prev, categoryId: event.target.value })}
+                    className={FORM_SELECT_CLASS}
+                  >
+                    {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
+                  </select>
+                </AthleteField>
+                <AthleteField label="Equipo" htmlFor="edit-athlete-team">
+                  <select
+                    id="edit-athlete-team"
+                    value={draft.assignedTeamId}
+                    onChange={(event) => setDraft((prev) => prev && { ...prev, assignedTeamId: event.target.value })}
+                    className={FORM_SELECT_CLASS}
+                  >
+                    <option value="">Sin equipo asignado</option>
+                    {teams.map((team) => <option key={team.id} value={team.id}>{team.nombre}</option>)}
+                  </select>
+                </AthleteField>
+                <AthleteField label="Temporada" htmlFor="edit-athlete-season">
+                  <select
+                    id="edit-athlete-season"
+                    value={draft.seasonId}
+                    onChange={(event) => setDraft((prev) => prev && { ...prev, seasonId: event.target.value })}
+                    className={FORM_SELECT_CLASS}
+                  >
+                    {seasons.map((season) => <option key={season.id} value={season.id}>{season.nombre}</option>)}
+                  </select>
+                </AthleteField>
+              </div>
+            </AthleteFormSection>
           </div>
         ) : null}
       </AdminFormDialog>
 
       <div className="mb-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-lg font-black tracking-tight text-foreground">Plantilla deportiva</p>
+            <p className="text-sm font-semibold text-muted-foreground">
+              Filtra por categoría, equipo, estado o temporada.
+            </p>
+          </div>
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            {filtered.length} de {athletes.length}
+          </span>
+        </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input type="search" placeholder="Búsqueda general" value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" />
+            <Input type="search" placeholder="Buscar por jugador, tutor, categoría, equipo o estado" value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" />
           </div>
           {hasActiveFilters ? (
             <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
@@ -507,7 +700,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Nombre</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Jugador</th>
               <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Tutor</th>
               <th className="min-w-48 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Categoría</th>
               <th className="min-w-48 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Equipo</th>
@@ -527,17 +720,11 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
 
             {filtered.map((athlete) => {
               const isDeleting = deleteId === athlete.id
-              const athleteAssignments = assignmentsByAthlete.get(athlete.id) ?? []
 
               return (
                 <tr key={athlete.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
                   <td className="px-4 py-3 font-medium">
                     <p>{athlete.nombre}</p>
-                    {canManageFees && athleteAssignments.length > 0 ? (
-                      <p className="mt-1 text-xs font-semibold text-primary">
-                        {athleteAssignments.length} cuota{athleteAssignments.length !== 1 ? 's' : ''} asignada{athleteAssignments.length !== 1 ? 's' : ''}
-                      </p>
-                    ) : null}
                   </td>
                   <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
                     {athlete.tutor}
@@ -569,22 +756,13 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
                       </div>
                     ) : (
                       <div className="flex justify-end gap-1">
+                        <Button size="icon-sm" variant="ghost" aria-label="Ver ficha del deportista" onClick={() => setViewingAthlete(athlete)}>
+                          <Eye className="size-4" />
+                        </Button>
                         <Button size="icon-sm" variant="ghost" aria-label="Editar deportista" onClick={() => openEdit(athlete)}>
                           <Pencil className="size-4" />
                         </Button>
-                        {canManageFees ? (
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label="Asignar cuota"
-                            title={athlete.guardianId ? 'Asignar cuota' : 'Asigna primero un tutor'}
-                            disabled={!athlete.guardianId}
-                            onClick={() => setAssigningAthlete(athlete)}
-                          >
-                            <CreditCard className="size-4" />
-                          </Button>
-                        ) : null}
-                        <Button size="icon-sm" variant="destructive" aria-label="Eliminar deportista" onClick={() => { setEditId(null); setDraft(null); setDeleteId(athlete.id) }}>
+                        <Button size="icon-sm" variant="destructive" aria-label="Eliminar deportista" onClick={() => { setViewingAthlete(null); setEditId(null); setDraft(null); setDeleteId(athlete.id) }}>
                           <Trash2 className="size-4" />
                         </Button>
                       </div>
@@ -600,8 +778,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
       <AdminErrorDialog
         message={
           actionError ??
-          (createState.message && !createState.ok ? createState.message : null) ??
-          (feeAssignmentState.message && !feeAssignmentState.ok ? feeAssignmentState.message : null)
+          (createState.message && !createState.ok ? createState.message : null)
         }
         onClose={() => setActionError(null)}
       />

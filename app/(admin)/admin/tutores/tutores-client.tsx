@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useMemo, useRef, useState, useTransition } from 'react'
+import type { ReactNode } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { AlertTriangle, CheckCircle2, CreditCard, KeyRound, Loader2, Pencil, Plus, Search, Trash2, UserCheck, Users, X, XCircle } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
@@ -77,6 +78,79 @@ function IconStatus({
   )
 }
 
+function TutorSummaryCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  tone,
+}: {
+  title: string
+  value: string | number
+  detail: string
+  icon: typeof Users
+  tone: 'blue' | 'green' | 'amber' | 'red'
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-white/88 p-4 shadow-sm backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+          <p className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</p>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">{detail}</p>
+        </div>
+        <span
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-xl',
+            tone === 'blue' && 'bg-primary/10 text-primary',
+            tone === 'green' && 'bg-emerald-100 text-emerald-700',
+            tone === 'amber' && 'bg-amber-100 text-amber-700',
+            tone === 'red' && 'bg-rose-100 text-rose-700',
+          )}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function TutorFormSection({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string
+  description: string
+  icon: typeof Users
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-foreground">{title}</p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function TutorField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-black text-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
+
 function getNextCharge(assignments?: AdminTutorFeeAssignmentRow[]) {
   const assignment = assignments?.find((item) => item.status === 'active' && item.scheduledCharges > 0)
   if (!assignment) return null
@@ -146,6 +220,10 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
   const pendingTutors = tutors.filter((tutor) => tutor.approvalStatus === 'pending')
   const rejectedTutors = tutors.filter((tutor) => tutor.approvalStatus === 'rejected')
+  const approvedTutors = tutors.filter((tutor) => tutor.approvalStatus === 'approved')
+  const tutorMembers = approvedTutors.filter((tutor) => tutor.isSocio).length
+  const tutorsWithAthletes = approvedTutors.filter((tutor) => tutor.deportistasAsociados > 0).length
+  const activeFeeAssignments = feeAssignments.filter((assignment) => assignment.status === 'active').length
   const assignmentsByGuardian = useMemo(() => {
     const map = new Map<string, AdminTutorFeeAssignmentRow[]>()
     for (const assignment of feeAssignments) {
@@ -224,12 +302,70 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones de tutores y socios">
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">
+              Administración familiar
+            </p>
+            <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+              Tutores, socios y estado económico
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Separa familias, socios del club, solicitudes pendientes y cuotas activas vinculadas a tutores.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              setEditingTutor(null)
+              setShowTutorForm(true)
+              setActiveTab('tutores')
+            }}
+          >
+            <Plus className="size-4" />
+            Crear tutor
+          </Button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <TutorSummaryCard
+            title="Tutores"
+            value={approvedTutors.length}
+            detail={`${tutorsWithAthletes} con deportistas asociados`}
+            icon={Users}
+            tone="blue"
+          />
+          <TutorSummaryCard
+            title="Socios"
+            value={members.length}
+            detail={`${tutorMembers} tutores también son socios`}
+            icon={UserCheck}
+            tone="green"
+          />
+          <TutorSummaryCard
+            title="Pendientes"
+            value={pendingTutors.length}
+            detail="Solicitudes esperando revisión"
+            icon={AlertTriangle}
+            tone="amber"
+          />
+          <TutorSummaryCard
+            title="Cuotas activas"
+            value={activeFeeAssignments}
+            detail="Asignaciones vinculadas a familias"
+            icon={CreditCard}
+            tone="green"
+          />
+        </div>
+      </section>
+
+      <div className="grid gap-2 border-b border-border pb-3 sm:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="Secciones de tutores y socios">
         {[
-          { id: 'tutores', label: 'Tutores' },
-          { id: 'socios', label: 'Socios' },
-          { id: 'pendientes', label: 'Tutores pendientes' },
-          { id: 'rechazados', label: 'Tutores rechazados' },
+          { id: 'tutores', label: 'Tutores', count: approvedTutors.length, helper: 'Familias activas' },
+          { id: 'socios', label: 'Socios', count: members.length, helper: 'Socios del club' },
+          { id: 'pendientes', label: 'Pendientes', count: pendingTutors.length, helper: 'Por aprobar' },
+          { id: 'rechazados', label: 'Rechazados', count: rejectedTutors.length, helper: 'Solicitudes no aceptadas' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -238,32 +374,27 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
             aria-selected={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id as typeof activeTab)}
             className={cn(
-              'rounded-full px-4 py-2 text-sm font-black uppercase transition-colors',
+              'rounded-xl px-4 py-3 text-left text-sm font-black transition-colors',
               activeTab === tab.id
                 ? 'bg-primary text-white shadow-sm'
                 : 'bg-white/75 text-muted-foreground ring-1 ring-foreground/10 hover:bg-primary/10 hover:text-primary',
             )}
           >
-            {tab.label}
+            <span className="flex items-center justify-between gap-3">
+              <span>{tab.label}</span>
+              <span className={cn('rounded-full px-2 py-0.5 text-xs', activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary')}>
+                {tab.count}
+              </span>
+            </span>
+            <span className={cn('mt-1 block text-xs font-semibold', activeTab === tab.id ? 'text-white/75' : 'text-muted-foreground')}>
+              {tab.helper}
+            </span>
           </button>
         ))}
       </div>
 
       {activeTab === 'tutores' ? (
         <section className="space-y-5">
-          <div className="flex flex-wrap items-center justify-start gap-3">
-            <Button
-              type="button"
-              onClick={() => {
-                setEditingTutor(null)
-                setShowTutorForm(true)
-              }}
-            >
-              <Plus className="size-4" />
-              Crear tutor
-            </Button>
-          </div>
-
           <Dialog.Root
             open={showTutorForm || Boolean(editingTutor)}
             onOpenChange={(open) => {
@@ -295,35 +426,90 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                   <form key={editingTutor?.id ?? 'new-tutor'} ref={tutorFormRef} action={tutorAction} className="space-y-4">
                     <input type="hidden" name="id" value={editingTutor?.id ?? ''} />
                     <input type="hidden" name="userId" value={editingTutor?.userId ?? ''} />
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Input name="nombre" placeholder="Nombre" defaultValue={editingTutor?.nombre.split(' ')[0] ?? ''} required />
-                      <Input name="apellidos" placeholder="Apellidos" defaultValue={editingTutor ? editingTutor.nombre.split(' ').slice(1).join(' ') : ''} required />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Input name="email" type="email" placeholder="Email" defaultValue={editingTutor?.email ?? ''} required />
-                      {!editingTutor ? (
-                        <Input name="password" type="password" placeholder="Contraseña" minLength={8} required />
-                      ) : (
-                        <Input value="La contraseña no se edita desde aquí" readOnly className="text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <Input name="telefono" placeholder="Teléfono" defaultValue={editingTutor?.telefono ?? ''} required />
-                      <Input name="documento" placeholder="DNI/NIE" defaultValue={editingTutor?.documento ?? ''} required />
-                      <Input name="ciudad" placeholder="Ciudad" defaultValue={editingTutor?.ciudad ?? ''} required />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                        <input type="checkbox" name="isSocio" className="size-4" defaultChecked={editingTutor?.isSocio ?? false} />
-                        También es socio
-                      </label>
-                      {!editingTutor ? (
-                        <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
-                          <input type="checkbox" name="imageConsent" className="size-4" />
-                          Acepta consentimiento de imagen
+                    <TutorFormSection
+                      title="Identidad"
+                      description="Nombre legal y documento del tutor."
+                      icon={Users}
+                    >
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <TutorField label="Nombre">
+                          <Input name="nombre" placeholder="Nombre" defaultValue={editingTutor?.nombre.split(' ')[0] ?? ''} required />
+                        </TutorField>
+                        <TutorField label="Apellidos">
+                          <Input name="apellidos" placeholder="Apellidos" defaultValue={editingTutor ? editingTutor.nombre.split(' ').slice(1).join(' ') : ''} required />
+                        </TutorField>
+                        <TutorField label="DNI/NIE">
+                          <Input name="documento" placeholder="DNI/NIE" defaultValue={editingTutor?.documento ?? ''} required />
+                        </TutorField>
+                      </div>
+                    </TutorFormSection>
+
+                    <TutorFormSection
+                      title="Acceso"
+                      description="Cuenta con la que el tutor entra en la zona privada."
+                      icon={KeyRound}
+                    >
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <TutorField label="Email">
+                          <Input name="email" type="email" placeholder="Email" defaultValue={editingTutor?.email ?? ''} required />
+                        </TutorField>
+                        <TutorField label="Contraseña">
+                          {!editingTutor ? (
+                            <Input name="password" type="password" placeholder="Contraseña" minLength={8} required />
+                          ) : (
+                            <Input value="La contraseña no se edita desde aquí" readOnly className="text-muted-foreground" />
+                          )}
+                        </TutorField>
+                      </div>
+                    </TutorFormSection>
+
+                    <TutorFormSection
+                      title="Contacto"
+                      description="Datos básicos para comunicaciones administrativas."
+                      icon={UserCheck}
+                    >
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <TutorField label="Teléfono">
+                          <Input name="telefono" placeholder="Teléfono" defaultValue={editingTutor?.telefono ?? ''} required />
+                        </TutorField>
+                        <TutorField label="Ciudad">
+                          <Input name="ciudad" placeholder="Ciudad" defaultValue={editingTutor?.ciudad ?? ''} required />
+                        </TutorField>
+                      </div>
+                    </TutorFormSection>
+
+                    <TutorFormSection
+                      title="Socio y consentimientos"
+                      description="Configuración inicial de socio y autorización de imagen."
+                      icon={CheckCircle2}
+                    >
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-3 py-3 text-sm font-semibold">
+                          <input type="checkbox" name="isSocio" className="mt-0.5 size-4 accent-primary" defaultChecked={editingTutor?.isSocio ?? false} />
+                          <span>
+                            <span className="block font-black text-foreground">También es socio</span>
+                            <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                              Marca al tutor como socio del club desde el alta.
+                            </span>
+                          </span>
                         </label>
-                      ) : null}
-                    </div>
+                        {!editingTutor ? (
+                          <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-3 py-3 text-sm font-semibold">
+                            <input type="checkbox" name="imageConsent" className="mt-0.5 size-4 accent-primary" />
+                            <span>
+                              <span className="block font-black text-foreground">Acepta imagen</span>
+                              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                                Registra el consentimiento de derechos de imagen al crear el tutor.
+                              </span>
+                            </span>
+                          </label>
+                        ) : (
+                          <p className="rounded-lg bg-muted/50 px-3 py-3 text-sm font-semibold text-muted-foreground">
+                            Los consentimientos ya firmados se revisan desde su apartado correspondiente.
+                          </p>
+                        )}
+                      </div>
+                    </TutorFormSection>
                     <FormMessage state={tutorState} />
                     <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
                       <Dialog.Close render={<Button type="button" variant="outline" disabled={tutorPending} />}>
@@ -346,90 +532,85 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
               <Input value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} placeholder="Buscar por tutor, email, teléfono o ciudad" className="pl-9" />
             </div>
             {toggleMessage?.message && toggleMessage.ok ? <FormMessage state={toggleMessage} /> : null}
-            <div className="mt-4 overflow-hidden rounded-xl ring-1 ring-foreground/10">
-              <table className="w-full table-fixed text-sm">
-                <colgroup>
-                  <col className="w-[15%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[14%]" />
-                </colgroup>
-                <thead>
-                  <tr className="border-b border-border bg-blue-50 text-center text-xs font-bold text-blue-950">
-                    <th className="px-3 py-2.5 text-center">Nombre</th>
-                    <th className="px-2 py-2.5 text-center">DNI/NIE</th>
-                    <th className="px-2 py-2.5 text-center">Teléfono</th>
-                    <th className="px-2 py-2.5 text-center">Ciudad</th>
-                    <th className="px-2 py-2.5 text-center">Socio</th>
-                    <th className="px-2 py-2.5 text-center">Deportistas</th>
-                    <th className="px-2 py-2.5 text-center">Consentimientos</th>
-                    <th className="px-2 py-2.5 text-center">Tarjeta</th>
-                    <th className="px-2 py-2.5 text-center">Próximo cargo</th>
-                    <th className="px-3 py-2.5 text-center">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-card">
-                  {visibleTutors.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                        No hay tutores que coincidan con la búsqueda.
-                      </td>
-                    </tr>
-                  ) : null}
+            <div className="mt-4 grid gap-3">
+              {visibleTutors.length === 0 ? (
+                <p className="rounded-xl bg-muted px-4 py-14 text-center text-sm text-muted-foreground">
+                  No hay tutores que coincidan con la búsqueda.
+                </p>
+              ) : null}
 
-                  {visibleTutors.map((tutor) => {
-                    const nextCharge = getNextCharge(assignmentsByGuardian.get(tutor.id))
-                    const consentStatus = getConsentStatus(tutor)
-                    const cardStatus = getCardStatus(tutor)
+              {visibleTutors.map((tutor) => {
+                const nextCharge = getNextCharge(assignmentsByGuardian.get(tutor.id))
+                const consentStatus = getConsentStatus(tutor)
+                const cardStatus = getCardStatus(tutor)
 
-                    return (
-                    <tr key={tutor.id} className="transition-colors hover:bg-muted/30">
-                      <td className="min-w-0 px-3 py-3 text-center">
-                        <p className="truncate font-semibold text-foreground" title={tutor.nombre}>{tutor.nombre}</p>
-                        <p className="truncate text-xs text-muted-foreground" title={tutor.email}>{tutor.email}</p>
-                      </td>
-                      <td className="px-2 py-3 text-center">{maskDocument(tutor.documento)}</td>
-                      <td className="whitespace-nowrap px-2 py-3 text-center">{formatSpanishPhone(tutor.telefono)}</td>
-                      <td className="truncate px-2 py-3 text-center" title={tutor.ciudad}>{tutor.ciudad}</td>
-                      <td className="px-2 py-3 text-center">
+                return (
+                  <article key={tutor.id} className="rounded-xl border border-border bg-white p-4 shadow-sm">
+                    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.85fr_0.95fr_auto]">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', tutor.isSocio ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
+                            {tutor.isSocio ? 'Socio' : 'Tutor'}
+                          </span>
+                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                            {tutor.deportistasAsociados} deportista{tutor.deportistasAsociados !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-lg font-black leading-tight text-foreground">{tutor.nombre}</p>
+                        <p className="mt-1 truncate text-sm font-semibold text-muted-foreground" title={tutor.email}>
+                          {tutor.email}
+                        </p>
+                        <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                          <span>{maskDocument(tutor.documento)}</span>
+                          <span>{formatSpanishPhone(tutor.telefono)}</span>
+                          <span className="truncate" title={tutor.ciudad}>{tutor.ciudad}</span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/40 px-3 py-3">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Estado familiar</p>
+                        <div className="mt-3 flex items-center gap-3">
+                          <IconStatus {...consentStatus} />
+                          <div>
+                            <p className="text-sm font-black text-foreground">Consentimientos</p>
+                            <p className="text-xs font-semibold text-muted-foreground">{consentStatus.title}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center gap-3">
+                          <IconStatus {...cardStatus} />
+                          <div>
+                            <p className="text-sm font-black text-foreground">Tarjeta</p>
+                            <p className="text-xs font-semibold text-muted-foreground">{cardStatus.title}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg bg-primary/5 px-3 py-3">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">Próximo cargo</p>
+                        {nextCharge ? (
+                          <div className="mt-2" title={`${nextCharge.label}. ${nextCharge.detail}.`}>
+                            <p className="font-black text-foreground">{nextCharge.label}</p>
+                            <p className="mt-1 text-sm font-semibold text-muted-foreground">{nextCharge.detail}</p>
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-sm font-semibold text-muted-foreground">Sin cargo programado</p>
+                        )}
                         <Button
                           type="button"
                           size="sm"
                           variant={tutor.isSocio ? 'default' : 'outline'}
                           disabled={isPending && pendingToggleId === tutor.userId}
                           onClick={() => handleToggleTutor(tutor)}
-                          className="h-8 px-2 text-xs"
+                          className="mt-3"
                         >
                           {pendingToggleId === tutor.userId ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
-                          {tutor.isSocio ? 'Sí' : 'No'}
+                          {tutor.isSocio ? 'Desmarcar socio' : 'Marcar socio'}
                         </Button>
-                      </td>
-                      <td className="px-2 py-3 text-center font-semibold">{tutor.deportistasAsociados}</td>
-                      <td className="px-2 py-3 text-center">
-                        <IconStatus {...consentStatus} />
-                      </td>
-                      <td className="px-2 py-3 text-center">
-                        <IconStatus {...cardStatus} />
-                      </td>
-                      <td className="min-w-0 px-2 py-3 text-center">
-                        {nextCharge ? (
-                          <div title={`${nextCharge.label}. ${nextCharge.detail}.`} className="min-w-0">
-                            <p className="truncate text-xs font-black text-primary">{nextCharge.label}</p>
-                            <p className="truncate text-xs font-semibold text-muted-foreground">{nextCharge.detail}</p>
-                          </div>
-                        ) : (
-                          <span className="text-xs font-semibold text-muted-foreground">Sin cargo</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-center">
+                      </div>
+
+                      <div className="flex items-start justify-end">
                         {confirmDeleteTutorId === tutor.id ? (
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <span className="text-xs text-muted-foreground">¿Eliminar?</span>
                             <Button size="sm" variant="destructive" onClick={() => handleDeleteTutor(tutor)} disabled={isPending}>
                               Sí, eliminar
@@ -439,7 +620,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                             </Button>
                           </div>
                         ) : (
-                          <div className="flex justify-center gap-1">
+                          <div className="flex justify-end gap-1">
                             <Button
                               size="icon-sm"
                               variant="ghost"
@@ -465,12 +646,11 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                             </Button>
                           </div>
                         )}
-                      </td>
-                    </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -479,60 +659,66 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
       {activeTab === 'pendientes' ? (
         <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
           {toggleMessage?.message && toggleMessage.ok ? <FormMessage state={toggleMessage} /> : null}
-          <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
-                  <th className="px-4 py-2.5">Nombre</th>
-                  <th className="px-4 py-2.5">DNI/NIE</th>
-                  <th className="px-4 py-2.5">Teléfono</th>
-                  <th className="px-4 py-2.5">Ciudad</th>
-                  <th className="px-4 py-2.5 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {pendingTutors.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                      No hay tutores pendientes de aprobación.
-                    </td>
-                  </tr>
-                ) : (
-                  pendingTutors.map((tutor) => (
-                    <tr key={tutor.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-foreground">{tutor.nombre}</p>
-                        <p className="text-xs text-muted-foreground">{tutor.email}</p>
-                      </td>
-                      <td className="px-4 py-3">{maskDocument(tutor.documento)}</td>
-                      <td className="px-4 py-3">{formatSpanishPhone(tutor.telefono)}</td>
-                      <td className="px-4 py-3">{tutor.ciudad}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            disabled={approvePendingId === tutor.id}
-                            onClick={() => handleApproveTutor(tutor)}
-                          >
-                            {approvePendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
-                            Aprobar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={rejectPendingId === tutor.id}
-                            onClick={() => handleRejectTutor(tutor)}
-                          >
-                            {rejectPendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                            Rechazar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.16em] text-amber-700">Bandeja de revisión</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">Solicitudes pendientes</h2>
+              <p className="mt-1 text-sm font-semibold text-muted-foreground">Revisa los datos del tutor antes de activar su acceso familiar.</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-700">
+              <AlertTriangle className="size-4" />
+              {pendingTutors.length} por aprobar
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {pendingTutors.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
+                No hay tutores pendientes de aprobación.
+              </div>
+            ) : null}
+            {pendingTutors.map((tutor) => (
+              <article key={tutor.id} className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-700">
+                        <AlertTriangle className="size-3.5" />
+                        Pendiente
+                      </span>
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                        Alta por validar
+                      </span>
+                    </div>
+                    <p className="mt-3 truncate text-lg font-black text-foreground">{tutor.nombre}</p>
+                    <p className="mt-1 truncate text-sm text-muted-foreground">{tutor.email}</p>
+                    <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Documento</p>
+                        <p className="mt-1 font-semibold text-foreground">{maskDocument(tutor.documento)}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Teléfono</p>
+                        <p className="mt-1 font-semibold text-foreground">{formatSpanishPhone(tutor.telefono)}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Ciudad</p>
+                        <p className="mt-1 truncate font-semibold text-foreground" title={tutor.ciudad}>{tutor.ciudad}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <Button size="sm" disabled={approvePendingId === tutor.id} onClick={() => handleApproveTutor(tutor)}>
+                      {approvePendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
+                      Aprobar
+                    </Button>
+                    <Button size="sm" variant="destructive" disabled={rejectPendingId === tutor.id} onClick={() => handleRejectTutor(tutor)}>
+                      {rejectPendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
+                      Rechazar
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       ) : null}
@@ -540,45 +726,62 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
       {activeTab === 'rechazados' ? (
         <section className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
           {toggleMessage?.message && toggleMessage.ok ? <FormMessage state={toggleMessage} /> : null}
-          <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
-                  <th className="px-4 py-2.5">Nombre</th>
-                  <th className="px-4 py-2.5">DNI/NIE</th>
-                  <th className="px-4 py-2.5">Teléfono</th>
-                  <th className="px-4 py-2.5">Ciudad</th>
-                  <th className="px-4 py-2.5 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {rejectedTutors.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                      No hay tutores rechazados.
-                    </td>
-                  </tr>
-                ) : (
-                  rejectedTutors.map((tutor) => (
-                    <tr key={tutor.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-foreground">{tutor.nombre}</p>
-                        <p className="text-xs text-muted-foreground">{tutor.email}</p>
-                      </td>
-                      <td className="px-4 py-3">{maskDocument(tutor.documento)}</td>
-                      <td className="px-4 py-3">{formatSpanishPhone(tutor.telefono)}</td>
-                      <td className="px-4 py-3">{tutor.ciudad}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Button size="sm" onClick={() => handleApproveTutor(tutor)} disabled={approvePendingId === tutor.id}>
-                          {approvePendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
-                          Aprobar
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.16em] text-rose-700">Historial de revisión</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">Solicitudes rechazadas</h2>
+              <p className="mt-1 text-sm font-semibold text-muted-foreground">Puedes reactivar una solicitud si la información ya está corregida.</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-sm font-black text-rose-700">
+              <XCircle className="size-4" />
+              {rejectedTutors.length} rechazados
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {rejectedTutors.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
+                No hay tutores rechazados.
+              </div>
+            ) : null}
+            {rejectedTutors.map((tutor) => (
+              <article key={tutor.id} className="rounded-xl border border-rose-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">
+                        <XCircle className="size-3.5" />
+                        Rechazado
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        Revisión cerrada
+                      </span>
+                    </div>
+                    <p className="mt-3 truncate text-lg font-black text-foreground">{tutor.nombre}</p>
+                    <p className="mt-1 truncate text-sm text-muted-foreground">{tutor.email}</p>
+                    <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Documento</p>
+                        <p className="mt-1 font-semibold text-foreground">{maskDocument(tutor.documento)}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Teléfono</p>
+                        <p className="mt-1 font-semibold text-foreground">{formatSpanishPhone(tutor.telefono)}</p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Ciudad</p>
+                        <p className="mt-1 truncate font-semibold text-foreground" title={tutor.ciudad}>{tutor.ciudad}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex lg:justify-end">
+                    <Button size="sm" onClick={() => handleApproveTutor(tutor)} disabled={approvePendingId === tutor.id}>
+                      {approvePendingId === tutor.id ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
+                      Aprobar
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       ) : null}
@@ -628,11 +831,29 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
           >
             <form id="member-form" key={editingMember?.id ?? 'new-member'} ref={memberFormRef} action={memberAction} className="space-y-4">
               <input type="hidden" name="id" value={editingMember?.id ?? ''} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input name="nombre" placeholder="Nombre" defaultValue={editingMember?.nombre.split(' ')[0] ?? ''} required />
-                <Input name="apellidos" placeholder="Apellidos" defaultValue={editingMember ? editingMember.nombre.split(' ').slice(1).join(' ') : ''} required />
-              </div>
-              <Input name="email" type="email" placeholder="Email" defaultValue={editingMember?.email ?? ''} required />
+              <TutorFormSection
+                title="Identidad del socio"
+                description="Nombre público con el que se identificará dentro del club."
+                icon={UserCheck}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TutorField label="Nombre">
+                    <Input name="nombre" placeholder="Ej. Antonio" defaultValue={editingMember?.nombre.split(' ')[0] ?? ''} required />
+                  </TutorField>
+                  <TutorField label="Apellidos">
+                    <Input name="apellidos" placeholder="Ej. García López" defaultValue={editingMember ? editingMember.nombre.split(' ').slice(1).join(' ') : ''} required />
+                  </TutorField>
+                </div>
+              </TutorFormSection>
+              <TutorFormSection
+                title="Acceso y comunicaciones"
+                description="Email usado para acceder y recibir recuperaciones de contraseña."
+                icon={KeyRound}
+              >
+                <TutorField label="Email">
+                  <Input name="email" type="email" placeholder="socio@correo.com" defaultValue={editingMember?.email ?? ''} required />
+                </TutorField>
+              </TutorFormSection>
               <FormMessage state={memberState} />
             </form>
           </AdminFormDialog>
@@ -648,63 +869,73 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="Buscar por socio, email o estado" className="pl-9" />
             </div>
-            <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
-                    <th className="px-4 py-2.5">Nombre</th>
-                    <th className="px-4 py-2.5">Email</th>
-                    <th className="px-4 py-2.5">Estado</th>
-                    <th className="hidden px-4 py-2.5 lg:table-cell">Alta</th>
-                    <th className="px-4 py-2.5 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-card">
-                  {visibleMembers.map((member) => (
-                    <tr key={member.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3 font-semibold text-foreground">{member.nombre}</td>
-                      <td className="px-4 py-3">{member.email}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
+            <div className="grid gap-3">
+              {visibleMembers.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
+                  No hay socios que coincidan con la búsqueda actual.
+                </div>
+              ) : null}
+              {visibleMembers.map((member) => (
+                <article key={member.id} className="rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50/25">
+                  <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
+                          <UserCheck className="size-3.5" />
                           {member.estado}
                         </span>
-                      </td>
-                      <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{member.fechaAlta}</td>
-                      <td className="px-4 py-3 text-right">
-                        {confirmDeleteMemberId === member.id ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-xs text-muted-foreground">¿Eliminar?</span>
-                            <Button size="sm" variant="destructive" onClick={() => handleDeleteMember(member)} disabled={isPending}>
-                              Sí, eliminar
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => setConfirmDeleteMemberId(null)}>
-                              Cancelar
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex justify-end gap-1">
-                            <Button size="icon-sm" variant="ghost" aria-label="Editar socio" onClick={() => { setEditingMember(member); setShowMemberForm(true) }}>
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label="Enviar recuperación de contraseña"
-                              disabled={recoveryPendingId === member.id}
-                              onClick={() => handleSendRecovery(member)}
-                            >
-                              {recoveryPendingId === member.id ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
-                            </Button>
-                            <Button size="icon-sm" variant="destructive" aria-label="Eliminar socio" onClick={() => setConfirmDeleteMemberId(member.id)}>
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                          Alta {member.fechaAlta}
+                        </span>
+                      </div>
+                      <p className="mt-3 truncate text-lg font-black text-foreground">{member.nombre}</p>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">{member.email}</p>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Acceso</p>
+                          <p className="mt-1 text-sm font-semibold text-foreground">Cuenta de socio activa</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Recuperación</p>
+                          <p className="mt-1 text-sm font-semibold text-foreground">Disponible por email</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-start lg:justify-end">
+                      {confirmDeleteMemberId === member.id ? (
+                        <div className="flex flex-wrap items-center justify-start gap-2 rounded-lg bg-rose-50 p-2 lg:justify-end">
+                          <span className="text-xs font-semibold text-rose-700">¿Eliminar socio?</span>
+                          <Button size="sm" variant="destructive" onClick={() => handleDeleteMember(member)} disabled={isPending}>
+                            Sí, eliminar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setConfirmDeleteMemberId(null)}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1">
+                          <Button size="icon-sm" variant="ghost" aria-label="Editar socio" onClick={() => { setEditingMember(member); setShowMemberForm(true) }}>
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="Enviar recuperación de contraseña"
+                            disabled={recoveryPendingId === member.id}
+                            onClick={() => handleSendRecovery(member)}
+                          >
+                            {recoveryPendingId === member.id ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+                          </Button>
+                          <Button size="icon-sm" variant="destructive" aria-label="Eliminar socio" onClick={() => setConfirmDeleteMemberId(member.id)}>
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
         </section>

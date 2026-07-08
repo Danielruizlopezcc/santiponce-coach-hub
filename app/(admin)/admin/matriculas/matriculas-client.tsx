@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CheckCircle2, Pencil, Search, Trash2, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ClipboardList, CreditCard, Pencil, Search, Trash2, X } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,9 +22,52 @@ const ESTADO_STYLES: Record<AdminEnrollmentRow['estadoMatricula'], string> = {
   Pendiente: 'bg-amber-100 text-amber-700',
 }
 
+const PAGO_STYLES: Record<AdminEnrollmentRow['estadoPago'], string> = {
+  Pagado: 'bg-emerald-100 text-emerald-700',
+  Pendiente: 'bg-amber-100 text-amber-700',
+}
+
 type MatriculasClientProps = {
   enrollments: AdminEnrollmentRow[]
   embedded?: boolean
+}
+
+function EnrollmentSummaryCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  tone = 'blue',
+}: {
+  title: string
+  value: string
+  detail: string
+  icon: typeof ClipboardList
+  tone?: 'blue' | 'green' | 'amber'
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-white/88 p-4 shadow-sm backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+            {title}
+          </p>
+          <p className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</p>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">{detail}</p>
+        </div>
+        <span
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-lg',
+            tone === 'blue' && 'bg-primary/10 text-primary',
+            tone === 'green' && 'bg-emerald-100 text-emerald-700',
+            tone === 'amber' && 'bg-amber-100 text-amber-700',
+          )}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export function MatriculasClient({ enrollments, embedded = false }: MatriculasClientProps) {
@@ -41,6 +84,15 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
   const [actionError, setActionError]         = useState<string | null>(null)
 
   const seasons = Array.from(new Set(enrollments.map((enrollment) => enrollment.temporada))).sort((a, b) => a.localeCompare(b, 'es'))
+  const matriculatedCount = enrollments.filter((enrollment) => enrollment.estadoMatricula === 'Matriculado').length
+  const reviewCount = enrollments.filter((enrollment) => enrollment.estadoMatricula === 'En revisión').length
+  const pendingCount = enrollments.filter((enrollment) => enrollment.estadoMatricula === 'Pendiente').length
+  const paidCount = enrollments.filter((enrollment) => enrollment.estadoPago === 'Pagado').length
+  const pendingPaymentCount = enrollments.filter((enrollment) => enrollment.estadoPago === 'Pendiente').length
+  const expectedTotal = enrollments.reduce((sum, enrollment) => sum + enrollment.importe, 0)
+  const paidTotal = enrollments
+    .filter((enrollment) => enrollment.estadoPago === 'Pagado')
+    .reduce((sum, enrollment) => sum + enrollment.importe, 0)
   const hasFilters = Boolean(search.trim()) || statusFilter !== 'todos' || paymentFilter !== 'todos' || seasonFilter !== 'todos'
   const filtered = enrollments.filter((e) => {
     if (statusFilter !== 'todos' && e.estadoMatricula !== statusFilter) return false
@@ -120,8 +172,60 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
 
   const content = (
     <>
+      <section className="mb-5 space-y-4">
+        <div className="rounded-xl border border-border bg-white/80 p-4 shadow-sm backdrop-blur">
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">
+            Puente administrativo
+          </p>
+          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+            Deportista, tutor y pago en una sola revisión
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+            Esta vista sirve para validar el estado administrativo de cada matrícula. Las cuotas
+            periódicas se gestionan en Cuotas de deportistas; aquí se revisa la matrícula inicial y
+            su estado de pago.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <EnrollmentSummaryCard
+            title="Matrículas"
+            value={String(enrollments.length)}
+            detail={`${matriculatedCount} matriculadas · ${reviewCount} en revisión`}
+            icon={ClipboardList}
+          />
+          <EnrollmentSummaryCard
+            title="Pendientes"
+            value={String(pendingCount)}
+            detail="Deportistas sin checkout iniciado o sin validar"
+            icon={AlertTriangle}
+            tone="amber"
+          />
+          <EnrollmentSummaryCard
+            title="Pagos"
+            value={`${paidCount}/${enrollments.length}`}
+            detail={`${pendingPaymentCount} pagos pendientes`}
+            icon={CreditCard}
+            tone="green"
+          />
+          <EnrollmentSummaryCard
+            title="Importe validado"
+            value={formatEuro(paidTotal)}
+            detail={`${formatEuro(expectedTotal)} previstos en matrículas`}
+            icon={CheckCircle2}
+            tone="green"
+          />
+        </div>
+      </section>
+
       {/* ── Buscador y filtros ──────────────────────────────────── */}
       <div className="mb-4 space-y-3 rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-black text-foreground">Buscar matrículas</p>
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            {filtered.length} de {enrollments.length}
+          </span>
+        </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search
@@ -197,7 +301,8 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
               <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Deportista</th>
               <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Tutor</th>
               <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 lg:table-cell">Temporada</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Estado</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Matrícula</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Pago</th>
               <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Importe</th>
               <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
             </tr>
@@ -205,7 +310,7 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
           <tbody className="divide-y divide-border bg-card">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-14 text-center text-sm text-muted-foreground">
+                <td colSpan={7} className="px-4 py-14 text-center text-sm text-muted-foreground">
                   No hay matrículas que coincidan con la búsqueda.
                 </td>
               </tr>
@@ -233,6 +338,11 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
                   <td className="px-4 py-3">
                     <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', ESTADO_STYLES[row.estadoMatricula])}>
                       {row.estadoMatricula}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', PAGO_STYLES[row.estadoPago])}>
+                      {row.estadoPago}
                     </span>
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">{formatEuro(row.importe)}</td>

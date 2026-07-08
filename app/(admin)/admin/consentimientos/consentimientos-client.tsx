@@ -1,7 +1,7 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Search, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { CheckCircle2, ChevronDown, ChevronRight, FileText, Search, Users, X, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageContainer } from '@/components/page-container'
@@ -11,6 +11,11 @@ import type { AdminConsentRow } from '@/lib/admin-app'
 const ESTADO_STYLES: Record<AdminConsentRow['estado'], string> = {
   Firmado:  'bg-emerald-100 text-emerald-700',
   Revocado: 'bg-destructive/10 text-destructive',
+}
+
+const ESTADO_CARD_STYLES: Record<AdminConsentRow['estado'], string> = {
+  Firmado:  'border-emerald-100 bg-emerald-50/60',
+  Revocado: 'border-rose-100 bg-rose-50/60',
 }
 
 type ConsentGroup = {
@@ -40,6 +45,19 @@ function groupByUser(consents: AdminConsentRow[]): ConsentGroup[] {
 export function ConsentimientosClient({ consents }: { consents: AdminConsentRow[] }) {
   const [search, setSearch]       = useState('')
   const [expanded, setExpanded]   = useState<Set<string>>(new Set())
+
+  const summary = useMemo(() => {
+    const allGroups = groupByUser(consents)
+    const firmados = consents.filter((consent) => consent.estado === 'Firmado').length
+    const revocados = consents.filter((consent) => consent.estado === 'Revocado').length
+
+    return {
+      personas: allGroups.length,
+      total: consents.length,
+      firmados,
+      revocados,
+    }
+  }, [consents])
 
   const groups = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -95,148 +113,195 @@ export function ConsentimientosClient({ consents }: { consents: AdminConsentRow[
       description="Registros de aceptación y firma digital agrupados por persona."
       className="max-w-7xl"
     >
-      {/* ── Cabecera ──────────────────────────────────────────────── */}
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={allExpanded ? collapseAll : expandAll}
-          className="text-muted-foreground"
-        >
-          {allExpanded ? 'Colapsar todo' : 'Expandir todo'}
-        </Button>
+      <div className="mb-6 grid gap-3 md:grid-cols-4">
+        <ConsentSummaryCard
+          title="Personas"
+          value={summary.personas}
+          detail="Con consentimientos"
+          icon={Users}
+          tone="blue"
+        />
+        <ConsentSummaryCard
+          title="Documentos"
+          value={summary.total}
+          detail="Registros guardados"
+          icon={FileText}
+          tone="slate"
+        />
+        <ConsentSummaryCard
+          title="Firmados"
+          value={summary.firmados}
+          detail="Aceptaciones activas"
+          icon={CheckCircle2}
+          tone="green"
+        />
+        <ConsentSummaryCard
+          title="Revocados"
+          value={summary.revocados}
+          detail="A revisar"
+          icon={XCircle}
+          tone="red"
+        />
       </div>
 
-      {/* ── Buscador ──────────────────────────────────────────────── */}
-      <div className="mb-4 flex gap-2">
-        <div className="relative flex-1">
-          <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            type="search"
-            placeholder="Buscar por persona o tipo de consentimiento…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        {search && (
+      <div className="mb-4 rounded-xl border border-border bg-white/82 p-4 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-primary">Administración familiar</p>
+            <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">Control de consentimientos</h2>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">
+              Consulta las firmas por persona, tipo de documento, versión y estado actual.
+            </p>
+          </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSearch('')}
-            className="gap-1.5 text-muted-foreground"
+            onClick={allExpanded ? collapseAll : expandAll}
+            className="text-muted-foreground"
           >
-            <X className="size-3.5" aria-hidden="true" />
-            Limpiar
+            {allExpanded ? 'Colapsar todo' : 'Expandir todo'}
           </Button>
-        )}
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              type="search"
+              placeholder="Buscar por persona o tipo de consentimiento..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {search && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSearch('')}
+              className="gap-1.5 text-muted-foreground"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              Limpiar
+            </Button>
+          )}
+        </div>
+
+        <p className="mt-3 text-xs font-semibold text-muted-foreground">
+          {groups.length} {groups.length === 1 ? 'persona' : 'personas'}
+          {search ? ' · búsqueda activa' : ''}
+        </p>
       </div>
 
-      <p className="mb-2 text-xs text-muted-foreground">
-        {groups.length} {groups.length === 1 ? 'persona' : 'personas'}
-        {search && ` · búsqueda activa`}
-      </p>
+      <div className="grid gap-3">
+        {groups.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-white/70 p-8 text-center text-sm text-muted-foreground">
+            No hay consentimientos que coincidan con la búsqueda.
+          </div>
+        ) : null}
 
-      {/* ── Tabla agrupada ────────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
-              <th className="w-8 px-2 py-2.5" />
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Persona</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Firmados</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Revocados</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Consentimientos</th>
-            </tr>
-          </thead>
+        {groups.map((group) => {
+          const isOpen = expandedWithSearch.has(group.usuario)
 
-          <tbody className="divide-y divide-border bg-card">
-            {groups.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                  No hay consentimientos que coincidan con la búsqueda.
-                </td>
-              </tr>
-            )}
+          return (
+            <article key={group.usuario} className="rounded-xl border border-border bg-white/88 shadow-sm backdrop-blur">
+              <button
+                type="button"
+                className="flex w-full flex-wrap items-center justify-between gap-4 p-4 text-left transition-colors hover:bg-blue-50/40"
+                onClick={() => toggleUser(group.usuario)}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    {isOpen ? <ChevronDown className="size-5" aria-hidden="true" /> : <ChevronRight className="size-5" aria-hidden="true" />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-black text-foreground">{group.usuario}</p>
+                    <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                      {group.rows.length} consentimiento{group.rows.length !== 1 ? 's' : ''}
+                      {isOpen ? ' · desplegado' : ' · haz clic para ver'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
+                    {group.firmados} firmado{group.firmados !== 1 ? 's' : ''}
+                  </span>
+                  <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">
+                    {group.revocados} revocado{group.revocados !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </button>
 
-            {groups.map((group) => {
-              const isOpen = expandedWithSearch.has(group.usuario)
-
-              return (
-                <Fragment key={group.usuario}>
-                  {/* ── Fila de grupo ──────────────────────────── */}
-                  <tr
-                    key={group.usuario}
-                    className="cursor-pointer transition-colors hover:bg-muted/30"
-                    onClick={() => toggleUser(group.usuario)}
-                  >
-                    <td className="px-2 py-3 text-center text-muted-foreground">
-                      {isOpen
-                        ? <ChevronDown className="size-4" aria-hidden="true" />
-                        : <ChevronRight className="size-4" aria-hidden="true" />}
-                    </td>
-                    <td className="px-4 py-3 font-medium">{group.usuario}</td>
-                    <td className="hidden px-4 py-3 sm:table-cell">
-                      {group.firmados > 0 && (
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                          {group.firmados} firmado{group.firmados !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </td>
-                    <td className="hidden px-4 py-3 sm:table-cell">
-                      {group.revocados > 0 ? (
-                        <span className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-medium text-destructive">
-                          {group.revocados} revocado{group.revocados !== 1 ? 's' : ''}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {isOpen
-                        ? 'Haz clic para colapsar'
-                        : `${group.rows.length} consentimiento${group.rows.length !== 1 ? 's' : ''} · haz clic para ver`}
-                    </td>
-                  </tr>
-
-                  {/* ── Filas expandidas ───────────────────────── */}
-                  {isOpen &&
-                    group.rows.map((row) => (
-                      <tr
-                        key={row.id}
-                        className="border-t-0 bg-muted/20"
-                      >
-                        <td className="border-l-2 border-primary/20" />
-                        <td
-                          colSpan={4}
-                          className="px-4 py-2.5"
-                        >
-                          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-6 gap-y-1 text-xs sm:grid-cols-[2fr_auto_auto_auto_auto]">
-                            <span className="font-medium text-foreground">{row.tipoConsentimiento}</span>
-                            <span className="hidden text-muted-foreground sm:inline">{row.version}</span>
-                            <span
-                              className={cn(
-                                'rounded-full px-2 py-0.5 text-xs font-medium',
-                                ESTADO_STYLES[row.estado],
-                              )}
-                            >
-                              {row.estado}
-                            </span>
-                            <span className="hidden text-muted-foreground sm:inline">{row.fecha}</span>
-                            <span className="hidden text-muted-foreground lg:inline">{row.firmante}</span>
+              {isOpen ? (
+                <div className="grid gap-2 border-t border-border bg-slate-50/60 p-3">
+                  {group.rows.map((row) => (
+                    <div key={row.id} className={cn('rounded-lg border p-3', ESTADO_CARD_STYLES[row.estado])}>
+                      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-foreground">{row.tipoConsentimiento}</p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-muted-foreground">
+                            <span>Versión: {row.version}</span>
+                            <span>Fecha: {row.fecha}</span>
+                            <span>Firmante: {row.firmante}</span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
+                        </div>
+                        <span
+                          className={cn(
+                            'inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-black',
+                            ESTADO_STYLES[row.estado],
+                          )}
+                        >
+                          {row.estado}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </article>
+          )
+        })}
       </div>
     </PageContainer>
+  )
+}
+
+function ConsentSummaryCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  tone,
+}: {
+  title: string
+  value: string | number
+  detail: string
+  icon: typeof Users
+  tone: 'blue' | 'green' | 'red' | 'slate'
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-white/88 p-4 shadow-sm backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+          <p className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</p>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">{detail}</p>
+        </div>
+        <span
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-xl',
+            tone === 'blue' && 'bg-primary/10 text-primary',
+            tone === 'green' && 'bg-emerald-100 text-emerald-700',
+            tone === 'red' && 'bg-rose-100 text-rose-700',
+            tone === 'slate' && 'bg-slate-100 text-slate-700',
+          )}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+    </div>
   )
 }

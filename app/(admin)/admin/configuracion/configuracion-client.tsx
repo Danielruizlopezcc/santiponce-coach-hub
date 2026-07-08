@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState, useTransition } from 'react'
+import type { ReactNode } from 'react'
 import { CheckCircle2, Loader2, Save, Settings2 } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,40 @@ function FormMessage({ state }: { state: AdminSettingsActionState }) {
     >
       {state.message}
     </p>
+  )
+}
+
+function ConfigSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Settings2 className="size-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-foreground">{title}</p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function ConfigField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="grid gap-2 text-sm font-semibold text-foreground">
+      {label}
+      {children}
+    </label>
   )
 }
 
@@ -80,59 +115,84 @@ export function ConfiguracionClient({ data }: { data: AdminConfigData }) {
         </div>
 
         <form action={action} className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-2 text-sm font-semibold text-foreground">
-              Nombre corto
-              <Input name="clubShortName" defaultValue={data.settings.clubShortName} required />
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-foreground">
-              Nombre legal
-              <Input name="clubLegalName" defaultValue={data.settings.clubLegalName} required />
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-foreground">
-              Temporada visible
-              <Input name="seasonLabel" defaultValue={data.settings.seasonLabel} required />
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-foreground">
-              Email de contacto
-              <Input name="contactEmail" type="email" defaultValue={data.settings.contactEmail} />
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-foreground">
-              Cuota socio
-              <Input
-                name="membershipFeeEuros"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue={data.settings.membershipFeeEuros}
-                required
-              />
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-foreground">
-              Importe matrícula
-              <Input
-                name="enrollmentFeeEuros"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue={data.settings.enrollmentFeeEuros}
-                required
-              />
-            </label>
-            <label className="grid gap-2 text-sm font-semibold text-foreground">
-              Teléfono de contacto
-              <Input name="contactPhone" defaultValue={data.settings.contactPhone} />
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold">
+          <ConfigSection
+            title="Identidad del club"
+            description="Nombre visible, denominación legal y temporada que se muestra en el panel."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <ConfigField label="Nombre corto">
+                <Input name="clubShortName" defaultValue={data.settings.clubShortName} required />
+              </ConfigField>
+              <ConfigField label="Nombre legal">
+                <Input name="clubLegalName" defaultValue={data.settings.clubLegalName} required />
+              </ConfigField>
+              <ConfigField label="Temporada visible">
+                <Input name="seasonLabel" defaultValue={data.settings.seasonLabel} required />
+              </ConfigField>
+            </div>
+          </ConfigSection>
+
+          <ConfigSection
+            title="Contacto"
+            description="Datos que usa el club para comunicaciones y referencias públicas."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <ConfigField label="Email de contacto">
+                <Input name="contactEmail" type="email" defaultValue={data.settings.contactEmail} />
+              </ConfigField>
+              <ConfigField label="Teléfono de contacto">
+                <Input name="contactPhone" defaultValue={data.settings.contactPhone} />
+              </ConfigField>
+            </div>
+          </ConfigSection>
+
+          <ConfigSection
+            title="Cuotas base"
+            description="Importes generales que sirven como referencia administrativa."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <ConfigField label="Cuota socio">
+                <Input
+                  name="membershipFeeEuros"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue={data.settings.membershipFeeEuros}
+                  required
+                />
+              </ConfigField>
+              <ConfigField label="Importe matrícula">
+                <Input
+                  name="enrollmentFeeEuros"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue={data.settings.enrollmentFeeEuros}
+                  required
+                />
+              </ConfigField>
+            </div>
+          </ConfigSection>
+
+          <ConfigSection
+            title="Registro público"
+            description="Controla si las familias pueden iniciar nuevas solicitudes desde la web."
+          >
+            <label className="flex items-start gap-3 rounded-lg border border-border bg-white px-3 py-3 text-sm font-semibold">
               <input
                 name="registrationOpen"
                 type="checkbox"
                 defaultChecked={data.settings.registrationOpen}
-                className="size-4"
+                className="mt-0.5 size-4"
               />
-              Registro público abierto
+              <span>
+                <span className="block font-black text-foreground">Registro público abierto</span>
+                <span className="mt-1 block text-xs font-semibold leading-5 text-muted-foreground">
+                  Si está activo, las familias pueden iniciar altas desde el formulario público.
+                </span>
+              </span>
             </label>
-          </div>
+          </ConfigSection>
 
           <FormMessage state={state} />
 
@@ -145,12 +205,18 @@ export function ConfiguracionClient({ data }: { data: AdminConfigData }) {
         </form>
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-lg font-black text-foreground">Temporada activa</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Define qué temporada se usa por defecto en altas, equipos y paneles.
-          </p>
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-primary">Temporadas</p>
+            <h2 className="mt-1 text-lg font-black text-foreground">Temporada activa</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Define qué temporada se usa por defecto en altas, equipos y paneles.
+            </p>
+          </div>
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">
+            {data.seasons.length} disponibles
+          </span>
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid min-w-72 flex-1 gap-2 text-sm font-semibold text-foreground">

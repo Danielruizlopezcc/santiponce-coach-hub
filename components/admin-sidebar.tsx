@@ -9,7 +9,7 @@ export function AdminSidebar({ role }: { role: AdminRole }) {
   const homeHref = getDefaultAdminPath(role)
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden h-svh w-52 shrink-0 flex-col bg-blue-900 md:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden h-svh w-60 shrink-0 flex-col bg-blue-900 md:flex">
       <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-white/10 px-4">
         <Link
           href={homeHref}

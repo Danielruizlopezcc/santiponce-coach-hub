@@ -1,8 +1,9 @@
 'use client'
 
 import { ChangeEvent, useState, useTransition } from 'react'
+import type { ReactNode } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
-import { Folder, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { CalendarDays, FileText, Folder, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { PageContainer } from '@/components/page-container'
 import { RichTextEditor } from '@/components/rich-text-editor'
@@ -29,6 +30,31 @@ type Props = {
   sections: AdminNewsSectionRow[]
 }
 
+function NewsFormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <FileText className="size-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-foreground">{title}</p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  )
+}
+
 export function NoticiasClient({ news, sections }: Props) {
   const [isPending, startTransition] = useTransition()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -50,6 +76,8 @@ export function NoticiasClient({ news, sections }: Props) {
 
   const firstAvailableSectionId = sections.find((section) => section.isActive)?.id ?? sections[0]?.id ?? ''
   const sectionOptions = sections.filter((section) => section.isActive || section.id === editing?.sectionId)
+  const activeSections = sections.filter((section) => section.isActive)
+  const inactiveSections = sections.filter((section) => !section.isActive)
 
   function openCreate() {
     setMode('create')
@@ -203,11 +231,43 @@ export function NoticiasClient({ news, sections }: Props) {
       description="Crea y gestiona noticias del club con imagen, título y cuerpo opcional."
       className="max-w-7xl"
     >
-      <div className="mb-6 flex flex-wrap items-center justify-start gap-3">
-        <Button size="sm" onClick={openCreate} disabled={sections.length === 0}>
-          <Plus className="size-4" aria-hidden="true" />
-          Nueva noticia
-        </Button>
+      <div className="mb-6 rounded-xl border border-border bg-white/84 p-5 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">Comunicación del club</p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground">Noticias y publicaciones</h2>
+            <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-muted-foreground">
+              Organiza las noticias que se muestran a familias y visitantes por secciones, imagen y contenido.
+            </p>
+          </div>
+          <Button size="sm" onClick={openCreate} disabled={sections.length === 0}>
+            <Plus className="size-4" aria-hidden="true" />
+            Nueva noticia
+          </Button>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          <div className="rounded-xl bg-primary/5 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-primary/70">Noticias</p>
+            <p className="mt-2 text-3xl font-black text-primary">{news.length}</p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">Publicaciones guardadas</p>
+          </div>
+          <div className="rounded-xl bg-emerald-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700/70">Secciones activas</p>
+            <p className="mt-2 text-3xl font-black text-emerald-700">{activeSections.length}</p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">Disponibles para publicar</p>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-700/70">Inactivas</p>
+            <p className="mt-2 text-3xl font-black text-slate-700">{inactiveSections.length}</p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">Ocultas en selección</p>
+          </div>
+          <div className="rounded-xl bg-blue-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700/70">Con contenido</p>
+            <p className="mt-2 text-3xl font-black text-blue-700">{news.filter((item) => getPlainNewsText(item.body ?? '').trim()).length}</p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">Noticias redactadas</p>
+          </div>
+        </div>
       </div>
 
       <section className="mb-6 rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -306,84 +366,93 @@ export function NoticiasClient({ news, sections }: Props) {
         </div>
       </section>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Imagen</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Título</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Sección</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Cuerpo</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 lg:table-cell">Fecha</th>
-              <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-card">
-            {news.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                  No hay noticias todavía. Crea la primera noticia del club.
-                </td>
-              </tr>
-            ) : (
-              news.map((item) => (
-                <tr
-                  key={item.id}
-                  className={cn(
-                    'transition-colors hover:bg-muted/30',
-                    confirmDeleteId === item.id && 'bg-destructive/5',
-                  )}
-                >
-                  <td className="px-4 py-3">
-                    <div className="relative h-16 w-28 overflow-hidden rounded-lg bg-muted">
-                      <SafeImage src={item.imageUrl} alt={item.title} fallbackSrc="/images/Fondo1.png" fill className="object-cover" />
+      <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.16em] text-primary">Publicaciones</p>
+            <p className="mt-1 text-sm font-semibold text-muted-foreground">{news.length} noticias configuradas</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {news.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-white/70 p-8 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+              No hay noticias todavía. Crea la primera noticia del club.
+            </div>
+          ) : null}
+          {news.map((item) => {
+            const isDeleting = confirmDeleteId === item.id
+            const plainBody = getPlainNewsText(item.body ?? '').trim()
+
+            return (
+              <article
+                key={item.id}
+                className={cn(
+                  'overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-colors hover:border-primary/25',
+                  isDeleting && 'border-destructive/30 bg-destructive/5',
+                )}
+              >
+                <div className="relative h-44 bg-muted">
+                  <SafeImage src={item.imageUrl} alt={item.title} fallbackSrc="/images/Fondo1.png" fill className="object-cover" />
+                </div>
+                <div className="space-y-4 p-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                        <Folder className="size-3.5" aria-hidden="true" />
+                        {item.sectionName}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <CalendarDays className="size-3.5" aria-hidden="true" />
+                        {item.createdAt}
+                      </span>
                     </div>
-                  </td>
-                  <td className="max-w-xs px-4 py-3 font-medium text-foreground">{item.title}</td>
-                  <td className="hidden px-4 py-3 sm:table-cell">
-                    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                      {item.sectionName}
-                    </span>
-                  </td>
-                  <td className="hidden max-w-md px-4 py-3 text-muted-foreground md:table-cell">
-                    {item.body ? getPlainNewsText(item.body).slice(0, 120) : 'Sin cuerpo'}
-                    {item.body && getPlainNewsText(item.body).length > 120 ? '…' : ''}
-                  </td>
-                  <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{item.createdAt}</td>
-                  <td className="px-4 py-3 text-right">
-                    {confirmDeleteId === item.id ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Eliminar?</span>
-                        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(item.id)}>
-                          Sí, eliminar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-end gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(item)}>
-                          <Pencil className="size-3.5" aria-hidden="true" />
-                          Editar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => setConfirmDeleteId(item.id)}
-                        >
-                          <Trash2 className="size-3.5" aria-hidden="true" />
-                          Eliminar
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    <p className="mt-3 line-clamp-2 text-lg font-black leading-tight text-foreground">{item.title}</p>
+                    <p className="mt-2 line-clamp-3 text-sm font-semibold leading-6 text-muted-foreground">
+                      {plainBody ? plainBody : 'Sin cuerpo'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-slate-50 px-3 py-2">
+                    <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Contenido</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-foreground">
+                      <FileText className="size-3.5" aria-hidden="true" />
+                      {plainBody.length} caracteres
+                    </p>
+                  </div>
+
+                  {isDeleting ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 p-2">
+                      <span className="text-xs font-semibold text-rose-700">¿Eliminar noticia?</span>
+                      <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(item.id)}>
+                        Sí, eliminar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end gap-1 border-t border-border pt-3">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(item)}>
+                        <Pencil className="size-3.5" aria-hidden="true" />
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => setConfirmDeleteId(item.id)}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                        Eliminar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </article>
+            )
+          })}
+        </div>
       </div>
 
       <Dialog.Root open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -414,63 +483,81 @@ export function NoticiasClient({ news, sections }: Props) {
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
               <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
                 <div className="space-y-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="news-title">Título</Label>
-                    <Input
-                      id="news-title"
-                      value={title}
-                      onChange={(event) => setTitle(event.target.value)}
-                      placeholder="Ej. Nueva jornada del club"
-                      autoFocus
-                    />
-                  </div>
+                  <NewsFormSection
+                    title="Contenido"
+                    description="Título y cuerpo principal de la noticia que leerán familias y visitantes."
+                  >
+                    <div className="space-y-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="news-title">Título</Label>
+                        <Input
+                          id="news-title"
+                          value={title}
+                          onChange={(event) => setTitle(event.target.value)}
+                          placeholder="Ej. Nueva jornada del club"
+                          autoFocus
+                        />
+                      </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="news-body">Contenido de la noticia</Label>
-                    <RichTextEditor id="news-body" value={body} onChange={setBody} />
-                  </div>
-                </div>
-
-                <aside className="space-y-4 rounded-lg border border-border bg-[#f8fafc] p-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="news-section">Sección</Label>
-                    <select
-                      id="news-section"
-                      value={sectionId}
-                      onChange={(event) => setSectionId(event.target.value)}
-                      className="h-10 rounded-lg border border-input bg-white px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <option value="">Selecciona una sección...</option>
-                      {sectionOptions.map((section) => (
-                        <option key={section.id} value={section.id}>
-                          {section.name}
-                          {section.isActive ? '' : ' (inactiva)'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {mode === 'edit' && editing ? (
-                    <div className="grid gap-2 rounded-lg border border-border bg-white p-3">
-                      <span className="text-sm font-black text-foreground">Imagen actual</span>
-                      <div className="relative h-44 overflow-hidden rounded-lg bg-muted">
-                        <SafeImage src={editing.imageUrl} alt={editing.title} fallbackSrc="/images/Fondo1.png" fill className="object-cover" />
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="news-body">Contenido de la noticia</Label>
+                        <RichTextEditor id="news-body" value={body} onChange={setBody} />
                       </div>
                     </div>
-                  ) : null}
+                  </NewsFormSection>
+                </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="news-image">Imagen</Label>
-                    <input
-                      key={inputKey}
-                      id="news-image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
-                    />
-                  </div>
+                <aside className="space-y-4">
+                  <NewsFormSection
+                    title="Clasificación"
+                    description="Sección donde aparecerá agrupada esta publicación."
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="news-section">Sección</Label>
+                      <select
+                        id="news-section"
+                        value={sectionId}
+                        onChange={(event) => setSectionId(event.target.value)}
+                        className="h-10 rounded-lg border border-input bg-white px-3 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <option value="">Selecciona una sección...</option>
+                        {sectionOptions.map((section) => (
+                          <option key={section.id} value={section.id}>
+                            {section.name}
+                            {section.isActive ? '' : ' (inactiva)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </NewsFormSection>
 
+                  <NewsFormSection
+                    title="Imagen"
+                    description={mode === 'create' ? 'La imagen es obligatoria al crear la noticia.' : 'Deja el campo vacío para conservar la imagen actual.'}
+                  >
+                    <div className="space-y-4">
+                      {mode === 'edit' && editing ? (
+                        <div className="grid gap-2 rounded-lg border border-border bg-white p-3">
+                          <span className="text-sm font-black text-foreground">Imagen actual</span>
+                          <div className="relative h-44 overflow-hidden rounded-lg bg-muted">
+                            <SafeImage src={editing.imageUrl} alt={editing.title} fallbackSrc="/images/Fondo1.png" fill className="object-cover" />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="news-image">Imagen</Label>
+                        <input
+                          key={inputKey}
+                          id="news-image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
+                        />
+                      </div>
+                    </div>
+                  </NewsFormSection>
                 </aside>
               </div>
             </div>

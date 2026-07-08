@@ -28,7 +28,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-import { CLUB, PUBLIC_NAV, type NavItem, type PrivateNavItem } from '@/lib/club'
+import { CLUB, CLUBER_JOIN_URL, PUBLIC_NAV, type NavItem, type PrivateNavItem } from '@/lib/club'
 import { type PrivateViewer } from '@/lib/private-app-shared'
 import type { PublicNavData } from '@/lib/public-app'
 import { cn } from '@/lib/utils'
@@ -58,7 +58,7 @@ const PUBLIC_ICONS: Partial<Record<string, DrawerItem['icon']>> = {
   '/equipos': UsersRound,
   '/club': Shield,
   '/patrocinadores': Handshake,
-  '/cluber': User,
+  [CLUBER_JOIN_URL]: User,
   '/tienda': ShoppingBag,
 }
 
@@ -70,7 +70,7 @@ const PRIVATE_ICONS: Partial<Record<PrivateNavItem['icon'], DrawerItem['icon']>>
 }
 
 const AUTH_HREFS = new Set(['/registro', '/iniciar-sesion'])
-const NON_NAVIGABLE_HREFS = new Set(['/club', '/cluber', '/tienda'])
+const NON_NAVIGABLE_HREFS = new Set(['/club', '/tienda'])
 const PRIVATE_MENU_HREFS = new Set(['/app/perfil', '/app/portal-socio', '/app/deportistas', '/app/matriculacion'])
 
 function getDropdownItems(href: string, navData: PublicNavData): DropdownItem[] {

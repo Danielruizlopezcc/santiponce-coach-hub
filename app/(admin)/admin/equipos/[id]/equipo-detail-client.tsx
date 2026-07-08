@@ -2,7 +2,17 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Pencil, UserMinus, UserPlus, Users } from 'lucide-react'
+import {
+  ArrowLeft,
+  ClipboardList,
+  Pencil,
+  Shield,
+  Shirt,
+  Trophy,
+  UserMinus,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,12 +38,6 @@ const MATRICULA_STYLES = {
   Pendiente:     'bg-amber-100 text-amber-700',
 } as const
 
-const TEAM_ESTADO_STYLES = {
-  Abierto:  'bg-emerald-100 text-emerald-700',
-  Completo: 'bg-blue-100 text-blue-700',
-  Pendiente:'bg-amber-100 text-amber-700',
-}
-
 const POSITION_OPTIONS: Array<{ value: PlayerPosition; label: string }> = [
   { value: 'goalkeeper', label: 'Portero' },
   { value: 'defender', label: 'Defensa' },
@@ -45,6 +49,42 @@ type Props = {
   team: AdminTeamDetail
   categories: AdminCategoryRow[]
   seasons: AdminSeasonRow[]
+}
+
+function TeamDetailSummaryCard({
+  label,
+  value,
+  helper,
+  icon: Icon,
+  tone,
+}: {
+  label: string
+  value: string | number
+  helper: string
+  icon: typeof Users
+  tone: 'blue' | 'emerald' | 'amber' | 'slate'
+}) {
+  const toneClasses = {
+    blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+    slate: 'bg-slate-50 text-slate-700 ring-slate-200',
+  }[tone]
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground">{label}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{value}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+        </div>
+        <span className={cn('rounded-2xl p-3 ring-1', toneClasses)}>
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export function EquipoDetailClient({ team, categories, seasons }: Props) {
@@ -66,6 +106,10 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
   const [editActive, setEditActive] = useState(team.isActive)
   const [editNotes, setEditNotes]   = useState(team.notes ?? '')
   const [editError, setEditError]   = useState<string | null>(null)
+
+  const matriculatedMembers = team.members.filter((m) => m.estadoMatricula === 'Matriculado').length
+  const positionedMembers = team.members.filter((m) => m.position).length
+  const numberedMembers = team.members.filter((m) => m.shirtNumber).length
 
   function openEdit() {
     setEditName(team.nombre)
@@ -156,7 +200,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 md:px-6 md:py-8">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
 
       {/* ── Navegación ───────────────────────────────────────────── */}
       <div className="mb-6 flex items-center justify-between gap-3">
@@ -173,60 +217,97 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
       </div>
 
       {/* ── Cabecera ─────────────────────────────────────────────── */}
-      <div className="mb-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-            {team.nombre}
-          </h1>
-          <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', TEAM_ESTADO_STYLES[team.estado])}>
-            {team.estado}
-          </span>
-          {!team.isActive && (
-            <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-              Inactivo
-            </span>
-          )}
+      <div className="mb-6 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 text-white shadow-sm">
+        <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:p-6">
+          <div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-blue-50">
+                <Shield className="size-3.5" aria-hidden="true" />
+                Gestión deportiva
+              </span>
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                {team.estado}
+              </span>
+              {!team.isActive && (
+                <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-blue-50">
+                  Inactivo
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight md:text-4xl">{team.nombre}</h1>
+            <p className="mt-2 text-sm font-medium text-blue-50">
+              {team.categoria} · {team.temporada}
+            </p>
+            {team.notes && (
+              <p className="mt-3 max-w-2xl text-sm italic text-blue-50/90">{team.notes}</p>
+            )}
+          </div>
+          <div className="grid min-w-52 grid-cols-2 gap-2 rounded-2xl bg-white/10 p-3 ring-1 ring-white/15 md:grid-cols-1">
+            <div>
+              <p className="text-xs font-medium text-blue-50/80">Plantilla</p>
+              <p className="text-2xl font-bold">{team.members.length}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-blue-50/80">Disponibles</p>
+              <p className="text-2xl font-bold">{team.available.length}</p>
+            </div>
+          </div>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {team.categoria} · {team.temporada}
-        </p>
-        {team.notes && (
-          <p className="mt-2 text-sm italic text-muted-foreground">{team.notes}</p>
-        )}
       </div>
 
       {/* ── Stat cards ───────────────────────────────────────────── */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl bg-card px-4 py-4 ring-1 ring-foreground/10">
-          <p className="text-xs text-muted-foreground">Jugadores</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{team.deportistas}</p>
-        </div>
-        <div className="rounded-xl bg-card px-4 py-4 ring-1 ring-foreground/10">
-          <p className="text-xs text-muted-foreground">Disponibles para añadir</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{team.available.length}</p>
-        </div>
-        <div className="col-span-2 rounded-xl bg-card px-4 py-4 ring-1 ring-foreground/10 sm:col-span-1">
-          <p className="text-xs text-muted-foreground">Matriculados</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">
-            {team.members.filter((m) => m.estadoMatricula === 'Matriculado').length}
-          </p>
-        </div>
+      <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <TeamDetailSummaryCard
+          label="Jugadores"
+          value={team.deportistas}
+          helper="Plantilla asignada"
+          icon={Users}
+          tone="blue"
+        />
+        <TeamDetailSummaryCard
+          label="Matriculados"
+          value={matriculatedMembers}
+          helper="Con matrícula cerrada"
+          icon={ClipboardList}
+          tone="emerald"
+        />
+        <TeamDetailSummaryCard
+          label="Dorsales"
+          value={numberedMembers}
+          helper="Jugadores numerados"
+          icon={Shirt}
+          tone="amber"
+        />
+        <TeamDetailSummaryCard
+          label="Posiciones"
+          value={positionedMembers}
+          helper="Roles deportivos definidos"
+          icon={Trophy}
+          tone="slate"
+        />
       </div>
 
       {/* ── Jugadores del equipo ─────────────────────────────────── */}
-      <section className="mb-8">
-        <div className="mb-3 flex items-center gap-2">
-          <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-          <h2 className="text-base font-semibold text-foreground">Jugadores del equipo</h2>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {team.members.length}
-          </span>
+      <section className="mb-8 rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 md:px-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <Users className="size-4 text-blue-700" aria-hidden="true" />
+              <h2 className="text-base font-semibold text-foreground">Plantilla del equipo</h2>
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                {team.members.length}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Dorsales, posiciones y estado de matrícula de cada jugador.
+            </p>
+          </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
+              <tr className="border-b border-border bg-blue-50/80 text-blue-950 font-bold">
                 <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Deportista</th>
                 <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Tutor</th>
                 <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Dorsal</th>
@@ -235,7 +316,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
                 <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border bg-card">
+            <tbody className="divide-y divide-border">
               {team.members.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center">
@@ -255,7 +336,13 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
                     confirmRemoveId === member.id && 'bg-destructive/5',
                   )}
                 >
-                  <td className="px-4 py-3 font-medium">{member.nombre}</td>
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-foreground">{member.nombre}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground sm:hidden">{member.tutor}</p>
+                    <p className="mt-1 text-xs text-muted-foreground md:hidden">
+                      {POSITION_OPTIONS.find((position) => position.value === member.position)?.label ?? 'Sin posición'}
+                    </p>
+                  </td>
                   <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{member.tutor}</td>
                   <td className="px-4 py-3">
                     <select
@@ -327,10 +414,20 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
       </section>
 
       {/* ── Añadir jugador ───────────────────────────────────────── */}
-      <section className="rounded-xl bg-muted/30 p-5 ring-1 ring-foreground/10">
-        <div className="mb-3 flex items-center gap-2">
-          <UserPlus className="size-4 text-muted-foreground" aria-hidden="true" />
-          <h2 className="text-base font-semibold text-foreground">Añadir jugador al equipo</h2>
+      <section className="rounded-2xl border border-border bg-muted/30 p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <UserPlus className="size-4 text-blue-700" aria-hidden="true" />
+              <h2 className="text-base font-semibold text-foreground">Incorporar jugador</h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Solo aparecen deportistas de esta categoría y temporada que todavía no tienen equipo asignado.
+            </p>
+          </div>
+          <span className="rounded-full bg-background px-3 py-1 text-xs font-bold text-muted-foreground ring-1 ring-border">
+            {team.available.length} disponibles
+          </span>
         </div>
 
         {team.available.length === 0 ? (
@@ -342,7 +439,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
             <p className="mb-3 text-xs text-muted-foreground">
               {team.available.length} deportista{team.available.length !== 1 ? 's' : ''} de categoría {team.categoria} sin equipo asignado.
             </p>
-            <div className="grid gap-2 md:grid-cols-[1fr_180px_auto]">
+            <div className="grid gap-2 md:grid-cols-[1fr_190px_auto]">
               <select
                 value={selectedAdd}
                 onChange={(e) => setSelectedAdd(e.target.value)}

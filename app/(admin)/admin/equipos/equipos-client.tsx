@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { Layers, Pencil, Plus, Shield, Trash2, Trophy, Users } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
@@ -45,6 +45,10 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
   const [notes, setNotes]           = useState('')
 
   const activeSeason = seasons.find((s) => s.estado === 'Activa')
+  const activeTeams = teams.filter((team) => team.isActive)
+  const totalPlayers = teams.reduce((sum, team) => sum + team.deportistas, 0)
+  const openTeams = teams.filter((team) => team.estado === 'Abierto').length
+  const completeTeams = teams.filter((team) => team.estado === 'Completo').length
 
   function openCreate() {
     setMode('create')
@@ -105,9 +109,62 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
   return (
     <PageContainer
       title="Equipos"
-      description="Gestión de equipos, jugadores asignados y estado de ocupación."
+      description="Gestión deportiva de plantillas, categorías y jugadores asignados."
       className="max-w-7xl"
     >
+      <section className="mb-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">
+              Gestión deportiva
+            </p>
+            <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+              Plantillas por equipo
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Revisa la estructura de cantera por categoría y temporada. Desde cada equipo puedes
+              entrar al detalle para gestionar jugadores, posiciones y dorsales.
+            </p>
+          </div>
+          {activeTab === 'equipos' ? (
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="size-4" aria-hidden="true" />
+              Nuevo equipo
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <TeamSummaryCard
+            title="Equipos"
+            value={String(teams.length)}
+            detail={`${activeTeams.length} activos en la estructura`}
+            icon={Shield}
+          />
+          <TeamSummaryCard
+            title="Jugadores"
+            value={String(totalPlayers)}
+            detail="Asignados actualmente a equipos"
+            icon={Users}
+            tone="green"
+          />
+          <TeamSummaryCard
+            title="Abiertos"
+            value={String(openTeams)}
+            detail="Plantillas con margen de incorporación"
+            icon={Trophy}
+            tone="green"
+          />
+          <TeamSummaryCard
+            title="Categorías"
+            value={String(categories.length)}
+            detail={`${completeTeams} equipos completos`}
+            icon={Layers}
+            tone="amber"
+          />
+        </div>
+      </section>
+
       <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones de equipos">
         {[
           { id: 'equipos', label: 'Equipos' },
@@ -135,21 +192,26 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
         <CategoriasClient categories={categories} embedded />
       ) : (
         <>
-      <div className="mb-6 flex items-center justify-start gap-3">
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="size-4" aria-hidden="true" />
-          Nuevo equipo
-        </Button>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-lg font-black tracking-tight text-foreground">Equipos configurados</p>
+          <p className="text-sm font-semibold text-muted-foreground">
+            Accede a cada plantilla para revisar jugadores, posiciones y dorsales.
+          </p>
+        </div>
+        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+          {teams.length} equipos
+        </span>
       </div>
 
       <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Nombre</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Equipo</th>
               <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Categoría</th>
               <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Temporada</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Jugadores</th>
+              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Plantilla</th>
               <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Estado</th>
               <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
             </tr>
@@ -170,7 +232,12 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
                   confirmDeleteId === team.id && 'bg-destructive/5',
                 )}
               >
-                <td className="px-4 py-3 font-medium">{team.nombre}</td>
+                <td className="px-4 py-3 font-medium">
+                  <p>{team.nombre}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                    {team.categoria} · {team.temporada}
+                  </p>
+                </td>
                 <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{team.categoria}</td>
                 <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{team.temporada}</td>
                 <td className="px-4 py-3">
@@ -200,7 +267,7 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
                       <Button size="sm" variant="ghost" asChild>
                         <Link href={`/admin/equipos/${team.id}`}>
                           <Users className="size-3.5" aria-hidden="true" />
-                          Ver jugadores
+                          Ver plantilla
                         </Link>
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(team)}>
@@ -311,5 +378,43 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
         </>
       )}
     </PageContainer>
+  )
+}
+
+function TeamSummaryCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  tone = 'blue',
+}: {
+  title: string
+  value: string
+  detail: string
+  icon: typeof Shield
+  tone?: 'blue' | 'green' | 'amber'
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-white/88 p-4 shadow-sm backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+            {title}
+          </p>
+          <p className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</p>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">{detail}</p>
+        </div>
+        <span
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-lg',
+            tone === 'blue' && 'bg-primary/10 text-primary',
+            tone === 'green' && 'bg-emerald-100 text-emerald-700',
+            tone === 'amber' && 'bg-amber-100 text-amber-700',
+          )}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+    </div>
   )
 }

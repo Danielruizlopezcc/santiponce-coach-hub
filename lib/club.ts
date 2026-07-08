@@ -7,6 +7,7 @@ export const CLUB = {
 
 export const MEMBERSHIP_IMPORTE = 20
 export const MATRICULA_IMPORTE = 50
+export const CLUBER_JOIN_URL = 'https://app.cluber.es/clubs/6853d56f81d74085568121/players/join'
 
 export type NavItem = {
   label: string
@@ -36,7 +37,7 @@ export const PUBLIC_NAV: NavItem[] = [
   { label: 'Equipos', href: '/equipos' },
   { label: 'Club', href: '/club' },
   { label: 'Patrocinadores', href: '/patrocinadores' },
-  { label: 'Cluber', href: '/cluber' },
+  { label: 'Cluber', href: CLUBER_JOIN_URL },
   { label: 'Tienda', href: '/tienda' },
   { label: 'Registrarse', href: '/registro' },
   { label: 'Iniciar sesión', href: '/iniciar-sesion' },

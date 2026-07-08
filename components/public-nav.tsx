@@ -27,7 +27,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-import { CLUB, PUBLIC_NAV } from '@/lib/club'
+import { CLUB, CLUBER_JOIN_URL, PUBLIC_NAV } from '@/lib/club'
 import type { PublicNavData } from '@/lib/public-app'
 import { cn } from '@/lib/utils'
 
@@ -43,12 +43,12 @@ const NAV_ICONS: Partial<Record<string, LucideIcon>> = {
   '/equipos': UsersRound,
   '/club': Shield,
   '/patrocinadores': Handshake,
-  '/cluber': UserPlus,
+  [CLUBER_JOIN_URL]: UserPlus,
   '/tienda': ShoppingBag,
 }
 
 const AUTH_HREFS = new Set(['/registro', '/iniciar-sesion'])
-const NON_NAVIGABLE_HREFS = new Set(['/club', '/cluber', '/tienda'])
+const NON_NAVIGABLE_HREFS = new Set(['/club', '/tienda'])
 
 type DropdownItem = {
   href: string

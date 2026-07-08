@@ -1,9 +1,9 @@
 import {
+  ArrowRight,
   AlertTriangle,
   BadgeCheck,
   CalendarDays,
   Info,
-  Medal,
   Newspaper,
   ShieldCheck,
   Tags,
@@ -12,6 +12,8 @@ import {
   Users,
   WalletCards,
 } from 'lucide-react'
+import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { PageContainer } from '@/components/page-container'
 import { getAdminDashboardData } from '@/lib/admin-app'
@@ -98,6 +100,89 @@ function KpiCard({
           <Icon className="size-5" aria-hidden="true" />
         </span>
       </div>
+    </div>
+  )
+}
+
+function ModuleMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: number | string
+  detail?: string
+}) {
+  return (
+    <div className="rounded-lg bg-muted/50 px-3 py-2.5">
+      <p className="text-2xl font-black tracking-tight text-foreground">{value}</p>
+      <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">{label}</p>
+      {detail && <p className="mt-1 text-xs font-semibold leading-4 text-muted-foreground">{detail}</p>}
+    </div>
+  )
+}
+
+function ModuleCard({
+  label,
+  title,
+  description,
+  icon: Icon,
+  tone = 'blue',
+  actions = [],
+  children,
+}: {
+  label: string
+  title: string
+  description: string
+  icon: typeof Users
+  tone?: 'blue' | 'green' | 'amber' | 'red'
+  actions?: Array<{
+    label: string
+    href: string
+  }>
+  children: ReactNode
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-muted-foreground">
+            {label}
+          </p>
+          <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">{title}</h3>
+          <p className="mt-1 text-sm font-semibold leading-5 text-muted-foreground">
+            {description}
+          </p>
+        </div>
+        <span
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-lg',
+            tone === 'blue' && 'bg-primary/10 text-primary',
+            tone === 'green' && 'bg-emerald-100 text-emerald-700',
+            tone === 'amber' && 'bg-amber-100 text-amber-700',
+            tone === 'red' && 'bg-red-100 text-red-700',
+          )}
+        >
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-1 2xl:grid-cols-3">
+        {children}
+      </div>
+      {actions.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-3">
+          {actions.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-black text-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {action.label}
+              <ArrowRight className="size-3" aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -223,43 +308,118 @@ export default async function AdminDashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            label="Tutores"
-            value={data.summary.tutores}
-            detail={`${data.summary.tutoresSocios} también figuran como socios`}
-            icon={UserCheck}
+        <section className="space-y-4">
+          <SectionHeading
+            label="Áreas de trabajo"
+            title="Panel organizado por módulos"
+            description="Cada bloque resume una parte del club sin mezclar lo deportivo con cuotas, comunicación o sistema."
           />
-          <KpiCard
-            label="Socios activos"
-            value={data.summary.sociosActivos}
-            detail="Usuarios con cuota de socio activa"
-            icon={Medal}
-            tone="green"
-          />
-          <KpiCard
-            label="Ingresos recientes"
-            value={moneyFormatter.format(ingresosRecientes)}
-            detail="Cobros pagados en el resumen"
-            icon={WalletCards}
-            tone="green"
-          />
-          <KpiCard
-            label="Alertas"
-            value={data.alerts.length}
-            detail="Puntos que conviene revisar"
-            icon={AlertTriangle}
-            tone={data.alerts.some((alert) => alert.tipo === 'aviso') ? 'amber' : 'blue'}
-          />
+          <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+            <ModuleCard
+              label="Gestión deportiva"
+              title="Cantera y equipos"
+              description="Seguimiento deportivo de jugadores, plantillas y estructura de temporada."
+              icon={Trophy}
+              actions={[
+                { label: 'Deportistas', href: '/admin/deportistas' },
+                { label: 'Equipos', href: '/admin/equipos' },
+                { label: 'Calendario', href: '/admin/calendario' },
+              ]}
+            >
+              <ModuleMetric label="Deportistas" value={data.summary.deportistas} />
+              <ModuleMetric label="Equipos" value={data.summary.equipos} detail="Activos" />
+              <ModuleMetric
+                label="Sin equipo"
+                value={data.summary.deportistasSinEquipo}
+                detail="Pendientes de asignación"
+              />
+            </ModuleCard>
+
+            <ModuleCard
+              label="Administración"
+              title="Matrículas y familias"
+              description="Control administrativo de tutores, socios, matrículas y consentimientos."
+              icon={UserCheck}
+              tone="amber"
+              actions={[
+                { label: 'Matrículas', href: '/admin/matriculas' },
+                { label: 'Tutores / Socios', href: '/admin/tutores' },
+                { label: 'Consentimientos', href: '/admin/consentimientos' },
+              ]}
+            >
+              <ModuleMetric
+                label="Matriculados"
+                value={`${getPercent(data.summary.deportistasMatriculados, totalDeportistas)}%`}
+                detail={`${data.summary.deportistasMatriculados} de ${data.summary.deportistas}`}
+              />
+              <ModuleMetric label="Tutores" value={data.summary.tutores} />
+              <ModuleMetric
+                label="Alertas"
+                value={data.alerts.length}
+                detail="Puntos a revisar"
+              />
+            </ModuleCard>
+
+            <ModuleCard
+              label="Cuotas"
+              title="Cobros por deportista"
+              description="Resumen económico ligado a cuotas, matrículas y actividad reciente de pagos."
+              icon={WalletCards}
+              tone="green"
+              actions={[
+                { label: 'Cuotas', href: '/admin/pagos' },
+                { label: 'Matrículas', href: '/admin/matriculas' },
+              ]}
+            >
+              <ModuleMetric label="Ingresos" value={moneyFormatter.format(ingresosRecientes)} />
+              <ModuleMetric label="Socios activos" value={data.summary.sociosActivos} />
+              <ModuleMetric
+                label="Pagos recientes"
+                value={data.recentPayments.length}
+                detail="Confirmados en el resumen"
+              />
+            </ModuleCard>
+
+            <ModuleCard
+              label="Comunicación"
+              title="Noticias y patrocinio"
+              description="Contenido público que mantiene viva la presencia del club."
+              icon={Newspaper}
+              actions={[
+                { label: 'Noticias', href: '/admin/noticias' },
+                { label: 'Patrocinadores', href: '/admin/patrocinadores' },
+              ]}
+            >
+              <ModuleMetric label="Noticias" value={data.summary.noticias} />
+              <ModuleMetric label="Patrocinadores" value={data.summary.patrocinadores} />
+              <ModuleMetric label="Socios" value={data.summary.sociosActivos} detail="Comunidad activa" />
+            </ModuleCard>
+
+            <ModuleCard
+              label="Sistema"
+              title="Configuración y control"
+              description="Base operativa del panel: temporadas, categorías y usuarios con acceso."
+              icon={ShieldCheck}
+              actions={[
+                { label: 'Configuración', href: '/admin/configuracion' },
+                { label: 'Administradores', href: '/admin/administradores' },
+                { label: 'Auditoría', href: '/admin/auditoria' },
+              ]}
+            >
+              <ModuleMetric label="Temporadas" value={data.summary.temporadas} />
+              <ModuleMetric label="Categorías" value={data.summary.categorias} />
+              <ModuleMetric label="Admins" value={data.summary.administradores} />
+            </ModuleCard>
+          </div>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <Card className="bg-white shadow-sm">
             <CardHeader>
               <SectionHeading
-                label="Matrículas"
-                title="Estado deportivo"
-                description="Situación actual de deportistas y asignaciones."
+                label="Administración"
+                title="Matrículas y asignaciones"
+                description="Situación actual de estados administrativos y equipos asignados."
               />
             </CardHeader>
             <CardContent className="space-y-5">
