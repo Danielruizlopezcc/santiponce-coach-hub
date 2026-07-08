@@ -8,6 +8,7 @@ const SPORTS_COORDINATOR_ALLOWED_PATHS = [
   '/admin/equipos',
   '/admin/calendario',
   '/admin/estadisticas',
+  '/admin/temporadas',
 ] as const
 
 export function getAdminRoleLabel(role: AdminRole) {

@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
+import { SafeImage } from '@/components/safe-image'
 import type { PrivateNewsItem } from '@/lib/private-app-shared'
 import { CLUB } from '@/lib/club'
 import { cn } from '@/lib/utils'
@@ -73,9 +74,10 @@ export function HomeNewsCarousel({ news, linkHref = '/noticias' }: HomeNewsCarou
             index === activeIndex ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
         >
-          <Image
+          <SafeImage
             src={item.imageUrl}
             alt={item.title}
+            fallbackSrc="/images/Fondo1.png"
             fill
             priority={index === 0}
             className="object-cover object-center transition-transform duration-700 group-hover:scale-[1.035]"

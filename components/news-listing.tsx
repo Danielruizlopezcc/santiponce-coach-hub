@@ -1,8 +1,8 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Newspaper } from 'lucide-react'
 import { BrandedPageHero } from '@/components/branded-page-hero'
 import { NewsRowCarousel } from '@/components/news-row-carousel'
+import { SafeImage } from '@/components/safe-image'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateNewsSection } from '@/lib/private-app-shared'
 import { cn } from '@/lib/utils'
@@ -64,9 +64,10 @@ function FeaturedNewsCard({ item, href }: { item: PrivateNewsItem; href: string 
   return (
     <Link href={href} className="group relative block min-h-[520px] overflow-hidden rounded-lg bg-foreground text-white shadow-xl ring-1 ring-black/10">
       <div className="absolute inset-0 bg-muted">
-        <Image
+        <SafeImage
           src={item.imageUrl}
           alt={item.title}
+          fallbackSrc="/images/Fondo1.png"
           fill
           priority
           className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
@@ -94,7 +95,7 @@ function HeadlineCard({ item, index, href }: { item: PrivateNewsItem; index: num
   return (
     <Link href={href} className="group grid grid-cols-[92px_1fr] gap-4 border-b border-border/80 py-5 last:border-b-0">
       <div className="relative aspect-square overflow-hidden rounded-md bg-muted">
-        <Image src={item.imageUrl} alt={item.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" sizes="92px" />
+        <SafeImage src={item.imageUrl} alt={item.title} fallbackSrc="/images/Fondo1.png" fill className="object-cover transition-transform duration-500 group-hover:scale-105" sizes="92px" />
       </div>
       <div className="min-w-0">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">
@@ -113,9 +114,10 @@ function CompactNewsCard({ item, href }: { item: PrivateNewsItem; href: string }
   return (
     <Link href={href} className="group block min-w-0">
       <div className="relative aspect-[16/9] overflow-hidden bg-muted">
-        <Image
+        <SafeImage
           src={item.imageUrl}
           alt={item.title}
+          fallbackSrc="/images/Fondo1.png"
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"

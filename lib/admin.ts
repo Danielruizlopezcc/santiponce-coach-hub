@@ -40,7 +40,16 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: 'Configuración', href: '/admin/configuracion', icon: Settings, section: 'admin' },
 ]
 
+const SPORTS_COORDINATOR_NAV_PATHS = new Set([
+  '/admin/entrenadores',
+  '/admin/deportistas',
+  '/admin/equipos',
+  '/admin/calendario',
+  '/admin/estadisticas',
+  '/admin/temporadas',
+])
+
 export function getAdminNavForRole(role: 'admin' | 'sports_coordinator') {
   if (role === 'admin') return ADMIN_NAV
-  return ADMIN_NAV.filter((item) => item.section === 'sports')
+  return ADMIN_NAV.filter((item) => SPORTS_COORDINATOR_NAV_PATHS.has(item.href))
 }

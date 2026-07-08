@@ -1,9 +1,9 @@
 'use client'
 
 import { useRef } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { SafeImage } from '@/components/safe-image'
 import type { PrivateNewsItem } from '@/lib/private-app-shared'
 
 type NewsRowCarouselProps = {
@@ -78,9 +78,10 @@ export function NewsRowCarousel({ items, basePath, title, showMoreHref }: NewsRo
               className="group block w-[270px] shrink-0 sm:w-[326px]"
             >
               <div className="relative aspect-[16/9] overflow-hidden bg-muted">
-                <Image
+                <SafeImage
                   src={item.imageUrl}
                   alt={item.title}
+                  fallbackSrc="/images/Fondo1.png"
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="326px"

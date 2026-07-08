@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { requireAdminAction } from '@/lib/auth'
+import { requireSportsAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const seasonBaseSchema = z.object({
@@ -24,7 +24,7 @@ const createSeasonSchema = seasonBaseSchema.omit({ id: true }).refine((values) =
 })
 
 export async function updateSeasonAction(input: z.infer<typeof seasonSchema>): Promise<void> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsed = seasonSchema.parse(input)
   const supabase = createAdminClient()
 
@@ -52,7 +52,7 @@ export async function updateSeasonAction(input: z.infer<typeof seasonSchema>): P
 }
 
 export async function createSeasonAction(input: z.infer<typeof createSeasonSchema>): Promise<void> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsed = createSeasonSchema.parse(input)
   const supabase = createAdminClient()
 
@@ -78,7 +78,7 @@ export async function createSeasonAction(input: z.infer<typeof createSeasonSchem
 }
 
 export async function deleteSeasonAction(id: string): Promise<void> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsed = z.string().uuid().parse(id)
   const supabase = createAdminClient()
   const { error } = await supabase.from('seasons').delete().eq('id', parsed)

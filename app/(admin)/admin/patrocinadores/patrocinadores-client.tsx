@@ -2,9 +2,9 @@
 
 import { ChangeEvent, useState, useTransition } from 'react'
 import { BadgeCheck, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
-import Image from 'next/image'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
+import { SafeImage } from '@/components/safe-image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -166,9 +166,10 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="relative h-16 w-24 overflow-hidden rounded-lg bg-white ring-1 ring-border">
-                          <Image
+                          <SafeImage
                             src={sponsor.imageUrl}
                             alt={sponsor.title}
+                            fallbackSrc="/images/Escudo_Santiponce_Fondo.jpg"
                             fill
                             className="object-contain p-2"
                           />
@@ -311,9 +312,10 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
               <div className="grid gap-2 rounded-xl border border-border bg-white p-3">
                 <span className="text-sm font-medium text-foreground">Imagen actual</span>
                 <div className="relative h-40 overflow-hidden rounded-xl bg-muted">
-                  <Image
+                  <SafeImage
                     src={editing.imageUrl}
                     alt={editing.title}
+                    fallbackSrc="/images/Escudo_Santiponce_Fondo.jpg"
                     fill
                     className="object-contain p-3"
                   />

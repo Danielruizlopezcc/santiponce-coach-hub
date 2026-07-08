@@ -2,11 +2,11 @@
 
 import { ChangeEvent, useState, useTransition } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
-import Image from 'next/image'
 import { Folder, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { PageContainer } from '@/components/page-container'
 import { RichTextEditor } from '@/components/rich-text-editor'
+import { SafeImage } from '@/components/safe-image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -336,7 +336,7 @@ export function NoticiasClient({ news, sections }: Props) {
                 >
                   <td className="px-4 py-3">
                     <div className="relative h-16 w-28 overflow-hidden rounded-lg bg-muted">
-                      <Image src={item.imageUrl} alt={item.title} fill className="object-cover" />
+                      <SafeImage src={item.imageUrl} alt={item.title} fallbackSrc="/images/Fondo1.png" fill className="object-cover" />
                     </div>
                   </td>
                   <td className="max-w-xs px-4 py-3 font-medium text-foreground">{item.title}</td>
@@ -454,7 +454,7 @@ export function NoticiasClient({ news, sections }: Props) {
                     <div className="grid gap-2 rounded-lg border border-border bg-white p-3">
                       <span className="text-sm font-black text-foreground">Imagen actual</span>
                       <div className="relative h-44 overflow-hidden rounded-lg bg-muted">
-                        <Image src={editing.imageUrl} alt={editing.title} fill className="object-cover" />
+                        <SafeImage src={editing.imageUrl} alt={editing.title} fallbackSrc="/images/Fondo1.png" fill className="object-cover" />
                       </div>
                     </div>
                   ) : null}

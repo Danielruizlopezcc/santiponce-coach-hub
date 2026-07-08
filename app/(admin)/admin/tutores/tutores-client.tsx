@@ -262,9 +262,6 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
               <Plus className="size-4" />
               Crear tutor
             </Button>
-            <p className="text-sm font-bold text-muted-foreground">
-              Alta, revisión y seguimiento administrativo de tutores.
-            </p>
           </div>
 
           <Dialog.Root
@@ -378,6 +375,14 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-card">
+                  {visibleTutors.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-14 text-center text-sm text-muted-foreground">
+                        No hay tutores que coincidan con la búsqueda.
+                      </td>
+                    </tr>
+                  ) : null}
+
                   {visibleTutors.map((tutor) => {
                     const nextCharge = getNextCharge(assignmentsByGuardian.get(tutor.id))
                     const consentStatus = getConsentStatus(tutor)

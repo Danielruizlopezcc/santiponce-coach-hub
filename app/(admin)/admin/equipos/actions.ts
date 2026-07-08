@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireSportsAdminAction } from '@/lib/auth'
 import type { PlayerPosition } from '@/lib/private-app-shared'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getTeamShirtNumbers, saveTeamShirtNumbers } from '@/lib/team-shirt-numbers'
 
 async function getAdminSupabase() {
   await requireSportsAdminAction()
@@ -103,5 +104,77 @@ export async function removeAthleteAction(teamId: string, athleteId: string): Pr
     .eq('id', athleteId)
     .eq('assigned_team_id', teamId)
   if (error) throw new Error(error.message)
+  teamPaths(teamId)
+}
+
+export async function updateAthletePositionAction(
+  teamId: string,
+  athleteId: string,
+  position: PlayerPosition | null,
+): Promise<void> {
+  if (position !== null && !VALID_POSITIONS.includes(position)) {
+    throw new Error('Selecciona una posición válida para el jugador.')
+  }
+
+  const supabase = await getAdminSupabase()
+  const { data: athlete, error } = await supabase
+    .from('athletes')
+    .update({ position })
+    .select('id')
+    .eq('id', athleteId)
+    .eq('assigned_team_id', teamId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!athlete) {
+    throw new Error('No se ha encontrado el jugador en este equipo.')
+  }
+
+  teamPaths(teamId)
+}
+
+export async function updateAthleteShirtNumberAction(
+  teamId: string,
+  athleteId: string,
+  shirtNumber: number | null,
+): Promise<void> {
+  if (
+    shirtNumber !== null &&
+    (!Number.isInteger(shirtNumber) || shirtNumber < 1 || shirtNumber > 99)
+  ) {
+    throw new Error('El dorsal debe estar entre 1 y 99.')
+  }
+
+  const supabase = await getAdminSupabase()
+  const { data: teamAthletes, error } = await supabase
+    .from('athletes')
+    .select('id, first_name, last_name')
+    .eq('assigned_team_id', teamId)
+
+  if (error) throw new Error(error.message)
+
+  const athleteIds = new Set((teamAthletes ?? []).map((athlete) => athlete.id))
+  if (!athleteIds.has(athleteId)) {
+    throw new Error('No se ha encontrado el jugador en este equipo.')
+  }
+
+  const shirtNumbers = await getTeamShirtNumbers()
+
+  if (shirtNumber !== null) {
+    const duplicate = (teamAthletes ?? []).find(
+      (athlete) => athlete.id !== athleteId && shirtNumbers[athlete.id] === shirtNumber,
+    )
+
+    if (duplicate) {
+      const duplicateName = `${duplicate.first_name} ${duplicate.last_name}`.trim()
+      throw new Error(`El dorsal ${shirtNumber} ya lo tiene ${duplicateName}.`)
+    }
+
+    shirtNumbers[athleteId] = shirtNumber
+  } else {
+    delete shirtNumbers[athleteId]
+  }
+
+  await saveTeamShirtNumbers(shirtNumbers)
   teamPaths(teamId)
 }

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { signOutAction } from '@/app/iniciar-sesion/actions'
 
 type SignOutButtonProps = {
   className?: string
@@ -20,8 +21,11 @@ export function SignOutButton({
 
   async function handleSignOut() {
     const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/iniciar-sesion')
+    await Promise.allSettled([
+      supabase.auth.signOut(),
+      signOutAction(),
+    ])
+    router.replace('/iniciar-sesion')
     router.refresh()
   }
 

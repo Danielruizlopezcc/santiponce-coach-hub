@@ -1,6 +1,6 @@
-import Image from 'next/image'
 import { BadgeCheck, Building2, Handshake, ShieldCheck, Sparkles, Trophy } from 'lucide-react'
 import { BrandedPageHero } from '@/components/branded-page-hero'
+import { SafeImage } from '@/components/safe-image'
 import { CLUB } from '@/lib/club'
 import type { PrivateSponsor } from '@/lib/private-app-shared'
 import { getSponsorTierOption } from '@/lib/sponsors'
@@ -35,9 +35,10 @@ function SponsorCard({
     <li className="group overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl">
       <article className={cn('grid h-full', isPrincipalVariant && 'lg:grid-cols-[1.05fr_0.95fr]')}>
         <div className={cn('relative bg-white', isPrincipalVariant ? 'min-h-[280px]' : 'aspect-[16/10]')}>
-          <Image
+          <SafeImage
             src={sponsor.imageUrl}
             alt={sponsor.title}
+            fallbackSrc="/images/Escudo_Santiponce_Fondo.jpg"
             fill
             priority={priority}
             className="object-contain p-8 transition-transform duration-500 group-hover:scale-[1.035]"

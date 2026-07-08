@@ -1,10 +1,10 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import type { ComponentType } from 'react'
 import { ArrowRight, Award, CalendarDays, ChevronLeft, ChevronRight, CreditCard, Newspaper, Shield, Users } from 'lucide-react'
 import { HomeNewsCarousel } from '@/components/home-news-carousel'
 import { ClubShopBanner } from '@/components/club-shop-banner'
 import { ScrollReveal } from '@/components/scroll-reveal'
+import { SafeImage } from '@/components/safe-image'
 import { CLUB } from '@/lib/club'
 import type { PrivateNewsItem, PrivateSponsor, PrivateTeamSummary } from '@/lib/private-app-shared'
 
@@ -141,9 +141,10 @@ export function LandingHero({
                       className="group block min-w-0"
                     >
                       <div className="relative aspect-[16/9] overflow-hidden bg-muted">
-                        <Image
+                        <SafeImage
                           src={item.imageUrl}
                           alt={item.title}
+                          fallbackSrc="/images/Fondo1.png"
                           fill
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -240,7 +241,7 @@ export function LandingHero({
               {featuredSponsors.map((sponsor) => (
                 <Link key={sponsor.id} href={sponsorsHref} className="overflow-hidden rounded-lg bg-[#f3f6fa] transition-transform hover:-translate-y-0.5">
                   <div className="relative h-36 bg-muted">
-                    <Image src={sponsor.imageUrl} alt={sponsor.title} fill className="object-cover" sizes="(max-width: 1024px) 50vw, 25vw" />
+                    <SafeImage src={sponsor.imageUrl} alt={sponsor.title} fallbackSrc="/images/Escudo_Santiponce_Fondo.jpg" fill className="object-cover" sizes="(max-width: 1024px) 50vw, 25vw" />
                   </div>
                   <p className="p-4 text-base font-black text-foreground">{sponsor.title}</p>
                 </Link>

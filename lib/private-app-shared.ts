@@ -86,6 +86,7 @@ export type PrivateTeamPlayer = {
   nombre: string
   categoriaSolicitada: string
   position: PlayerPosition | null
+  shirtNumber: number | null
   estadoMatricula: 'Pendiente' | 'Matriculado' | 'En revisión'
 }
 

@@ -14,7 +14,13 @@ import {
 import { cn } from '@/lib/utils'
 import type { AdminCategoryRow, AdminSeasonRow, AdminTeamDetail } from '@/lib/admin-app'
 import type { PlayerPosition } from '@/lib/private-app-shared'
-import { assignAthleteAction, removeAthleteAction, updateTeamAction } from '../actions'
+import {
+  assignAthleteAction,
+  removeAthleteAction,
+  updateAthletePositionAction,
+  updateAthleteShirtNumberAction,
+  updateTeamAction,
+} from '../actions'
 
 const MATRICULA_STYLES = {
   Matriculado:   'bg-emerald-100 text-emerald-700',
@@ -35,13 +41,6 @@ const POSITION_OPTIONS: Array<{ value: PlayerPosition; label: string }> = [
   { value: 'forward', label: 'Delantero' },
 ]
 
-const POSITION_LABELS: Record<PlayerPosition, string> = {
-  goalkeeper: 'Portero',
-  defender: 'Defensa',
-  midfielder: 'Mediocampista',
-  forward: 'Delantero',
-}
-
 type Props = {
   team: AdminTeamDetail
   categories: AdminCategoryRow[]
@@ -55,6 +54,8 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [selectedAdd, setSelectedAdd]         = useState('')
   const [selectedPosition, setSelectedPosition] = useState<PlayerPosition | ''>('')
+  const [updatingPositionId, setUpdatingPositionId] = useState<string | null>(null)
+  const [updatingShirtNumberId, setUpdatingShirtNumberId] = useState<string | null>(null)
   const [actionError, setActionError]         = useState<string | null>(null)
 
   // edición
@@ -118,6 +119,38 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
         setSelectedPosition('')
       } catch (e) {
         setActionError(e instanceof Error ? e.message : 'Error al añadir al jugador.')
+      }
+    })
+  }
+
+  function handlePositionChange(athleteId: string, position: PlayerPosition | '') {
+    setActionError(null)
+    setUpdatingPositionId(athleteId)
+    startTransition(async () => {
+      try {
+        await updateAthletePositionAction(team.id, athleteId, position || null)
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Error al actualizar la posición.')
+      } finally {
+        setUpdatingPositionId(null)
+      }
+    })
+  }
+
+  function handleShirtNumberChange(athleteId: string, shirtNumber: string) {
+    setActionError(null)
+    setUpdatingShirtNumberId(athleteId)
+    startTransition(async () => {
+      try {
+        await updateAthleteShirtNumberAction(
+          team.id,
+          athleteId,
+          shirtNumber ? Number(shirtNumber) : null,
+        )
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Error al actualizar el dorsal.')
+      } finally {
+        setUpdatingShirtNumberId(null)
       }
     })
   }
@@ -196,6 +229,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
               <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
                 <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Deportista</th>
                 <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Tutor</th>
+                <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Dorsal</th>
                 <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Posición</th>
                 <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Matrícula</th>
                 <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
@@ -204,7 +238,7 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
             <tbody className="divide-y divide-border bg-card">
               {team.members.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
+                  <td colSpan={6} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <Users className="size-8 opacity-25" aria-hidden="true" />
                       <p className="text-sm">El equipo aún no tiene jugadores</p>
@@ -223,8 +257,39 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
                 >
                   <td className="px-4 py-3 font-medium">{member.nombre}</td>
                   <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{member.tutor}</td>
-                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                    {member.position ? POSITION_LABELS[member.position] : 'Sin posición'}
+                  <td className="px-4 py-3">
+                    <select
+                      value={member.shirtNumber ?? ''}
+                      disabled={isPending && updatingShirtNumberId === member.id}
+                      onChange={(event) => handleShirtNumberChange(member.id, event.target.value)}
+                      aria-label={`Dorsal de ${member.nombre}`}
+                      className="h-9 min-w-24 rounded-md border border-input bg-white px-3 text-sm font-medium text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <option value="">Sin dorsal</option>
+                      {Array.from({ length: 99 }, (_, index) => index + 1).map((number) => (
+                        <option key={number} value={number}>
+                          {number}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="hidden px-4 py-3 md:table-cell">
+                    <select
+                      value={member.position ?? ''}
+                      disabled={isPending && updatingPositionId === member.id}
+                      onChange={(event) =>
+                        handlePositionChange(member.id, event.target.value as PlayerPosition | '')
+                      }
+                      aria-label={`Posición de ${member.nombre}`}
+                      className="h-9 min-w-40 rounded-md border border-input bg-white px-3 text-sm font-medium text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <option value="">Sin posición</option>
+                      {POSITION_OPTIONS.map((position) => (
+                        <option key={position.value} value={position.value}>
+                          {position.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-3">
                     <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', MATRICULA_STYLES[member.estadoMatricula])}>

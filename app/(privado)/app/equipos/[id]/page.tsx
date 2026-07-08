@@ -56,7 +56,7 @@ function PlayerCard({
       style={CARD_PATTERN}
     >
       <div className="absolute right-4 top-3 font-serif text-6xl font-black leading-none text-white">
-        {index + 1}
+        {player.shirtNumber ?? index + 1}
       </div>
 
       <div className="absolute inset-x-0 top-12 flex justify-center">
@@ -70,14 +70,6 @@ function PlayerCard({
         <h3 className="mt-1 font-serif text-3xl font-black uppercase leading-none text-white">
           {player.nombre}
         </h3>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/12 px-2.5 py-1 text-xs font-semibold text-white">
-            {player.categoriaSolicitada}
-          </span>
-          <span className="rounded-full bg-white/12 px-2.5 py-1 text-xs font-semibold text-white">
-            {player.estadoMatricula}
-          </span>
-        </div>
       </div>
     </article>
   )
@@ -137,27 +129,6 @@ export default async function PrivateEquipoDetailPage({ params }: Props) {
             </div>
           ) : (
             <>
-              <section>
-                <div className="mb-6">
-                  <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-                    Plantilla
-                  </p>
-                  <h2 className="mt-2 text-3xl font-black tracking-tight text-foreground">
-                    Jugadores del equipo
-                  </h2>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {team.players.map((player) => (
-                    <article key={player.id} className="rounded-lg border border-border bg-white px-4 py-3 shadow-sm">
-                      <p className="font-black text-foreground">{player.nombre}</p>
-                      <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                        {player.categoriaSolicitada} · {player.estadoMatricula}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
               {visibleSections.map((section) => (
                 <section key={section.key}>
                   <div className="mb-8 flex items-center justify-between gap-4">

@@ -7,6 +7,11 @@ type AdminHeaderProps = {
 }
 
 export function AdminHeader({ viewer }: AdminHeaderProps) {
+  const displayName =
+    viewer.fullName.trim().toLowerCase() === 'coordinadore deportivo'
+      ? 'Coordinador Deportivo'
+      : viewer.fullName
+
   return (
     <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-border bg-background/95 px-5 backdrop-blur supports-backdrop-filter:bg-background/80 md:px-8">
       <AdminMobileDrawer role={viewer.role} />
@@ -18,7 +23,7 @@ export function AdminHeader({ viewer }: AdminHeaderProps) {
 
       <div className="ml-auto flex items-center gap-3">
         <div className="hidden flex-col text-right leading-tight sm:flex">
-          <span className="text-xs font-semibold text-foreground">{viewer.fullName}</span>
+          <span className="text-xs font-semibold text-foreground">{displayName}</span>
           <span className="text-[0.7rem] text-muted-foreground">{viewer.roleLabel}</span>
         </div>
         <span

@@ -1,7 +1,6 @@
-import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Newspaper, Share2 } from 'lucide-react'
-import { CLUB } from '@/lib/club'
+import { ArrowLeft, CalendarDays } from 'lucide-react'
+import { SafeImage } from '@/components/safe-image'
 import { sanitizeNewsHtml } from '@/lib/news-content'
 import { NewsRowCarousel } from '@/components/news-row-carousel'
 import type { PrivateNewsDetail, PrivateNewsItem } from '@/lib/private-app-shared'
@@ -58,9 +57,10 @@ export function NewsDetail({ item, backHref, relatedNews = [] }: NewsDetailProps
           </div>
 
           <div className="relative min-h-[320px] bg-muted lg:min-h-[460px]">
-            <Image
+            <SafeImage
               src={item.imageUrl}
               alt={item.title}
+              fallbackSrc="/images/Fondo1.png"
               fill
               priority
               className="object-cover"

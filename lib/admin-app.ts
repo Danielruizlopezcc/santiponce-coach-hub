@@ -8,6 +8,7 @@ import type { PlayerPosition, PrivateViewer } from '@/lib/private-app-shared'
 import { getSponsorTierFromSortOrder, type SponsorTier } from '@/lib/sponsors'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getTeamShirtNumbers } from '@/lib/team-shirt-numbers'
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
 export type AdminViewer = PrivateViewer & {
@@ -157,6 +158,7 @@ export type AdminTeamMember = {
   nombre: string
   tutor: string
   position: PlayerPosition | null
+  shirtNumber: number | null
   estadoMatricula: AdminAthleteRow['estadoMatricula']
 }
 
@@ -1538,12 +1540,14 @@ export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetai
 
   const teamAthletes = athletes.filter((a) => a.assigned_team_id === teamId)
   const totalMembers = teamAthletes.length
+  const shirtNumbers = await getTeamShirtNumbers()
 
   const members: AdminTeamMember[] = teamAthletes.map((a) => ({
     id: a.id,
     nombre: `${a.first_name} ${a.last_name}`.trim(),
     tutor: guardianById.get(a.guardian_id)?.name ?? 'Tutor no disponible',
     position: (a.position ?? null) as PlayerPosition | null,
+    shirtNumber: shirtNumbers[a.id] ?? null,
     estadoMatricula: mapStatusLabel(a.status),
   }))
 

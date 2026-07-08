@@ -21,6 +21,7 @@ import { getSavedStripeCardByEmail } from '@/lib/stripe-payment-methods'
 import { getSponsorTierFromSortOrder } from '@/lib/sponsors'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getTeamShirtNumbers } from '@/lib/team-shirt-numbers'
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
 type PrivateCollections = {
@@ -484,12 +485,14 @@ export async function getPrivateTeamDetail(teamId: string): Promise<PrivateTeamD
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
   const categoryName = categoryById.get(team.category_id) ?? 'Sin categoría'
   const sortInfo = getTeamCategorySortInfo(team.name, categoryName)
+  const shirtNumbers = await getTeamShirtNumbers()
   const players: PrivateTeamPlayer[] = (athletes ?? []).map((athlete) => ({
     id: athlete.id,
     nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
     categoriaSolicitada:
       categoryById.get(athlete.requested_category_id) ?? 'Categoría pendiente',
     position: (athlete.position ?? null) as PlayerPosition | null,
+    shirtNumber: shirtNumbers[athlete.id] ?? null,
     estadoMatricula: mapPrivateTeamPlayerStatus(athlete.status),
   }))
 
