@@ -204,93 +204,104 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Equipo</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Categoría</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Temporada</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Plantilla</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Estado</th>
-              <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-card">
-            {teams.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                  No hay equipos. Crea el primero.
-                </td>
-              </tr>
-            )}
-            {teams.map((team) => (
-              <tr
+      {teams.length === 0 ? (
+        <div className="rounded-xl bg-white px-4 py-14 text-center text-sm font-semibold text-muted-foreground ring-1 ring-foreground/10">
+          No hay equipos. Crea el primero.
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {teams.map((team) => {
+            const isDeleting = confirmDeleteId === team.id
+            const capacityPercent = Math.min(100, Math.round((team.deportistas / 15) * 100))
+
+            return (
+              <article
                 key={team.id}
                 className={cn(
-                  'transition-colors hover:bg-muted/30',
-                  confirmDeleteId === team.id && 'bg-destructive/5',
+                  'overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-foreground/10 transition-colors',
+                  isDeleting && 'bg-destructive/5 ring-destructive/25',
                 )}
               >
-                <td className="px-4 py-3 font-medium">
-                  <p>{team.nombre}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground sm:hidden">
-                    {team.categoria} · {team.temporada}
-                  </p>
-                </td>
-                <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{team.categoria}</td>
-                <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{team.temporada}</td>
-                <td className="px-4 py-3">
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <Users className="size-3.5" aria-hidden="true" />
-                    {team.deportistas}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', ESTADO_STYLES[team.estado])}>
-                    {team.estado}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {confirmDeleteId === team.id ? (
-                    <div className="flex items-center justify-end gap-2">
-                      <span className="text-xs text-muted-foreground">¿Eliminar equipo?</span>
-                      <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(team.id)}>
-                        Sí, eliminar
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)}>
-                        Cancelar
-                      </Button>
+                <div className="bg-primary p-4 text-white">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                        {team.categoria}
+                      </p>
+                      <h3 className="mt-2 truncate text-2xl font-black leading-tight">{team.nombre}</h3>
+                      <p className="mt-1 text-sm font-semibold text-white/75">{team.temporada}</p>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-end gap-1">
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link href={`/admin/equipos/${team.id}`}>
-                          <Users className="size-3.5" aria-hidden="true" />
-                          Ver plantilla
-                        </Link>
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(team)}>
-                        <Pencil className="size-3.5" aria-hidden="true" />
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => setConfirmDeleteId(team.id)}
-                      >
-                        <Trash2 className="size-3.5" aria-hidden="true" />
-                        Eliminar
-                      </Button>
+                    <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-black', ESTADO_STYLES[team.estado])}>
+                      {team.estado}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Plantilla</p>
+                      <div className="mt-2 flex items-end gap-2">
+                        <p className="text-3xl font-black text-foreground">{team.deportistas}</p>
+                        <p className="pb-1 text-xs font-semibold text-muted-foreground">jugadores</p>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white ring-1 ring-blue-100">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${capacityPercent}%` }} />
+                      </div>
                     </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+
+                    <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Actividad</p>
+                      <p className="mt-2 text-lg font-black text-foreground">
+                        {team.isActive ? 'Activo' : 'Inactivo'}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                        {team.notes?.trim() || 'Sin notas internas'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-border pt-3">
+                    {isDeleting ? (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="mr-auto text-xs font-semibold text-muted-foreground">¿Eliminar equipo?</span>
+                        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(team.id)}>
+                          Sí, eliminar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Button size="sm" variant="ghost" asChild>
+                          <Link href={`/admin/equipos/${team.id}`}>
+                            <Users className="size-3.5" aria-hidden="true" />
+                            Ver plantilla
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(team)}>
+                          <Pencil className="size-3.5" aria-hidden="true" />
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setConfirmDeleteId(team.id)}
+                        >
+                          <Trash2 className="size-3.5" aria-hidden="true" />
+                          Eliminar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
 
       <AdminFormDialog
         open={sheetOpen}
@@ -309,69 +320,87 @@ export function EquiposClient({ teams, categories, seasons }: Props) {
           </>
         }
       >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="team-name">Nombre</Label>
-              <Input
-                id="team-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ej. Benjamín A"
-                autoFocus
-              />
-            </div>
+          <div className="space-y-4">
+            <section className="rounded-xl bg-blue-50/70 p-4 ring-1 ring-blue-100">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Identidad</p>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="team-name">Nombre</Label>
+                  <Input
+                    id="team-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej. Benjamín A"
+                    autoFocus
+                  />
+                </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="team-category">Categoría</Label>
-              <select
-                id="team-category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Selecciona categoría…</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
-            </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="team-notes">Notas (opcional)</Label>
+                  <Input
+                    id="team-notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Observaciones internas..."
+                  />
+                </div>
+              </div>
+            </section>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="team-season">Temporada</Label>
-              <select
-                id="team-season"
-                value={seasonId}
-                onChange={(e) => setSeasonId(e.target.value)}
-                className="h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Selecciona temporada…</option>
-                {seasons.map((s) => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
-            </div>
+            <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Categoría y temporada</p>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="team-category">Categoría</Label>
+                  <select
+                    id="team-category"
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Selecciona categoría...</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="team-notes">Notas (opcional)</Label>
-              <Input
-                id="team-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Observaciones internas…"
-              />
-            </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="team-season">Temporada</Label>
+                  <select
+                    id="team-season"
+                    value={seasonId}
+                    onChange={(e) => setSeasonId(e.target.value)}
+                    className="h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Selecciona temporada...</option>
+                    {seasons.map((s) => (
+                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Estado</p>
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-muted/35 px-3 py-3">
+                <div>
+                  <Label htmlFor="team-active" className="font-black">Equipo activo</Label>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                    Los equipos activos aparecen disponibles en planificación y asignaciones.
+                  </p>
+                </div>
+                <input
+                  id="team-active"
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="size-4 rounded border-border accent-primary"
+                />
+              </div>
+            </section>
           </div>
-
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
-              <input
-                id="team-active"
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="size-4 rounded border-border accent-primary"
-              />
-              <Label htmlFor="team-active">Equipo activo</Label>
-            </div>
 
       </AdminFormDialog>
       <AdminErrorDialog message={formError} onClose={() => setFormError(null)} />

@@ -338,12 +338,12 @@ export default async function AdminDashboardPage() {
             <ModuleCard
               label="Administración"
               title="Matrículas y familias"
-              description="Control administrativo de tutores, socios, matrículas y consentimientos."
+              description="Control administrativo de tutores legales, socios, matrículas y consentimientos."
               icon={UserCheck}
               tone="amber"
               actions={[
                 { label: 'Matrículas', href: '/admin/matriculas' },
-                { label: 'Tutores / Socios', href: '/admin/tutores' },
+                { label: 'Tutores legales / Socios', href: '/admin/tutores' },
                 { label: 'Consentimientos', href: '/admin/consentimientos' },
               ]}
             >
@@ -352,7 +352,7 @@ export default async function AdminDashboardPage() {
                 value={`${getPercent(data.summary.deportistasMatriculados, totalDeportistas)}%`}
                 detail={`${data.summary.deportistasMatriculados} de ${data.summary.deportistas}`}
               />
-              <ModuleMetric label="Tutores" value={data.summary.tutores} />
+              <ModuleMetric label="Tutores legales" value={data.summary.tutores} />
               <ModuleMetric
                 label="Alertas"
                 value={data.alerts.length}
@@ -361,13 +361,13 @@ export default async function AdminDashboardPage() {
             </ModuleCard>
 
             <ModuleCard
-              label="Cuotas"
-              title="Cobros por deportista"
+              label="Contabilidad"
+              title="Cobros y cuotas"
               description="Resumen económico ligado a cuotas, matrículas y actividad reciente de pagos."
               icon={WalletCards}
               tone="green"
               actions={[
-                { label: 'Cuotas', href: '/admin/pagos' },
+                { label: 'Contabilidad', href: '/admin/pagos' },
                 { label: 'Matrículas', href: '/admin/matriculas' },
               ]}
             >

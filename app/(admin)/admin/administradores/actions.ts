@@ -29,6 +29,11 @@ function getManagerRoleLabel(role: AdminRole) {
   return role === 'admin' ? 'Administrador General' : 'Coordinador deportivo'
 }
 
+function normalizeManagerName(nombre: string, role: AdminRole) {
+  if (role !== 'sports_coordinator') return nombre
+  return nombre.replace(/^Coordinadore$/i, 'Coordinador')
+}
+
 async function countAdmins() {
   const { count, error } = await createAdminClient()
     .from('user_roles')
@@ -59,6 +64,7 @@ export async function createAdminManagerAction(
 
   const values = parsed.data
   const email = normalizeEmail(values.email)
+  const nombre = normalizeManagerName(values.nombre, values.role)
   const supabase = createAdminClient()
   let createdUserId: string | null = null
 
@@ -77,7 +83,7 @@ export async function createAdminManagerAction(
       password: values.password,
       email_confirm: true,
       user_metadata: {
-        first_name: values.nombre,
+        first_name: nombre,
         last_name: values.apellidos,
       },
     })
@@ -90,7 +96,7 @@ export async function createAdminManagerAction(
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: createdUserId,
       email,
-      first_name: values.nombre,
+      first_name: nombre,
       last_name: values.apellidos,
     })
     if (profileError) throw new Error(profileError.message)
@@ -105,7 +111,7 @@ export async function createAdminManagerAction(
       action: 'admin.create',
       entityType: 'profile',
       entityId: createdUserId,
-      summary: `Creó ${getManagerRoleLabel(values.role)} ${values.nombre} ${values.apellidos}.`,
+      summary: `Creó ${getManagerRoleLabel(values.role)} ${nombre} ${values.apellidos}.`,
       metadata: { email, role: values.role },
     })
 
@@ -128,6 +134,7 @@ export async function updateAdminManagerAction(input: unknown): Promise<void> {
   const admin = await requireAdminAction()
   const parsed = updateManagerSchema.parse(input)
   const email = normalizeEmail(parsed.email)
+  const nombre = normalizeManagerName(parsed.nombre, parsed.role)
   const supabase = createAdminClient()
 
   const { data: adminRole, error: roleLookupError } = await supabase
@@ -152,7 +159,7 @@ export async function updateAdminManagerAction(input: unknown): Promise<void> {
   const { error: authError } = await supabase.auth.admin.updateUserById(parsed.adminId, {
     email,
     user_metadata: {
-      first_name: parsed.nombre,
+      first_name: nombre,
       last_name: parsed.apellidos,
     },
   })
@@ -161,7 +168,7 @@ export async function updateAdminManagerAction(input: unknown): Promise<void> {
   const { error: profileError } = await supabase.from('profiles').upsert({
     id: parsed.adminId,
     email,
-    first_name: parsed.nombre,
+    first_name: nombre,
     last_name: parsed.apellidos,
   })
   if (profileError) throw new Error(profileError.message)
@@ -193,7 +200,7 @@ export async function updateAdminManagerAction(input: unknown): Promise<void> {
     action: 'admin.update',
     entityType: 'profile',
     entityId: parsed.adminId,
-    summary: `Actualizó ${getManagerRoleLabel(parsed.role)} ${parsed.nombre} ${parsed.apellidos}.`,
+    summary: `Actualizó ${getManagerRoleLabel(parsed.role)} ${nombre} ${parsed.apellidos}.`,
     metadata: { email, role: parsed.role },
   })
 

@@ -2,13 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BarChart3, CreditCard, Download, FileText, Landmark, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
-import {
-  AdminTable,
-  type AdminTableRow,
-  type Column,
-  type FilterConfig,
-} from '@/components/admin/admin-table'
+import { ArrowRight, BarChart3, CreditCard, Download, FileText, Landmark, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,18 +40,24 @@ type PaymentsTab = 'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'programadas
 const TAB_GROUPS: Array<{
   title: string
   description: string
+  eyebrow: string
+  icon: typeof Wallet
   tone: 'blue' | 'green' | 'amber'
   tabs: Array<{ id: PaymentsTab; label: string }>
 }> = [
   {
     title: 'Vista general',
     description: 'Foto rápida del dinero cobrado, pendiente y balance.',
+    eyebrow: 'Resumen',
+    icon: Wallet,
     tone: 'blue',
     tabs: [{ id: 'resumen', label: 'Resumen' }],
   },
   {
     title: 'Cobros a familias',
     description: 'Pagos reales de matrículas y socios vinculados a tutores/deportistas.',
+    eyebrow: 'Operaciones',
+    icon: ReceiptText,
     tone: 'green',
     tabs: [
       { id: 'cobros', label: 'Cobros realizados' },
@@ -66,8 +66,10 @@ const TAB_GROUPS: Array<{
     ],
   },
   {
-    title: 'Cuotas de deportistas',
+    title: 'Cuotas y asignaciones',
     description: 'Plantillas de cuota y cargos programados para asignar a jugadores.',
+    eyebrow: 'Deportistas',
+    icon: Tags,
     tone: 'amber',
     tabs: [
       { id: 'cuotas', label: 'Cuotas configuradas' },
@@ -77,50 +79,13 @@ const TAB_GROUPS: Array<{
   {
     title: 'Contabilidad del club',
     description: 'Ingresos y gastos manuales que completan el balance contable.',
+    eyebrow: 'Balance',
+    icon: Landmark,
     tone: 'blue',
     tabs: [
       { id: 'ingresos', label: 'Ingresos manuales' },
       { id: 'gastos', label: 'Gastos manuales' },
       { id: 'informes', label: 'Informes' },
-    ],
-  },
-]
-
-const columns: Column[] = [
-  { key: 'operacion', label: 'Operación' },
-  { key: 'deportista', label: 'Deportista' },
-  { key: 'tutor', label: 'Tutor', responsive: 'md' },
-  { key: 'importe', label: 'Importe' },
-  { key: 'estado', label: 'Estado' },
-  { key: 'proveedor', label: 'Proveedor', responsive: 'lg' },
-  { key: 'fecha', label: 'Fecha', responsive: 'lg' },
-]
-
-const filters: FilterConfig[] = [
-  {
-    key: 'estado',
-    label: 'Estado',
-    options: [
-      { label: 'Pagado', value: 'pagado' },
-      { label: 'Pendiente', value: 'pendiente' },
-      { label: 'Fallido', value: 'fallido' },
-      { label: 'Reembolsado', value: 'reembolsado' },
-    ],
-  },
-  {
-    key: 'proveedor',
-    label: 'Proveedor',
-    options: [
-      { label: 'Stripe', value: 'Stripe' },
-      { label: 'Manual', value: 'Manual' },
-    ],
-  },
-  {
-    key: 'operacion',
-    label: 'Operación',
-    options: [
-      { label: 'Cuota socio', value: 'Cuota de socio' },
-      { label: 'Matrícula', value: 'Matrícula inicial' },
     ],
   },
 ]
@@ -131,6 +96,13 @@ const STATUS_STYLES = {
   fallido: 'bg-rose-500',
   reembolsado: 'bg-sky-500',
 } as const
+
+const PAYMENT_BADGE_STYLES: Record<AdminPaymentRow['estado'], string> = {
+  pagado: 'bg-emerald-100 text-emerald-700',
+  pendiente: 'bg-amber-100 text-amber-700',
+  fallido: 'bg-rose-100 text-rose-700',
+  reembolsado: 'bg-sky-100 text-sky-700',
+}
 
 function getPercent(value: number, total: number) {
   if (total <= 0) return 0
@@ -424,6 +396,10 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
   const [deleteMessage, setDeleteMessage] = useState<FinanceMovementActionState | null>(null)
   const [paymentActionId, setPaymentActionId] = useState<string | null>(null)
   const [paymentMessage, setPaymentMessage] = useState<FinanceMovementActionState | null>(null)
+  const [paymentSearch, setPaymentSearch] = useState('')
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'todos' | AdminPaymentRow['estado']>('todos')
+  const [paymentProviderFilter, setPaymentProviderFilter] = useState('todos')
+  const [paymentOperationFilter, setPaymentOperationFilter] = useState('todos')
   const [feeDeleteMessage, setFeeDeleteMessage] = useState<FeeTemplateActionState | null>(null)
   const [movementState, movementAction, movementPending] = useActionState(
     createFinanceMovementAction,
@@ -487,14 +463,33 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
     }
   }, [payments, financeMovements])
 
-  const tableData = useMemo<AdminTableRow[]>(
-    () =>
-      payments.map((row) => ({
-        ...row,
-        importe: formatEuro(row.importe),
-      })),
+  const paymentOperationTypes = useMemo(
+    () => Array.from(new Set(payments.map((payment) => payment.operacion))).sort((a, b) => a.localeCompare(b, 'es')),
     [payments],
   )
+
+  const visiblePayments = useMemo(() => {
+    const q = paymentSearch.trim().toLowerCase()
+    return payments.filter((payment) => {
+      if (paymentStatusFilter !== 'todos' && payment.estado !== paymentStatusFilter) return false
+      if (paymentProviderFilter !== 'todos' && payment.proveedor !== paymentProviderFilter) return false
+      if (paymentOperationFilter !== 'todos' && payment.operacion !== paymentOperationFilter) return false
+      if (!q) return true
+
+      return [
+        payment.operacion,
+        payment.deportista,
+        payment.tutor,
+        payment.estado,
+        payment.proveedor,
+        payment.fecha,
+        formatEuro(payment.importe),
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+  }, [paymentOperationFilter, paymentProviderFilter, paymentSearch, paymentStatusFilter, payments])
 
   const visibleMovements = useMemo(() => {
     const q = movementSearch.trim().toLowerCase()
@@ -731,83 +726,125 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
 
   return (
     <div className="space-y-8">
-      <section className="rounded-xl border border-border bg-white/80 p-4 shadow-sm backdrop-blur">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+      <section className="rounded-xl border border-border bg-white/86 p-5 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-primary">
               Mapa del módulo
             </p>
-            <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
-              Cobros, cuotas y contabilidad separados
+            <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">
+              Elige qué parte de contabilidad quieres revisar
             </h2>
-            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
-              Los cobros son operaciones reales a familias; las cuotas son plantillas y cargos
-              programados para deportistas; la contabilidad recoge movimientos manuales del club.
+            <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">
+              Accede directamente a cobros, matrículas, cuotas asignadas o movimientos del club sin
+              mezclar tareas. La sección activa queda marcada para que sepas dónde estás.
             </p>
           </div>
           {activeGroup ? (
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary">
-              {activeGroup.title}
-            </span>
+            <div className="rounded-xl bg-primary/10 px-4 py-2 text-right">
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-primary/70">Ahora viendo</p>
+              <p className="text-sm font-black text-primary">{activeGroup.title}</p>
+            </div>
           ) : null}
         </div>
 
-        <div className="mt-4 grid gap-3 xl:grid-cols-4" role="tablist" aria-label="Secciones de cuotas y contabilidad">
-          {TAB_GROUPS.map((group) => (
-            <div
-              key={group.title}
-              className={cn(
-                'rounded-lg border p-3',
-                group.tabs.some((tab) => tab.id === activeTab)
-                  ? 'border-primary/30 bg-primary/5'
-                  : 'border-border bg-white',
-              )}
-            >
-              <div className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    'mt-0.5 size-2.5 shrink-0 rounded-full',
-                    group.tone === 'green' && 'bg-emerald-500',
-                    group.tone === 'amber' && 'bg-amber-500',
-                    group.tone === 'blue' && 'bg-primary',
-                  )}
-                  aria-hidden="true"
-                />
-                <div className="min-w-0">
-                  <p className="font-black text-foreground">{group.title}</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-muted-foreground">
-                    {group.description}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {group.tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id)
-                      if (tab.id === 'ingresos' || tab.id === 'gastos') {
-                        setMovementFormType(tab.id === 'gastos' ? 'gasto' : 'ingreso')
-                        setEditingMovement(null)
-                        setConfirmDeleteMovementId(null)
-                      }
-                    }}
+        <div className="mt-5 grid gap-3 lg:grid-cols-2 2xl:grid-cols-4" role="tablist" aria-label="Secciones de cuotas y contabilidad">
+          {TAB_GROUPS.map((group) => {
+            const Icon = group.icon
+            const isGroupActive = group.tabs.some((tab) => tab.id === activeTab)
+
+            return (
+              <article
+                key={group.title}
+                className={cn(
+                  'flex min-h-56 flex-col rounded-xl border p-4 shadow-sm transition-colors',
+                  isGroupActive
+                    ? 'border-primary/35 bg-primary/5 ring-1 ring-primary/15'
+                    : 'border-border bg-white/92 hover:border-primary/25 hover:bg-blue-50/20',
+                )}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p
+                      className={cn(
+                        'text-[0.68rem] font-black uppercase tracking-[0.18em]',
+                        group.tone === 'green' && 'text-emerald-700',
+                        group.tone === 'amber' && 'text-amber-700',
+                        group.tone === 'blue' && 'text-primary',
+                      )}
+                    >
+                      {group.eyebrow}
+                    </p>
+                    <h3 className="mt-2 text-lg font-black tracking-tight text-foreground">{group.title}</h3>
+                  </div>
+                  <span
                     className={cn(
-                      'rounded-full px-3 py-1.5 text-xs font-black uppercase transition-colors',
-                      activeTab === tab.id
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'bg-white text-muted-foreground ring-1 ring-foreground/10 hover:bg-primary/10 hover:text-primary',
+                      'flex size-11 shrink-0 items-center justify-center rounded-xl',
+                      group.tone === 'green' && 'bg-emerald-100 text-emerald-700',
+                      group.tone === 'amber' && 'bg-amber-100 text-amber-700',
+                      group.tone === 'blue' && 'bg-primary/10 text-primary',
                     )}
+                    aria-hidden="true"
                   >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+                    <Icon className="size-5" />
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm font-semibold leading-6 text-muted-foreground">
+                  {group.description}
+                </p>
+
+                <div className="mt-auto grid gap-2 pt-4">
+                  {group.tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id)
+                        if (tab.id === 'ingresos' || tab.id === 'gastos') {
+                          setMovementFormType(tab.id === 'gastos' ? 'gasto' : 'ingreso')
+                          setEditingMovement(null)
+                          setConfirmDeleteMovementId(null)
+                        }
+                      }}
+                      className={cn(
+                        'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm font-black transition-colors',
+                        activeTab === tab.id
+                          ? 'border-primary bg-primary text-white shadow-sm'
+                          : 'border-border bg-white text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary',
+                      )}
+                    >
+                      <span>{tab.label}</span>
+                      <ArrowRight
+                        className={cn(
+                          'size-4 shrink-0',
+                          activeTab === tab.id ? 'text-white' : 'text-muted-foreground',
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                {isGroupActive ? (
+                  <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/80 px-3 py-2 text-xs font-black text-primary">
+                    <span
+                      className={cn(
+                        'size-2 rounded-full',
+                        group.tone === 'green' && 'bg-emerald-500',
+                        group.tone === 'amber' && 'bg-amber-500',
+                        group.tone === 'blue' && 'bg-primary',
+                      )}
+                      aria-hidden="true"
+                    />
+                    Sección activa
+                  </div>
+                ) : null}
+              </article>
+            )
+          })}
         </div>
       </section>
 
@@ -937,80 +974,141 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
               <ReceiptText className="size-3.5" aria-hidden="true" />
               Histórico
             </span>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">
+              {visiblePayments.length} de {payments.length}
+            </span>
           </div>
-          <AdminTable
-            data={tableData}
-            columns={columns}
-            searchPlaceholder="Buscar por operación, tutor, deportista, proveedor o fecha"
-            filters={filters}
-            isLoading={false}
-            emptyTitle="Sin pagos"
-            emptyDescription="No hay pagos que coincidan con los filtros aplicados."
-          />
+
+          <div className="mb-4 space-y-3 rounded-xl bg-muted/25 p-3 ring-1 ring-foreground/10">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                type="search"
+                value={paymentSearch}
+                onChange={(event) => setPaymentSearch(event.target.value)}
+                placeholder="Buscar por operación, tutor, deportista, proveedor o fecha"
+                className="pl-9"
+              />
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              <select
+                value={paymentStatusFilter}
+                onChange={(event) => setPaymentStatusFilter(event.target.value as typeof paymentStatusFilter)}
+                className="h-9 rounded-lg border border-input bg-white px-3 text-sm"
+              >
+                <option value="todos">Todos los estados</option>
+                <option value="pagado">Pagados</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="fallido">Fallidos</option>
+                <option value="reembolsado">Reembolsados</option>
+              </select>
+              <select
+                value={paymentProviderFilter}
+                onChange={(event) => setPaymentProviderFilter(event.target.value)}
+                className="h-9 rounded-lg border border-input bg-white px-3 text-sm"
+              >
+                <option value="todos">Todos los proveedores</option>
+                <option value="Stripe">Stripe</option>
+                <option value="Manual">Manual</option>
+              </select>
+              <select
+                value={paymentOperationFilter}
+                onChange={(event) => setPaymentOperationFilter(event.target.value)}
+                className="h-9 rounded-lg border border-input bg-white px-3 text-sm"
+              >
+                <option value="todos">Todas las operaciones</option>
+                {paymentOperationTypes.map((operation) => (
+                  <option key={operation} value={operation}>{operation}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {paymentMessage?.message && paymentMessage.ok ? (
             <p
               className={cn(
-                'mt-4 rounded-lg px-3 py-2 text-sm font-semibold',
+                'mb-4 rounded-lg px-3 py-2 text-sm font-semibold',
                 paymentMessage.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
               )}
             >
               {paymentMessage.message}
             </p>
           ) : null}
-          <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
-                  <th className="px-4 py-2.5">Operación</th>
-                  <th className="hidden px-4 py-2.5 md:table-cell">Tutor</th>
-                  <th className="px-4 py-2.5">Estado</th>
-                  <th className="px-4 py-2.5">Importe</th>
-                  <th className="px-4 py-2.5 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {payments.map((payment) => {
-                  const canRefund = payment.estado === 'pagado' && payment.proveedor === 'Stripe' && Boolean(payment.stripePaymentIntentId)
-                  const canRetry = payment.estado === 'fallido'
-                  const canCancel = payment.estado === 'pendiente' || payment.estado === 'fallido'
 
-                  return (
-                    <tr key={payment.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-4 py-3 font-semibold text-foreground">{payment.operacion}</td>
-                      <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{payment.tutor}</td>
-                      <td className="px-4 py-3">{payment.estado}</td>
-                      <td className="px-4 py-3 font-semibold text-foreground">{formatEuro(payment.importe)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          {canRetry ? (
-                            <Button type="button" size="sm" variant="outline" disabled={paymentActionId === `${payment.id}:pending`} onClick={() => handlePaymentAction(payment, 'pending')}>
-                              {paymentActionId === `${payment.id}:pending` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
-                              Reintentar
-                            </Button>
-                          ) : null}
-                          {canCancel ? (
-                            <Button type="button" size="sm" variant="destructive" disabled={paymentActionId === `${payment.id}:cancel`} onClick={() => handlePaymentAction(payment, 'cancel')}>
-                              {paymentActionId === `${payment.id}:cancel` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
-                              Cancelar
-                            </Button>
-                          ) : null}
-                          {canRefund ? (
-                            <Button type="button" size="sm" variant="outline" disabled={paymentActionId === `${payment.id}:refund`} onClick={() => handlePaymentAction(payment, 'refund')}>
-                              {paymentActionId === `${payment.id}:refund` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
-                              Reembolsar
-                            </Button>
-                          ) : null}
-                          {!canRetry && !canCancel && !canRefund ? (
-                            <span className="text-xs text-muted-foreground">Sin acciones</span>
-                          ) : null}
+          {visiblePayments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-white/70 px-4 py-12 text-center text-sm font-semibold text-muted-foreground">
+              No hay pagos que coincidan con los filtros aplicados.
+            </div>
+          ) : (
+            <div className="grid gap-3 xl:grid-cols-2">
+              {visiblePayments.map((payment) => {
+                const canRefund = payment.estado === 'pagado' && payment.proveedor === 'Stripe' && Boolean(payment.stripePaymentIntentId)
+                const canRetry = payment.estado === 'fallido'
+                const canCancel = payment.estado === 'pendiente' || payment.estado === 'fallido'
+
+                return (
+                  <article key={payment.id} className="rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', PAYMENT_BADGE_STYLES[payment.estado])}>
+                            {payment.estado}
+                          </span>
+                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
+                            {payment.proveedor}
+                          </span>
                         </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        <p className="mt-3 text-lg font-black leading-tight text-foreground">{payment.operacion}</p>
+                        <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                          {payment.tutor} · {payment.deportista}
+                        </p>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Importe</p>
+                        <p className="mt-1 text-2xl font-black text-foreground">{formatEuro(payment.importe)}</p>
+                        <p className="mt-1 text-xs font-semibold text-muted-foreground">{payment.fecha}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/35 px-3 py-2">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {canRetry
+                          ? 'Pago fallido: se puede volver a pasar a pendiente.'
+                          : canRefund
+                            ? 'Cobro confirmado por Stripe con opción de reembolso.'
+                            : canCancel
+                              ? 'Pago pendiente: puede cancelarse si procede.'
+                              : 'Operación cerrada sin acciones disponibles.'}
+                      </p>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {canRetry ? (
+                          <Button type="button" size="sm" variant="outline" disabled={paymentActionId === `${payment.id}:pending`} onClick={() => handlePaymentAction(payment, 'pending')}>
+                            {paymentActionId === `${payment.id}:pending` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                            Reintentar
+                          </Button>
+                        ) : null}
+                        {canCancel ? (
+                          <Button type="button" size="sm" variant="destructive" disabled={paymentActionId === `${payment.id}:cancel`} onClick={() => handlePaymentAction(payment, 'cancel')}>
+                            {paymentActionId === `${payment.id}:cancel` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                            Cancelar
+                          </Button>
+                        ) : null}
+                        {canRefund ? (
+                          <Button type="button" size="sm" variant="outline" disabled={paymentActionId === `${payment.id}:refund`} onClick={() => handlePaymentAction(payment, 'refund')}>
+                            {paymentActionId === `${payment.id}:refund` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                            Reembolsar
+                          </Button>
+                        ) : null}
+                        {!canRetry && !canCancel && !canRefund ? (
+                          <span className="self-center text-xs font-semibold text-muted-foreground">Sin acciones</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </div>
       </section>
       ) : null}
@@ -1026,7 +1124,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-                Cuotas de deportistas
+                Contabilidad
               </p>
               <h2 id="pagos-cuotas" className="mt-2 text-2xl font-black tracking-tight text-foreground">
                 Plantillas de cuotas
@@ -1450,40 +1548,60 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-blue-50 text-left text-xs font-bold text-blue-950">
-                        <th className="px-4 py-2.5">Operación</th>
-                        <th className="px-4 py-2.5">Tutor</th>
-                        <th className="px-4 py-2.5">Importe</th>
-                        <th className="px-4 py-2.5">Estado</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-card">
-                      {visiblePendingPayments.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                            No hay pagos que coincidan con los filtros.
-                          </td>
-                        </tr>
-                      ) : (
-                        visiblePendingPayments.map((payment) => (
-                          <tr key={payment.id}>
-                            <td className="px-4 py-3 font-semibold">{payment.operacion}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{payment.tutor}</td>
-                            <td className="px-4 py-3 font-semibold">{formatEuro(payment.importe)}</td>
-                            <td className="px-4 py-3">
-                              <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', payment.estado === 'pendiente' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700')}>
+                {visiblePendingPayments.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-white/70 px-4 py-12 text-center text-sm font-semibold text-muted-foreground">
+                    No hay pagos que coincidan con los filtros.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {visiblePendingPayments.map((payment) => {
+                      const canRetry = payment.estado === 'fallido'
+                      const canCancel = payment.estado === 'pendiente' || payment.estado === 'fallido'
+
+                      return (
+                        <article key={payment.id} className="rounded-xl border border-border bg-white p-4 shadow-sm">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', PAYMENT_BADGE_STYLES[payment.estado])}>
                                 {payment.estado}
                               </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                              <p className="mt-3 text-lg font-black leading-tight text-foreground">{payment.operacion}</p>
+                              <p className="mt-1 text-sm font-semibold text-muted-foreground">{payment.tutor}</p>
+                              <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{payment.deportista}</p>
+                            </div>
+                            <div className="text-left sm:text-right">
+                              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Importe</p>
+                              <p className="mt-1 text-2xl font-black text-foreground">{formatEuro(payment.importe)}</p>
+                              <p className="mt-1 text-xs font-semibold text-muted-foreground">{payment.fecha}</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/35 px-3 py-2">
+                            <p className="text-xs font-semibold text-muted-foreground">
+                              {payment.estado === 'fallido'
+                                ? 'Operación fallida pendiente de reintento o cancelación.'
+                                : 'Operación pendiente de cobro o revisión.'}
+                            </p>
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {canRetry ? (
+                                <Button type="button" size="sm" variant="outline" disabled={paymentActionId === `${payment.id}:pending`} onClick={() => handlePaymentAction(payment, 'pending')}>
+                                  {paymentActionId === `${payment.id}:pending` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                                  Reintentar
+                                </Button>
+                              ) : null}
+                              {canCancel ? (
+                                <Button type="button" size="sm" variant="destructive" disabled={paymentActionId === `${payment.id}:cancel`} onClick={() => handlePaymentAction(payment, 'cancel')}>
+                                  {paymentActionId === `${payment.id}:cancel` ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+                                  Cancelar
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1495,7 +1613,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">
-                Cuotas de deportistas
+                Contabilidad
               </p>
               <h2 id="pagos-programadas" className="mt-2 text-2xl font-black tracking-tight text-foreground">
                 Cuotas programadas

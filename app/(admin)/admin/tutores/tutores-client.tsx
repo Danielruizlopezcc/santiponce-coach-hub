@@ -309,28 +309,17 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
               Administración familiar
             </p>
             <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
-              Tutores, socios y estado económico
+              Tutores legales, socios y estado económico
             </h2>
             <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
-              Separa familias, socios del club, solicitudes pendientes y cuotas activas vinculadas a tutores.
+              Separa familias, socios del club, solicitudes pendientes y cuotas activas vinculadas a tutores legales.
             </p>
           </div>
-          <Button
-            type="button"
-            onClick={() => {
-              setEditingTutor(null)
-              setShowTutorForm(true)
-              setActiveTab('tutores')
-            }}
-          >
-            <Plus className="size-4" />
-            Crear tutor
-          </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <TutorSummaryCard
-            title="Tutores"
+            title="Tutores legales"
             value={approvedTutors.length}
             detail={`${tutorsWithAthletes} con deportistas asociados`}
             icon={Users}
@@ -339,7 +328,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
           <TutorSummaryCard
             title="Socios"
             value={members.length}
-            detail={`${tutorMembers} tutores también son socios`}
+            detail={`${tutorMembers} tutores legales también son socios`}
             icon={UserCheck}
             tone="green"
           />
@@ -360,9 +349,9 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
         </div>
       </section>
 
-      <div className="grid gap-2 border-b border-border pb-3 sm:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="Secciones de tutores y socios">
+      <div className="grid gap-2 border-b border-border pb-3 sm:grid-cols-2 xl:grid-cols-4" role="tablist" aria-label="Secciones de tutores legales y socios">
         {[
-          { id: 'tutores', label: 'Tutores', count: approvedTutors.length, helper: 'Familias activas' },
+          { id: 'tutores', label: 'Tutores legales', count: approvedTutors.length, helper: 'Familias activas' },
           { id: 'socios', label: 'Socios', count: members.length, helper: 'Socios del club' },
           { id: 'pendientes', label: 'Pendientes', count: pendingTutors.length, helper: 'Por aprobar' },
           { id: 'rechazados', label: 'Rechazados', count: rejectedTutors.length, helper: 'Solicitudes no aceptadas' },
@@ -408,12 +397,12 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                 <div className="flex items-start justify-between gap-4 border-b border-border bg-[#06172f] px-6 py-5 text-white">
                   <div>
                     <Dialog.Title className="text-2xl font-black tracking-tight">
-                      {editingTutor ? 'Editar tutor' : 'Crear tutor'}
+                      {editingTutor ? 'Editar tutor legal' : 'Crear tutor legal'}
                     </Dialog.Title>
                     <Dialog.Description className="mt-1 text-sm font-medium text-white/70">
                       {editingTutor
-                        ? 'Actualiza los datos administrativos del tutor.'
-                        : 'Crea una cuenta de tutor con sus datos de acceso y consentimientos.'}
+                        ? 'Actualiza los datos administrativos del tutor legal.'
+                        : 'Crea una cuenta de tutor legal con sus datos de acceso y consentimientos.'}
                     </Dialog.Description>
                   </div>
                   <Dialog.Close render={<Button type="button" variant="ghost" size="icon-sm" className="text-white hover:bg-white/10 hover:text-white" />}>
@@ -428,7 +417,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                     <input type="hidden" name="userId" value={editingTutor?.userId ?? ''} />
                     <TutorFormSection
                       title="Identidad"
-                      description="Nombre legal y documento del tutor."
+                      description="Nombre legal y documento del tutor legal."
                       icon={Users}
                     >
                       <div className="grid gap-3 sm:grid-cols-3">
@@ -446,7 +435,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
                     <TutorFormSection
                       title="Acceso"
-                      description="Cuenta con la que el tutor entra en la zona privada."
+                      description="Cuenta con la que el tutor legal entra en la zona privada."
                       icon={KeyRound}
                     >
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -489,7 +478,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                           <span>
                             <span className="block font-black text-foreground">También es socio</span>
                             <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
-                              Marca al tutor como socio del club desde el alta.
+                              Marca al tutor legal como socio del club desde el alta.
                             </span>
                           </span>
                         </label>
@@ -517,7 +506,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                       </Dialog.Close>
                       <Button type="submit" disabled={tutorPending}>
                         {tutorPending ? <Loader2 className="size-4 animate-spin" /> : editingTutor ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-                        {editingTutor ? 'Guardar cambios' : 'Crear tutor'}
+                        {editingTutor ? 'Guardar cambios' : 'Crear tutor legal'}
                       </Button>
                     </div>
                   </form>
@@ -527,15 +516,31 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
           </Dialog.Root>
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">
+                <Users className="size-3.5" />
+                Gestión de tutores legales
+              </span>
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingTutor(null)
+                  setShowTutorForm(true)
+                }}
+              >
+                <Plus className="size-4" />
+                Crear tutor legal
+              </Button>
+            </div>
             <div className="relative mb-4">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} placeholder="Buscar por tutor, email, teléfono o ciudad" className="pl-9" />
+              <Input value={tutorSearch} onChange={(event) => setTutorSearch(event.target.value)} placeholder="Buscar por tutor legal, email, teléfono o ciudad" className="pl-9" />
             </div>
             {toggleMessage?.message && toggleMessage.ok ? <FormMessage state={toggleMessage} /> : null}
             <div className="mt-4 grid gap-3">
               {visibleTutors.length === 0 ? (
                 <p className="rounded-xl bg-muted px-4 py-14 text-center text-sm text-muted-foreground">
-                  No hay tutores que coincidan con la búsqueda.
+                  No hay tutores legales que coincidan con la búsqueda.
                 </p>
               ) : null}
 
@@ -545,38 +550,38 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                 const cardStatus = getCardStatus(tutor)
 
                 return (
-                  <article key={tutor.id} className="rounded-xl border border-border bg-white p-4 shadow-sm">
-                    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.85fr_0.95fr_auto]">
+                  <article key={tutor.id} className="rounded-xl border border-border bg-white p-3 shadow-sm">
+                    <div className="grid gap-3 xl:grid-cols-[1.2fr_0.85fr_0.95fr_auto]">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', tutor.isSocio ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
-                            {tutor.isSocio ? 'Socio' : 'Tutor'}
+                            {tutor.isSocio ? 'Socio' : 'Tutor legal'}
                           </span>
                           <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
                             {tutor.deportistasAsociados} deportista{tutor.deportistasAsociados !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <p className="mt-3 text-lg font-black leading-tight text-foreground">{tutor.nombre}</p>
+                        <p className="mt-2 text-lg font-black leading-tight text-foreground">{tutor.nombre}</p>
                         <p className="mt-1 truncate text-sm font-semibold text-muted-foreground" title={tutor.email}>
                           {tutor.email}
                         </p>
-                        <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                        <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
                           <span>{maskDocument(tutor.documento)}</span>
                           <span>{formatSpanishPhone(tutor.telefono)}</span>
                           <span className="truncate" title={tutor.ciudad}>{tutor.ciudad}</span>
                         </div>
                       </div>
 
-                      <div className="rounded-lg bg-muted/40 px-3 py-3">
+                      <div className="rounded-lg bg-muted/40 px-3 py-2">
                         <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Estado familiar</p>
-                        <div className="mt-3 flex items-center gap-3">
+                        <div className="mt-2 flex items-center gap-3">
                           <IconStatus {...consentStatus} />
                           <div>
                             <p className="text-sm font-black text-foreground">Consentimientos</p>
                             <p className="text-xs font-semibold text-muted-foreground">{consentStatus.title}</p>
                           </div>
                         </div>
-                        <div className="mt-3 flex items-center gap-3">
+                        <div className="mt-2 flex items-center gap-3">
                           <IconStatus {...cardStatus} />
                           <div>
                             <p className="text-sm font-black text-foreground">Tarjeta</p>
@@ -585,7 +590,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                         </div>
                       </div>
 
-                      <div className="rounded-lg bg-primary/5 px-3 py-3">
+                      <div className="rounded-lg bg-primary/5 px-3 py-2">
                         <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">Próximo cargo</p>
                         {nextCharge ? (
                           <div className="mt-2" title={`${nextCharge.label}. ${nextCharge.detail}.`}>
@@ -601,7 +606,7 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                           variant={tutor.isSocio ? 'default' : 'outline'}
                           disabled={isPending && pendingToggleId === tutor.userId}
                           onClick={() => handleToggleTutor(tutor)}
-                          className="mt-3"
+                          className="mt-2"
                         >
                           {pendingToggleId === tutor.userId ? <Loader2 className="size-3.5 animate-spin" /> : <UserCheck className="size-3.5" />}
                           {tutor.isSocio ? 'Desmarcar socio' : 'Marcar socio'}
@@ -663,22 +668,22 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
             <div>
               <p className="text-sm font-black uppercase tracking-[0.16em] text-amber-700">Bandeja de revisión</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">Solicitudes pendientes</h2>
-              <p className="mt-1 text-sm font-semibold text-muted-foreground">Revisa los datos del tutor antes de activar su acceso familiar.</p>
+              <p className="mt-1 text-sm font-semibold text-muted-foreground">Revisa los datos del tutor legal antes de activar su acceso familiar.</p>
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-700">
               <AlertTriangle className="size-4" />
               {pendingTutors.length} por aprobar
             </span>
           </div>
-          <div className="mt-4 grid gap-3">
+            <div className="mt-4 grid gap-3">
             {pendingTutors.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
-                No hay tutores pendientes de aprobación.
+                No hay tutores legales pendientes de aprobación.
               </div>
             ) : null}
             {pendingTutors.map((tutor) => (
-              <article key={tutor.id} className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm">
-                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+              <article key={tutor.id} className="rounded-xl border border-amber-200 bg-white p-3 shadow-sm">
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-700">
@@ -689,9 +694,9 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                         Alta por validar
                       </span>
                     </div>
-                    <p className="mt-3 truncate text-lg font-black text-foreground">{tutor.nombre}</p>
+                    <p className="mt-2 truncate text-lg font-black text-foreground">{tutor.nombre}</p>
                     <p className="mt-1 truncate text-sm text-muted-foreground">{tutor.email}</p>
-                    <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
                       <div className="rounded-lg bg-slate-50 px-3 py-2">
                         <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Documento</p>
                         <p className="mt-1 font-semibold text-foreground">{maskDocument(tutor.documento)}</p>
@@ -740,12 +745,12 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
           <div className="mt-4 grid gap-3">
             {rejectedTutors.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
-                No hay tutores rechazados.
+                No hay tutores legales rechazados.
               </div>
             ) : null}
             {rejectedTutors.map((tutor) => (
-              <article key={tutor.id} className="rounded-xl border border-rose-200 bg-white p-4 shadow-sm">
-                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+              <article key={tutor.id} className="rounded-xl border border-rose-200 bg-white p-3 shadow-sm">
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">
@@ -756,9 +761,9 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                         Revisión cerrada
                       </span>
                     </div>
-                    <p className="mt-3 truncate text-lg font-black text-foreground">{tutor.nombre}</p>
+                    <p className="mt-2 truncate text-lg font-black text-foreground">{tutor.nombre}</p>
                     <p className="mt-1 truncate text-sm text-muted-foreground">{tutor.email}</p>
-                    <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
                       <div className="rounded-lg bg-slate-50 px-3 py-2">
                         <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Documento</p>
                         <p className="mt-1 font-semibold text-foreground">{maskDocument(tutor.documento)}</p>
@@ -788,19 +793,6 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
 
       {activeTab === 'socios' ? (
         <section className="space-y-5">
-          <div className="flex flex-wrap items-center justify-start gap-3">
-            <Button
-              type="button"
-              onClick={() => {
-                setEditingMember(null)
-                setShowMemberForm(true)
-              }}
-            >
-              <Plus className="size-4" />
-              Crear socio
-            </Button>
-          </div>
-
           <AdminFormDialog
             open={showMemberForm || Boolean(editingMember)}
             onOpenChange={(open) => {
@@ -859,11 +851,21 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
           </AdminFormDialog>
 
           <div className="rounded-xl bg-white/78 p-4 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-            <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                 <Users className="size-3.5" />
                 Gestión de socios
               </span>
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingMember(null)
+                  setShowMemberForm(true)
+                }}
+              >
+                <Plus className="size-4" />
+                Crear socio
+              </Button>
             </div>
             <div className="relative mb-4">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -876,8 +878,8 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                 </div>
               ) : null}
               {visibleMembers.map((member) => (
-                <article key={member.id} className="rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50/25">
-                  <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                <article key={member.id} className="rounded-xl border border-border bg-white p-3 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50/25">
+                  <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
@@ -888,9 +890,9 @@ export function TutorsMembersClient({ tutors, members, feeAssignments }: Props) 
                           Alta {member.fechaAlta}
                         </span>
                       </div>
-                      <p className="mt-3 truncate text-lg font-black text-foreground">{member.nombre}</p>
+                      <p className="mt-2 truncate text-lg font-black text-foreground">{member.nombre}</p>
                       <p className="mt-1 truncate text-sm text-muted-foreground">{member.email}</p>
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         <div className="rounded-lg bg-slate-50 px-3 py-2">
                           <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Acceso</p>
                           <p className="mt-1 text-sm font-semibold text-foreground">Cuenta de socio activa</p>

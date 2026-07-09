@@ -25,7 +25,7 @@ export function AdminNav({ onNavigate, role }: AdminNavProps) {
       aria-label="Navegación de administración"
       className="flex min-h-0 flex-1 flex-col p-2.5"
     >
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="admin-sidebar-scroll min-h-0 flex-1 overflow-y-auto pr-1">
         <div className="grid gap-4">
           {groupedNav.map((section) => (
             <div key={section.id} className="grid gap-1">

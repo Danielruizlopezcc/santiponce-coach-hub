@@ -309,8 +309,8 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
                 : 'bg-slate-100 text-slate-700'
 
             return (
-              <article key={season.id} className={cn('rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20', isDeleting && 'border-destructive/30 bg-destructive/5')}>
-                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+              <article key={season.id} className={cn('rounded-xl border border-border bg-white p-3 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20', isDeleting && 'border-destructive/30 bg-destructive/5')}>
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black', statusTone)}>
@@ -321,12 +321,12 @@ export function TemporadasClient({ seasons }: { seasons: AdminSeasonRow[] }) {
                         {season.isActive ? 'Temporada por defecto' : 'Disponible'}
                       </span>
                     </div>
-                    <p className="mt-3 text-lg font-black text-foreground">{season.nombre}</p>
+                    <p className="mt-2 text-lg font-black text-foreground">{season.nombre}</p>
                     <p className="mt-1 text-sm font-semibold text-muted-foreground">
                       Periodo deportivo usado para equipos, altas y actividad del club.
                     </p>
 
-                    <div className="mt-4 grid gap-2 text-sm md:grid-cols-3">
+                    <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
                       <div className="rounded-lg bg-slate-50 px-3 py-2">
                         <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Inicio</p>
                         <p className="mt-1 font-semibold text-foreground">{season.fechaInicio}</p>

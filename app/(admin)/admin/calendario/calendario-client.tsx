@@ -12,9 +12,11 @@ import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchT
 import { cn } from '@/lib/utils'
 import {
   createMatchAction as adminCreateMatchAction,
+  createRecurringTrainingAction as adminCreateRecurringTrainingAction,
   createTrainingAction as adminCreateTrainingAction,
   deleteMatchAction as adminDeleteMatchAction,
   deleteTrainingAction as adminDeleteTrainingAction,
+  deleteTrainingSeriesAction as adminDeleteTrainingSeriesAction,
   resetAllTeamColorsAction as adminResetAllTeamColorsAction,
   resetTeamColorAction as adminResetTeamColorAction,
   updateTeamColorAction as adminUpdateTeamColorAction,
@@ -64,6 +66,11 @@ type TrainingFormState = {
   durationMinutes: string
   location: TrainingLocation
   notes: string
+}
+
+type RecurringTrainingFormState = {
+  enabled: boolean
+  repeatMonths: string
 }
 
 type ColumnFilters = {
@@ -223,8 +230,10 @@ type CalendarActions = {
   updateMatch: (input: MatchActionInput & { id: string }) => Promise<void>
   deleteMatch: (id: string) => Promise<void>
   createTraining?: (input: TrainingActionInput) => Promise<void>
+  createRecurringTraining?: (input: TrainingActionInput & { repeatMonths: number }) => Promise<void>
   updateTraining?: (input: TrainingActionInput & { id: string }) => Promise<void>
   deleteTraining?: (id: string) => Promise<void>
+  deleteTrainingSeries?: (seriesId: string) => Promise<void>
 }
 
 const TEAM_COLOR_ACTIONS = {
@@ -450,6 +459,34 @@ function addDays(date: Date, days: number) {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date)
+  next.setMonth(next.getMonth() + months)
+  return next
+}
+
+function parseDateKey(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
+  return new Date(year, month - 1, day)
+}
+
+function getWeeklyDatePreview(startDate: string, repeatMonths: number) {
+  const firstDate = parseDateKey(startDate)
+  if (!firstDate || repeatMonths < 1 || repeatMonths > 12) return []
+
+  const endDate = addMonths(firstDate, repeatMonths)
+  const dates: Date[] = []
+  let current = firstDate
+
+  while (current <= endDate && dates.length <= 60) {
+    dates.push(current)
+    current = addDays(current, 7)
+  }
+
+  return dates
 }
 
 function addMinutesToTime(time: string, minutesToAdd: number) {
@@ -704,6 +741,10 @@ export function CalendarioClient({
   const [editingTraining, setEditingTraining] = useState<AdminTrainingSessionRow | null>(null)
   const [deleteTrainingId, setDeleteTrainingId] = useState<string | null>(null)
   const [trainingForm, setTrainingForm] = useState<TrainingFormState>(() => createEmptyTrainingForm(teams[0]?.id ?? ''))
+  const [recurringTrainingForm, setRecurringTrainingForm] = useState<RecurringTrainingFormState>({
+    enabled: false,
+    repeatMonths: '3',
+  })
   const [trainingError, setTrainingError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<ColumnFilters>({
@@ -765,8 +806,10 @@ export function CalendarioClient({
     updateMatch: adminUpdateMatchAction,
     deleteMatch: adminDeleteMatchAction,
     createTraining: adminCreateTrainingAction,
+    createRecurringTraining: adminCreateRecurringTrainingAction,
     updateTraining: adminUpdateTrainingAction,
     deleteTraining: adminDeleteTrainingAction,
+    deleteTrainingSeries: adminDeleteTrainingSeriesAction,
   }
 
   const activeTeams = useMemo(
@@ -806,6 +849,16 @@ export function CalendarioClient({
     () => Array.from(new Set(trainings.map((training) => `${training.weekLabel}|${training.weekRangeLabel}`))),
     [trainings],
   )
+  const trainingSeriesCountById = useMemo(() => {
+    const countById = new Map<string, number>()
+
+    for (const training of trainings) {
+      if (!training.seriesId) continue
+      countById.set(training.seriesId, (countById.get(training.seriesId) ?? 0) + 1)
+    }
+
+    return countById
+  }, [trainings])
   const positionedScheduleEventsByDate = useMemo(() => {
     const eventsByDate = new Map<string, ScheduleEvent[]>()
 
@@ -924,6 +977,29 @@ export function CalendarioClient({
     return true
   })
   const hasTrainingFilters = Object.values(trainingFilters).some(Boolean)
+  const recurringTrainingPreview = useMemo(
+    () =>
+      trainingMode === 'create' && recurringTrainingForm.enabled
+        ? getWeeklyDatePreview(trainingForm.trainingDate, Number(recurringTrainingForm.repeatMonths || 0))
+        : [],
+    [recurringTrainingForm.enabled, recurringTrainingForm.repeatMonths, trainingForm.trainingDate, trainingMode],
+  )
+  const todayKey = getDateKey(new Date())
+  const scheduledMatches = matches.filter((match) => match.status === 'scheduled')
+  const playedMatches = matches.filter((match) => match.status === 'played')
+  const homeMatches = matches.filter((match) => match.isHome)
+  const upcomingMatches = scheduledMatches.filter((match) => match.matchDate >= todayKey)
+  const upcomingTrainings = trainings.filter((training) => training.trainingDate >= todayKey)
+  const weekMatchCount = matches.filter((match) => scheduleDateKeys.includes(match.matchDate)).length
+  const weekTrainingCount = trainings.filter((training) => scheduleDateKeys.includes(training.trainingDate)).length
+  const pendingResultMatches = matches.filter((match) => match.status === 'scheduled' && match.matchDate < todayKey)
+  const incompleteScheduleItems = [
+    ...matches.filter((match) => !match.matchTime || !match.location),
+    ...trainings.filter((training) => !training.startTime || !training.location),
+  ]
+  const calledUpPlayersCount = playerForm.filter((player) => player.isCalledUp).length
+  const starterPlayersCount = playerForm.filter((player) => player.isStarter).length
+  const playerStatTotals = getPlayerStatTotals()
 
   function setField<K extends keyof MatchFormState>(field: K, value: MatchFormState[K]) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -1024,6 +1100,10 @@ export function CalendarioClient({
     setTrainingMode('create')
     setEditingTraining(null)
     setDeleteTrainingId(null)
+    setRecurringTrainingForm({
+      enabled: false,
+      repeatMonths: '3',
+    })
     setTrainingForm({
       ...createEmptyTrainingForm(selectableTeams[0]?.id ?? ''),
       trainingDate: slot?.date ?? '',
@@ -1066,6 +1146,10 @@ export function CalendarioClient({
     setTrainingMode('edit')
     setEditingTraining(training)
     setDeleteTrainingId(null)
+    setRecurringTrainingForm({
+      enabled: false,
+      repeatMonths: '3',
+    })
     setTrainingForm(trainingToForm(training))
     setTrainingError(null)
     setTrainingSheetOpen(true)
@@ -1173,6 +1257,7 @@ export function CalendarioClient({
   function validateTrainingForm() {
     const durationHours = Number(trainingForm.durationHours || 0)
     const durationMinutes = Number(trainingForm.durationMinutes || 0)
+    const repeatMonths = Number(recurringTrainingForm.repeatMonths || 0)
 
     if (!trainingForm.teamId) return 'Selecciona un equipo.'
     if (!trainingForm.trainingDate) return 'Introduce la fecha del entrenamiento.'
@@ -1180,6 +1265,9 @@ export function CalendarioClient({
     if (!TRAINING_LOCATIONS.includes(trainingForm.location)) return 'Selecciona un lugar válido.'
     if (durationHours <= 0 && durationMinutes <= 0) return 'Introduce una duración mayor que cero.'
     if (durationMinutes > 59) return 'Los minutos deben estar entre 0 y 59.'
+    if (trainingMode === 'create' && recurringTrainingForm.enabled && (repeatMonths < 1 || repeatMonths > 12)) {
+      return 'La repetición debe estar entre 1 y 12 meses.'
+    }
 
     return null
   }
@@ -1488,12 +1576,18 @@ export function CalendarioClient({
     }
 
     const createTraining = calendarActions.createTraining ?? adminCreateTrainingAction
+    const createRecurringTraining = calendarActions.createRecurringTraining ?? adminCreateRecurringTrainingAction
     const updateTraining = calendarActions.updateTraining ?? adminUpdateTrainingAction
     const payload = buildTrainingPayload()
 
     startTransition(async () => {
       try {
-        if (trainingMode === 'create') {
+        if (trainingMode === 'create' && recurringTrainingForm.enabled) {
+          await createRecurringTraining({
+            ...payload,
+            repeatMonths: Number(recurringTrainingForm.repeatMonths || 0),
+          })
+        } else if (trainingMode === 'create') {
           await createTraining(payload)
         } else if (editingTraining) {
           await updateTraining({ ...payload, id: editingTraining.id })
@@ -1702,6 +1796,20 @@ export function CalendarioClient({
     })
   }
 
+  function handleTrainingSeriesDelete(seriesId: string) {
+    const deleteTrainingSeries = calendarActions.deleteTrainingSeries ?? adminDeleteTrainingSeriesAction
+
+    startTransition(async () => {
+      try {
+        await deleteTrainingSeries(seriesId)
+        setDeleteTrainingId(null)
+        setTrainingSheetOpen(false)
+      } catch (error) {
+        setTrainingError(error instanceof Error ? error.message : 'No se ha podido eliminar la serie de entrenamientos.')
+      }
+    })
+  }
+
   const eventPlayer = eventPlayerId ? playerForm.find((player) => player.athleteId === eventPlayerId) ?? null : null
   const eventGoalCount = eventPlayer ? parseRequiredStat(eventPlayer.goals) : 0
   const eventYellowCount = eventPlayer ? parseRequiredStat(eventPlayer.yellowCards) : 0
@@ -1770,6 +1878,81 @@ export function CalendarioClient({
 
   return (
     <div className="space-y-5">
+      {showCoordinatorSections ? (
+        <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-foreground/10">
+          <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="bg-primary p-6 text-white">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-white/70">Agenda deportiva</p>
+              <h2 className="mt-3 text-3xl font-black leading-tight">Calendario de entrenamientos y partidos</h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold text-white/80">
+                Vista rápida de la semana activa, próximos eventos y tareas pendientes antes de entrar al horario.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-white/14 p-4 ring-1 ring-white/15">
+                  <p className="text-3xl font-black">{weekMatchCount + weekTrainingCount}</p>
+                  <p className="mt-1 text-xs font-black uppercase text-white/75">Eventos esta semana</p>
+                </div>
+                <div className="rounded-xl bg-white/14 p-4 ring-1 ring-white/15">
+                  <p className="text-3xl font-black">{upcomingTrainings.length}</p>
+                  <p className="mt-1 text-xs font-black uppercase text-white/75">Entrenamientos próximos</p>
+                </div>
+                <div className="rounded-xl bg-white/14 p-4 ring-1 ring-white/15">
+                  <p className="text-3xl font-black">{upcomingMatches.length}</p>
+                  <p className="mt-1 text-xs font-black uppercase text-white/75">Partidos programados</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 bg-blue-50/70 p-6 sm:grid-cols-2">
+              <div className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-muted-foreground">Partidos</p>
+                  <CalendarDays className="size-5 text-primary" aria-hidden="true" />
+                </div>
+                <p className="mt-3 text-3xl font-black text-foreground">{matches.length}</p>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                  {homeMatches.length} en casa · {playedMatches.length} jugados
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-muted-foreground">Entrenamientos</p>
+                  <ClipboardList className="size-5 text-primary" aria-hidden="true" />
+                </div>
+                <p className="mt-3 text-3xl font-black text-foreground">{trainings.length}</p>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                  {weekTrainingCount} dentro de la semana visible
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-muted-foreground">Resultados</p>
+                  <ClipboardList className="size-5 text-emerald-600" aria-hidden="true" />
+                </div>
+                <p className="mt-3 text-3xl font-black text-foreground">{pendingResultMatches.length}</p>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                  Partidos pasados pendientes de cerrar
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-muted-foreground">Revisión</p>
+                  <AlertTriangle className="size-5 text-amber-600" aria-hidden="true" />
+                </div>
+                <p className="mt-3 text-3xl font-black text-foreground">{incompleteScheduleItems.length}</p>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                  Eventos sin hora o campo definido
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {showCoordinatorSections && coordinatorTabs.length > 1 ? (
         <div className="flex flex-wrap gap-2 border-b border-border pb-3" role="tablist" aria-label="Secciones del calendario">
           {[
@@ -2094,80 +2277,104 @@ export function CalendarioClient({
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-            <table className="w-full text-center text-sm">
-              <thead>
-                <tr className="border-b border-border bg-blue-50 text-xs font-bold text-blue-950">
-                  <th className="px-4 py-2.5 text-center">Semana</th>
-                  <th className="px-4 py-2.5 text-center">Fecha</th>
-                  <th className="px-4 py-2.5 text-center">Equipo</th>
-                  <th className="px-4 py-2.5 text-center">Hora</th>
-                  <th className="px-4 py-2.5 text-center">Duración</th>
-                  <th className="px-4 py-2.5 text-center">Lugar</th>
-                  <th className="px-4 py-2.5 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {filteredTrainings.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                      No hay entrenamientos registrados todavía.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredTrainings.map((training) => {
-                    const isDeleting = deleteTrainingId === training.id
+          {filteredTrainings.length === 0 ? (
+            <div className="rounded-xl bg-white px-4 py-14 text-center text-sm font-semibold text-muted-foreground ring-1 ring-foreground/10">
+              No hay entrenamientos registrados todavía.
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredTrainings.map((training) => {
+                const isDeleting = deleteTrainingId === training.id
+                const seriesCount = training.seriesId ? trainingSeriesCountById.get(training.seriesId) ?? 1 : 0
 
-                    return (
-                      <tr key={training.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-foreground">{training.weekLabel}</div>
-                          <div className="text-xs font-semibold text-muted-foreground">{training.weekRangeLabel}</div>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-foreground">{training.dateLabel}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-foreground">{training.teamName}</div>
-                          <div className="text-xs font-semibold text-muted-foreground">{training.categoryName}</div>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-foreground">{training.timeLabel}</td>
-                        <td className="px-4 py-3 font-semibold text-foreground">{training.durationLabel}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{training.location}</td>
-                        <td className="px-4 py-3">
-                          {isDeleting ? (
-                            <div className="flex items-center justify-center gap-2">
-                              <span className="text-xs text-muted-foreground">¿Eliminar?</span>
-                              <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleTrainingDelete(training.id)}>
-                                Sí, eliminar
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => setDeleteTrainingId(null)}>
-                                Cancelar
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-center gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => openTrainingEdit(training)}>
-                                <Pencil className="size-3.5" aria-hidden="true" />
-                                Editar
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => setDeleteTrainingId(training.id)}
-                              >
-                                <Trash2 className="size-3.5" aria-hidden="true" />
-                                Eliminar
-                              </Button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                return (
+                  <article
+                    key={training.id}
+                    className={cn(
+                      'overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-foreground/10 transition-colors',
+                      isDeleting && 'bg-destructive/5 ring-destructive/25',
+                    )}
+                  >
+                    <div className="bg-primary p-4 text-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">{training.weekLabel}</p>
+                          <h3 className="mt-2 truncate text-xl font-black leading-tight">{training.teamName}</h3>
+                          <p className="mt-1 truncate text-sm font-semibold text-white/75">{training.categoryName}</p>
+                        </div>
+                        <div className="shrink-0 rounded-xl bg-white/15 px-3 py-2 text-right ring-1 ring-white/20">
+                          <p className="text-sm font-black text-white">{training.timeLabel}</p>
+                          <p className="text-xs font-semibold text-white/75">{training.durationLabel}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
+                          <p className="text-xs font-black uppercase text-muted-foreground">Fecha</p>
+                          <p className="mt-2 text-sm font-black text-foreground">{training.dateLabel}</p>
+                        </div>
+                        <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
+                          <p className="text-xs font-black uppercase text-muted-foreground">Campo</p>
+                          <p className="mt-2 text-sm font-black text-foreground">{training.location}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <p className="text-xs font-semibold text-muted-foreground">{training.weekRangeLabel}</p>
+                        {training.seriesId ? (
+                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary ring-1 ring-primary/15">
+                            Serie semanal · {seriesCount} sesiones
+                          </span>
+                        ) : null}
+                      </div>
+
+                    <div className="mt-4 border-t border-border pt-3">
+                      {isDeleting ? (
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span className="mr-auto text-xs font-semibold text-muted-foreground">¿Eliminar entrenamiento?</span>
+                          <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleTrainingDelete(training.id)}>
+                            Solo este
+                          </Button>
+                          {training.seriesId ? (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={isPending}
+                              onClick={() => handleTrainingSeriesDelete(training.seriesId!)}
+                            >
+                              Serie completa
+                            </Button>
+                          ) : null}
+                          <Button size="sm" variant="outline" onClick={() => setDeleteTrainingId(null)}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => openTrainingEdit(training)}>
+                            <Pencil className="size-3.5" aria-hidden="true" />
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setDeleteTrainingId(training.id)}
+                          >
+                            <Trash2 className="size-3.5" aria-hidden="true" />
+                            Eliminar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </section>
       ) : null}
 
@@ -2318,114 +2525,118 @@ export function CalendarioClient({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-        <table className="w-full text-center text-sm">
-          <thead>
-            <tr className="border-b border-border bg-blue-50 text-xs font-bold text-blue-950">
-              <th className="px-4 py-2.5 text-center">Jornada</th>
-              <th className="px-4 py-2.5 text-center">Fecha</th>
-              <th className="px-4 py-2.5 text-center">Partido</th>
-              <th className="px-4 py-2.5 text-center">Competición</th>
-              <th className="px-4 py-2.5 text-center">Duración</th>
-              <th className="px-4 py-2.5 text-center">Lugar</th>
-              <th className="px-4 py-2.5 text-center">Estado</th>
-              <th className="px-4 py-2.5 text-center">Resultado</th>
-              <th className="px-4 py-2.5 text-center">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-card">
-            {filteredMatches.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                  No hay partidos registrados todavía.
-                </td>
-              </tr>
-            ) : (
-              filteredMatches.map((match) => {
-                const isDeleting = deleteId === match.id
+      {filteredMatches.length === 0 ? (
+        <div className="rounded-xl bg-white px-4 py-14 text-center text-sm font-semibold text-muted-foreground ring-1 ring-foreground/10">
+          No hay partidos registrados todavía.
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {filteredMatches.map((match) => {
+            const isDeleting = deleteId === match.id
 
-                return (
-                  <tr
-                    key={match.id}
-                    className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}
-                  >
-                    <td className="px-4 py-3 font-semibold text-foreground">
-                      {match.matchType === 'league' ? match.roundLabel : 'Amistoso'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">{match.dateLabel}</div>
-                      <div className="mt-0.5 flex items-center justify-center gap-1.5 font-semibold text-foreground">
+            return (
+              <article
+                key={match.id}
+                className={cn(
+                  'overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-foreground/10 transition-colors',
+                  isDeleting && 'bg-destructive/5 ring-destructive/25',
+                )}
+              >
+                <div className="bg-primary p-4 text-white">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                        {match.matchType === 'league' ? match.roundLabel : 'Amistoso'}
+                      </p>
+                      <h3 className="mt-2 truncate text-xl font-black leading-tight">
+                        {match.teamName} vs {match.opponentName}
+                      </h3>
+                      <p className="mt-1 text-sm font-semibold text-white/75">
+                        {MATCH_TYPE_LABELS[match.matchType]} · {match.durationLabel}
+                      </p>
+                    </div>
+                    <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-black', STATUS_STYLES[match.status])}>
+                      {STATUS_LABELS[match.status]}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
+                    <div className={cn('rounded-xl p-3 ring-1 ring-foreground/10', match.isHome ? 'bg-primary text-white' : 'bg-muted/35 text-foreground')}>
+                      <p className="text-xs font-black uppercase opacity-75">{match.isHome ? 'Local' : 'Visitante'}</p>
+                      <p className="mt-1 text-lg font-black leading-tight">{match.isHome ? CLUB.shortName : match.opponentName}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Resultado</p>
+                      <p className="mt-1 text-2xl font-black text-foreground">{getScoreLabel(match)}</p>
+                    </div>
+                    <div className={cn('rounded-xl p-3 text-right ring-1 ring-foreground/10', !match.isHome ? 'bg-primary text-white' : 'bg-muted/35 text-foreground')}>
+                      <p className="text-xs font-black uppercase opacity-75">{match.isHome ? 'Visitante' : 'Local'}</p>
+                      <p className="mt-1 text-lg font-black leading-tight">{match.isHome ? match.opponentName : CLUB.shortName}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Fecha</p>
+                      <p className="mt-2 text-sm font-black text-foreground">{match.dateLabel}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Hora</p>
+                      <p className="mt-2 flex items-center gap-1.5 text-sm font-black text-foreground">
                         <CalendarDays className="size-3.5" aria-hidden="true" />
                         {match.timeLabel}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Campo</p>
+                      <p className="mt-2 text-sm font-black text-foreground">{match.location || 'Sin lugar'}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-border pt-3">
+                    {isDeleting ? (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="mr-auto text-xs font-semibold text-muted-foreground">¿Eliminar partido?</span>
+                        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(match.id)}>
+                          Sí, eliminar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setDeleteId(null)}>
+                          Cancelar
+                        </Button>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold leading-tight text-foreground">
-                        <div>{match.isHome ? CLUB.shortName : match.opponentName}</div>
-                        <div className="text-xs font-black uppercase text-muted-foreground">vs</div>
-                        <div>{match.isHome ? match.opponentName : CLUB.shortName}</div>
+                    ) : (
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => openResult(match)}>
+                          <ClipboardList className="size-3.5" aria-hidden="true" />
+                          Ficha
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(match)}>
+                          <Pencil className="size-3.5" aria-hidden="true" />
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => {
+                            setSheetOpen(false)
+                            setDeleteId(match.id)
+                          }}
+                        >
+                          <Trash2 className="size-3.5" aria-hidden="true" />
+                          Eliminar
+                        </Button>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">
-                        {MATCH_TYPE_LABELS[match.matchType]}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-foreground">{match.durationLabel}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {match.location || 'Sin lugar'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', STATUS_STYLES[match.status])}>
-                        {STATUS_LABELS[match.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-black text-foreground">
-                      {getScoreLabel(match)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {isDeleting ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="text-xs text-muted-foreground">¿Eliminar?</span>
-                          <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(match.id)}>
-                            Sí, eliminar
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setDeleteId(null)}>
-                            Cancelar
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex justify-center gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => openResult(match)}>
-                            <ClipboardList className="size-3.5" aria-hidden="true" />
-                            Ficha
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => openEdit(match)}>
-                            <Pencil className="size-3.5" aria-hidden="true" />
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => {
-                              setSheetOpen(false)
-                              setDeleteId(match.id)
-                            }}
-                          >
-                            <Trash2 className="size-3.5" aria-hidden="true" />
-                            Eliminar
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                    )}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
       </section>
       ) : null}
 
@@ -2498,102 +2709,202 @@ export function CalendarioClient({
             </Button>
             <Button onClick={handleTrainingSubmit} disabled={isPending}>
               {isPending ? <Loader2 className="size-4 animate-spin" /> : trainingMode === 'create' ? <Plus className="size-4" /> : <Pencil className="size-4" />}
-              {trainingMode === 'create' ? 'Crear entrenamiento' : 'Guardar cambios'}
+              {trainingMode === 'create' && recurringTrainingForm.enabled
+                ? 'Crear serie'
+                : trainingMode === 'create'
+                  ? 'Crear entrenamiento'
+                  : 'Guardar cambios'}
             </Button>
           </>
         }
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="training-team">Equipo</Label>
-            <select
-              id="training-team"
-              value={trainingForm.teamId}
-              onChange={(event) => setTrainingField('teamId', event.target.value)}
-              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <option value="">Selecciona equipo</option>
-              {selectableTeams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="space-y-4">
+          <section className="rounded-xl bg-blue-50/70 p-4 ring-1 ring-blue-100">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Equipo y campo</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="training-team">Equipo</Label>
+                <select
+                  id="training-team"
+                  value={trainingForm.teamId}
+                  onChange={(event) => setTrainingField('teamId', event.target.value)}
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="">Selecciona equipo</option>
+                  {selectableTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="training-location">Lugar</Label>
-            <select
-              id="training-location"
-              value={trainingForm.location}
-              onChange={(event) => setTrainingField('location', event.target.value as TrainingLocation)}
-              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {TRAINING_LOCATIONS.map((location) => (
-                <option key={location} value={location}>
-                  {location}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="training-location">Lugar</Label>
+                <select
+                  id="training-location"
+                  value={trainingForm.location}
+                  onChange={(event) => setTrainingField('location', event.target.value as TrainingLocation)}
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  {TRAINING_LOCATIONS.map((location) => (
+                    <option key={location} value={location}>
+                      {location}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="training-date">Fecha</Label>
-            <Input
-              id="training-date"
-              type="date"
-              value={trainingForm.trainingDate}
-              onChange={(event) => setTrainingField('trainingDate', event.target.value)}
-            />
-          </div>
+          <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Horario</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="training-date">Fecha</Label>
+                <Input
+                  id="training-date"
+                  type="date"
+                  value={trainingForm.trainingDate}
+                  onChange={(event) => setTrainingField('trainingDate', event.target.value)}
+                />
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="training-time">Hora</Label>
-            <Input
-              id="training-time"
-              type="time"
-              value={trainingForm.startTime}
-              onChange={(event) => setTrainingField('startTime', event.target.value)}
-            />
-          </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="training-time">Hora</Label>
+                <Input
+                  id="training-time"
+                  type="time"
+                  value={trainingForm.startTime}
+                  onChange={(event) => setTrainingField('startTime', event.target.value)}
+                />
+              </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+              <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="training-duration-hours">Duración horas</Label>
+                  <Input
+                    id="training-duration-hours"
+                    type="number"
+                    min="0"
+                    max="6"
+                    step="1"
+                    value={trainingForm.durationHours}
+                    onChange={(event) => setTrainingField('durationHours', event.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="training-duration-minutes">Duración minutos</Label>
+                  <Input
+                    id="training-duration-minutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    step="1"
+                    value={trainingForm.durationMinutes}
+                    onChange={(event) => setTrainingField('durationMinutes', event.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {trainingMode === 'create' ? (
+            <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Repetición semanal</p>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                    Crea automáticamente este entrenamiento cada semana durante varios meses.
+                  </p>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 rounded-full bg-blue-50 px-3 py-2 text-sm font-black text-primary ring-1 ring-blue-100">
+                  <input
+                    type="checkbox"
+                    checked={recurringTrainingForm.enabled}
+                    onChange={(event) =>
+                      setRecurringTrainingForm((current) => ({
+                        ...current,
+                        enabled: event.target.checked,
+                      }))
+                    }
+                    className="size-4 rounded border-border accent-primary"
+                  />
+                  Repetir
+                </label>
+              </div>
+
+              {recurringTrainingForm.enabled ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="training-repeat-months">Durante meses</Label>
+                    <Input
+                      id="training-repeat-months"
+                      type="number"
+                      min="1"
+                      max="12"
+                      step="1"
+                      value={recurringTrainingForm.repeatMonths}
+                      onChange={(event) =>
+                        setRecurringTrainingForm((current) => ({
+                          ...current,
+                          repeatMonths: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 ring-1 ring-blue-100">
+                    {recurringTrainingPreview.length > 0 ? (
+                      <>
+                        <p className="font-black">
+                          Se crearán {recurringTrainingPreview.length} entrenamientos.
+                        </p>
+                        <p className="mt-1">
+                          {formatShortDay(recurringTrainingPreview[0])} a las {trainingForm.startTime || '--:--'} · {trainingForm.location}
+                        </p>
+                      </>
+                    ) : (
+                      'Elige una fecha inicial y una duración entre 1 y 12 meses para ver la previsión.'
+                    )}
+                  </div>
+
+                  {recurringTrainingPreview.length > 0 ? (
+                    <div className="md:col-span-2">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Primeras fechas</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {recurringTrainingPreview.slice(0, 6).map((date) => (
+                          <span
+                            key={getDateKey(date)}
+                            className="rounded-full bg-muted px-3 py-1 text-xs font-black text-foreground ring-1 ring-foreground/10"
+                          >
+                            {formatDayNumber(date)}
+                          </span>
+                        ))}
+                        {recurringTrainingPreview.length > 6 ? (
+                          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary ring-1 ring-primary/15">
+                            +{recurringTrainingPreview.length - 6} más
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="training-duration-hours">Duración horas</Label>
-              <Input
-                id="training-duration-hours"
-                type="number"
-                min="0"
-                max="6"
-                step="1"
-                value={trainingForm.durationHours}
-                onChange={(event) => setTrainingField('durationHours', event.target.value)}
+              <Label htmlFor="training-notes">Notas</Label>
+              <textarea
+                id="training-notes"
+                value={trainingForm.notes}
+                onChange={(event) => setTrainingField('notes', event.target.value)}
+                className="min-h-24 rounded-lg border border-input bg-white px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                placeholder="Observaciones internas"
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="training-duration-minutes">Duración minutos</Label>
-              <Input
-                id="training-duration-minutes"
-                type="number"
-                min="0"
-                max="59"
-                step="1"
-                value={trainingForm.durationMinutes}
-                onChange={(event) => setTrainingField('durationMinutes', event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5 md:col-span-2">
-            <Label htmlFor="training-notes">Notas</Label>
-            <textarea
-              id="training-notes"
-              value={trainingForm.notes}
-              onChange={(event) => setTrainingField('notes', event.target.value)}
-              className="min-h-24 rounded-lg border border-input bg-white px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              placeholder="Observaciones internas"
-            />
-          </div>
+          </section>
         </div>
 
       </AdminFormDialog>
@@ -2622,191 +2933,206 @@ export function CalendarioClient({
           </>
         }
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-team">Equipo</Label>
-            <select
-              id="match-team"
-              value={form.teamId}
-              onChange={(event) => {
-                const teamId = event.target.value
-                const nextTeam = selectableTeams.find((team) => team.id === teamId)
-                setForm((current) => ({
-                  ...current,
-                  teamId,
-                  location: getTeamDefaultMatchLocation(nextTeam),
-                }))
-              }}
-              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <option value="">Selecciona equipo</option>
-              {selectableTeams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="space-y-4">
+          <section className="rounded-xl bg-blue-50/70 p-4 ring-1 ring-blue-100">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Partido</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="match-team">Equipo</Label>
+                <select
+                  id="match-team"
+                  value={form.teamId}
+                  onChange={(event) => {
+                    const teamId = event.target.value
+                    const nextTeam = selectableTeams.find((team) => team.id === teamId)
+                    setForm((current) => ({
+                      ...current,
+                      teamId,
+                      location: getTeamDefaultMatchLocation(nextTeam),
+                    }))
+                  }}
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="">Selecciona equipo</option>
+                  {selectableTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-opponent">Rival</Label>
-            <Input
-              id="match-opponent"
-              value={form.opponentName}
-              onChange={(event) => setField('opponentName', event.target.value)}
-              placeholder="Ej. CD Rival"
-              autoFocus
-            />
-          </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="match-opponent">Rival</Label>
+                <Input
+                  id="match-opponent"
+                  value={form.opponentName}
+                  onChange={(event) => setField('opponentName', event.target.value)}
+                  placeholder="Ej. CD Rival"
+                  autoFocus
+                />
+              </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-date">Fecha</Label>
-            <Input
-              id="match-date"
-              type="date"
-              value={form.matchDate}
-              onChange={(event) => setField('matchDate', event.target.value)}
-            />
-          </div>
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 md:col-span-2">
+                <input
+                  id="match-home"
+                  type="checkbox"
+                  checked={form.isHome}
+                  onChange={(event) => setField('isHome', event.target.checked)}
+                  className="size-4 rounded border-border accent-primary"
+                />
+                <Label htmlFor="match-home">El equipo del club juega como local</Label>
+              </div>
+            </div>
+          </section>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-time">Hora</Label>
-            <Input
-              id="match-time"
-              type="time"
-              value={form.matchTime}
-              onChange={(event) => setField('matchTime', event.target.value)}
-            />
-          </div>
+          <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Horario y campo</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="match-date">Fecha</Label>
+                <Input
+                  id="match-date"
+                  type="date"
+                  value={form.matchDate}
+                  onChange={(event) => setField('matchDate', event.target.value)}
+                />
+              </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="match-time">Hora</Label>
+                <Input
+                  id="match-time"
+                  type="time"
+                  value={form.matchTime}
+                  onChange={(event) => setField('matchTime', event.target.value)}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="match-duration-hours">Duración horas</Label>
+                  <Input
+                    id="match-duration-hours"
+                    type="number"
+                    min="0"
+                    max="6"
+                    step="1"
+                    value={form.durationHours}
+                    onChange={(event) => setField('durationHours', event.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="match-duration-minutes">Duración minutos</Label>
+                  <Input
+                    id="match-duration-minutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    step="1"
+                    value={form.durationMinutes}
+                    onChange={(event) => setField('durationMinutes', event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5 md:col-span-2">
+                <Label htmlFor="match-location">Campo</Label>
+                {matchRequiresFullField ? (
+                  <Input id="match-location" value="Campo completo" readOnly className="font-semibold text-muted-foreground" />
+                ) : (
+                  <select
+                    id="match-location"
+                    value={form.location}
+                    onChange={(event) => setField('location', event.target.value as TrainingLocation)}
+                    className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    {FIELD_LOCATIONS.map((location) => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedMatchTeam ? (
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {matchRequiresFullField
+                      ? 'Esta categoría usa campo completo por defecto.'
+                      : 'Puedes elegir medio campo, campo completo o anexo.'}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Competición y estado</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="match-type">Competición</Label>
+                <select
+                  id="match-type"
+                  value={form.matchType}
+                  onChange={(event) => {
+                    const value = event.target.value as AdminMatchType
+                    setForm((current) => ({
+                      ...current,
+                      matchType: value,
+                      roundLabel: value === 'friendly' ? '' : current.roundLabel,
+                    }))
+                  }}
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  {Object.entries(MATCH_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="match-round">Jornada</Label>
+                <Input
+                  id="match-round"
+                  value={form.roundLabel}
+                  onChange={(event) => setField('roundLabel', event.target.value)}
+                  placeholder="Ej. Jornada 4"
+                  disabled={form.matchType !== 'league'}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="match-status">Estado</Label>
+                <select
+                  id="match-status"
+                  value={form.status}
+                  onChange={(event) => setField('status', event.target.value as AdminMatchStatus)}
+                  className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="match-duration-hours">Duración horas</Label>
-              <Input
-                id="match-duration-hours"
-                type="number"
-                min="0"
-                max="6"
-                step="1"
-                value={form.durationHours}
-                onChange={(event) => setField('durationHours', event.target.value)}
+              <Label htmlFor="match-notes">Notas internas</Label>
+              <textarea
+                id="match-notes"
+                value={form.notes}
+                onChange={(event) => setField('notes', event.target.value)}
+                placeholder="Observaciones opcionales..."
+                rows={4}
+                className="w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="match-duration-minutes">Duración minutos</Label>
-              <Input
-                id="match-duration-minutes"
-                type="number"
-                min="0"
-                max="59"
-                step="1"
-                value={form.durationMinutes}
-                onChange={(event) => setField('durationMinutes', event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-location">Campo</Label>
-            {matchRequiresFullField ? (
-              <Input id="match-location" value="Campo completo" readOnly className="font-semibold text-muted-foreground" />
-            ) : (
-              <select
-                id="match-location"
-                value={form.location}
-                onChange={(event) => setField('location', event.target.value as TrainingLocation)}
-                className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                {FIELD_LOCATIONS.map((location) => (
-                  <option key={location} value={location}>
-                    {location}
-                  </option>
-                ))}
-              </select>
-            )}
-            {selectedMatchTeam ? (
-              <p className="text-xs font-semibold text-muted-foreground">
-                {matchRequiresFullField
-                  ? 'Esta categoría usa campo completo por defecto.'
-                  : 'Puedes elegir medio campo, campo completo o anexo.'}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-type">Competición</Label>
-            <select
-              id="match-type"
-              value={form.matchType}
-              onChange={(event) => {
-                const value = event.target.value as AdminMatchType
-                setForm((current) => ({
-                  ...current,
-                  matchType: value,
-                  roundLabel: value === 'friendly' ? '' : current.roundLabel,
-                }))
-              }}
-              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {Object.entries(MATCH_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-round">Jornada</Label>
-            <Input
-              id="match-round"
-              value={form.roundLabel}
-              onChange={(event) => setField('roundLabel', event.target.value)}
-              placeholder="Ej. Jornada 4"
-              disabled={form.matchType !== 'league'}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="match-status">Estado</Label>
-            <select
-              id="match-status"
-              value={form.status}
-              onChange={(event) => setField('status', event.target.value as AdminMatchStatus)}
-              className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-4">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
-            <input
-              id="match-home"
-              type="checkbox"
-              checked={form.isHome}
-              onChange={(event) => setField('isHome', event.target.checked)}
-              className="size-4 rounded border-border accent-primary"
-            />
-            <Label htmlFor="match-home">El equipo del club juega como local</Label>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-1.5">
-          <Label htmlFor="match-notes">Notas internas</Label>
-          <textarea
-            id="match-notes"
-            value={form.notes}
-            onChange={(event) => setField('notes', event.target.value)}
-            placeholder="Observaciones opcionales..."
-            rows={4}
-            className="w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
+          </section>
         </div>
 
       </AdminFormDialog>
@@ -2834,46 +3160,74 @@ export function CalendarioClient({
           </>
         }
       >
-        <div className="mb-4 inline-flex rounded-lg border border-border bg-muted/40 p-1">
-          <button
-            type="button"
-            onClick={() => setResultTab('summary')}
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-bold transition-colors',
-              resultTab === 'summary' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            Resumen
-          </button>
-          <button
-            type="button"
-            onClick={() => setResultTab('players')}
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-bold transition-colors',
-              resultTab === 'players' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            Jugadores
-          </button>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex rounded-full border border-border bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={() => setResultTab('summary')}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-black transition-colors',
+                resultTab === 'summary' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Resumen
+            </button>
+            <button
+              type="button"
+              onClick={() => setResultTab('players')}
+              className={cn(
+                'rounded-full px-4 py-2 text-sm font-black transition-colors',
+                resultTab === 'players' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              Jugadores
+            </button>
+          </div>
+          <p className="text-xs font-semibold text-muted-foreground">
+            Los totales de jugadores se comparan con las estadísticas generales antes de guardar.
+          </p>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border bg-white">
+        <div className="overflow-hidden rounded-xl border border-border bg-white">
           {resultMatch ? (
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border px-4 py-4">
-              <div className="text-right">
-                <p className="text-sm font-black text-foreground">{CLUB.shortName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {resultMatch.isHome ? 'Local' : 'Visitante'}
-                </p>
+            <div className="border-b border-border bg-blue-50/70 p-4">
+              <div className="grid items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
+                <div className="rounded-xl bg-primary p-4 text-right text-white">
+                  <p className="text-xs font-black uppercase text-white/70">{resultMatch.isHome ? 'Local' : 'Visitante'}</p>
+                  <p className="mt-1 text-lg font-black leading-tight">{CLUB.shortName}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs font-black uppercase text-muted-foreground">Marcador</p>
+                  <div className="mt-1 rounded-2xl bg-white px-6 py-3 text-4xl font-black text-foreground shadow-sm ring-1 ring-foreground/10">
+                    {resultForm.clubScore || '-'} - {resultForm.opponentScore || '-'}
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                    {resultMatch.dateLabel} · {resultMatch.timeLabel} · {STATUS_LABELS[resultMatch.status]}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white p-4 text-foreground ring-1 ring-foreground/10">
+                  <p className="text-xs font-black uppercase text-muted-foreground">{resultMatch.isHome ? 'Visitante' : 'Local'}</p>
+                  <p className="mt-1 text-lg font-black leading-tight">{resultMatch.opponentName}</p>
+                </div>
               </div>
-              <div className="rounded-lg bg-muted px-4 py-2 text-2xl font-black text-foreground">
-                {resultForm.clubScore || '-'} - {resultForm.opponentScore || '-'}
-              </div>
-              <div>
-                <p className="text-sm font-black text-foreground">{resultMatch.opponentName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {resultMatch.isHome ? 'Visitante' : 'Local'}
-                </p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                <div className="rounded-xl bg-white p-3 text-center ring-1 ring-foreground/10">
+                  <p className="text-2xl font-black text-foreground">{calledUpPlayersCount}</p>
+                  <p className="text-xs font-black uppercase text-muted-foreground">Convocados</p>
+                </div>
+                <div className="rounded-xl bg-white p-3 text-center ring-1 ring-foreground/10">
+                  <p className="text-2xl font-black text-foreground">{starterPlayersCount}</p>
+                  <p className="text-xs font-black uppercase text-muted-foreground">Titulares</p>
+                </div>
+                <div className="rounded-xl bg-white p-3 text-center ring-1 ring-foreground/10">
+                  <p className="text-2xl font-black text-foreground">{playerStatTotals.goals}</p>
+                  <p className="text-xs font-black uppercase text-muted-foreground">Goles jugadores</p>
+                </div>
+                <div className="rounded-xl bg-white p-3 text-center ring-1 ring-foreground/10">
+                  <p className="text-2xl font-black text-foreground">{playerStatTotals.yellowCards + playerStatTotals.redCards}</p>
+                  <p className="text-xs font-black uppercase text-muted-foreground">Tarjetas</p>
+                </div>
               </div>
             </div>
           ) : null}
@@ -2986,67 +3340,35 @@ export function CalendarioClient({
                 })}
               </div>
             </section>
-          )) : (
-            <div className="overflow-x-auto">
-              {playerForm.length === 0 ? (
-                <div className="px-4 py-10 text-center text-sm font-semibold text-muted-foreground">
-                  Este equipo no tiene jugadores asignados todavía.
-                </div>
-              ) : (
-                <table className="w-full table-fixed text-left text-[11px]">
-                  <colgroup>
-                    <col className="w-[13%]" />
-                    <col className="w-[4%]" />
-                    <col className="w-[4%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[6%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[6%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[6%]" />
-                    <col className="w-[4%]" />
-                    <col className="w-[5%]" />
-                    <col className="w-[6%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[7%]" />
-                  </colgroup>
-                  <thead>
-                    <tr className="border-b border-border bg-blue-50 font-bold text-blue-950">
-                      <th className="px-2 py-2">Jugador</th>
-                      <th className="px-1 py-2 text-center">Conv.</th>
-                      <th className="px-1 py-2 text-center">Tit.</th>
-                      <th className="px-1 py-2 text-center">Pos.</th>
-                      <th className="px-1 py-2 text-center">Dorsal</th>
-                      <th className="px-1 py-2 text-center">Min</th>
-                      <th className="px-1 py-2 text-center">Goles</th>
-                      <th className="px-1 py-2 text-center">Asist.</th>
-                      <th className="px-1 py-2 text-center">Faltas</th>
-                      <th className="px-1 py-2 text-center">F. Rec.</th>
-                      <th className="px-1 py-2 text-center">Amar.</th>
-                      <th className="px-1 py-2 text-center">Roja</th>
-                      <th className="px-1 py-2 text-center">Tiros</th>
-                      <th className="px-1 py-2 text-center">Paradas</th>
-                      <th className="px-1 py-2 text-center">Eventos</th>
-                      <th className="px-2 py-2">Obs.</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {playerForm.map((player) => {
-                      const disabled = !player.isCalledUp
-                      const inputClass = 'h-8 w-full min-w-0 rounded-md border border-input bg-white px-1 text-center text-[11px] font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground'
-                      const selectClass = 'h-8 w-full min-w-0 rounded-md border border-input bg-white px-1 text-[11px] font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground'
-                      const isGoalkeeper = player.position === 'goalkeeper'
+          )) : playerForm.length === 0 ? (
+            <div className="px-4 py-10 text-center text-sm font-semibold text-muted-foreground">
+              Este equipo no tiene jugadores asignados todavía.
+            </div>
+          ) : (
+            <div className="grid gap-4 bg-muted/20 p-4">
+              {playerForm.map((player) => {
+                const disabled = !player.isCalledUp
+                const inputClass = 'h-8 w-full min-w-0 rounded-lg border border-input bg-white px-2 text-center text-sm font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground'
+                const selectClass = 'h-8 w-full min-w-0 rounded-lg border border-input bg-white px-2 text-sm font-semibold text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground'
+                const isGoalkeeper = player.position === 'goalkeeper'
+                const eventCount =
+                  parseRequiredStat(player.goals) +
+                  parseRequiredStat(player.yellowCards) +
+                  (player.redCard || parseRequiredStat(player.yellowCards) >= 2 ? 1 : 0)
 
-                      return (
-                        <tr key={player.athleteId} className={cn(disabled ? 'bg-muted/20' : 'bg-white')}>
-                          <td className="px-2 py-2">
-                            <div className="truncate font-black text-foreground" title={player.athleteName}>
-                              {player.athleteName}
-                            </div>
-                          </td>
-                          <td className="px-1 py-2 text-center">
+                return (
+                  <article
+                    key={player.athleteId}
+                    className={cn(
+                      'rounded-xl bg-white p-4 shadow-sm ring-1 ring-foreground/10',
+                      disabled && 'bg-muted/50',
+                    )}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-black leading-tight text-foreground">{player.athleteName}</h3>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <label className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-primary ring-1 ring-blue-100">
                             <input
                               type="checkbox"
                               checked={player.isCalledUp}
@@ -3054,8 +3376,9 @@ export function CalendarioClient({
                               className="size-4 rounded border-border accent-primary"
                               aria-label={`Convocar a ${player.athleteName}`}
                             />
-                          </td>
-                          <td className="px-1 py-2 text-center">
+                            Convocado
+                          </label>
+                          <label className="flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-xs font-black text-foreground ring-1 ring-foreground/10">
                             <input
                               type="checkbox"
                               checked={player.isStarter}
@@ -3063,8 +3386,29 @@ export function CalendarioClient({
                               className="size-4 rounded border-border accent-primary"
                               aria-label={`${player.athleteName} titular`}
                             />
-                          </td>
-                          <td className="px-1 py-2">
+                            Titular
+                          </label>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={disabled}
+                        onClick={() => setEventPlayerId(player.athleteId)}
+                        aria-label={`Eventos de ${player.athleteName}`}
+                      >
+                        <ClipboardList className="size-3.5" aria-hidden="true" />
+                        Eventos · {eventCount}
+                      </Button>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                      <section className="rounded-lg bg-blue-50/60 p-3 ring-1 ring-blue-100">
+                        <p className="text-xs font-black uppercase text-primary">Rol</p>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <Label className="text-xs">Posición</Label>
                             <select
                               value={player.position}
                               disabled={disabled}
@@ -3082,16 +3426,17 @@ export function CalendarioClient({
                                 </option>
                               ))}
                             </select>
-                          </td>
+                          </div>
                           {[
                             ['shirtNumber', 'Dorsal'],
                             ['minutes', 'Minutos'],
                           ].map(([field, label]) => (
-                            <td key={field} className="px-1 py-2 text-center">
+                            <div key={field} className="flex flex-col gap-1.5">
+                              <Label className="text-xs">{label}</Label>
                               <input
                                 type="number"
                                 min="0"
-                                max={field === 'minutes' ? '100' : field === 'yellowCards' ? '2' : undefined}
+                                max={field === 'minutes' ? '100' : undefined}
                                 step="1"
                                 value={player[field as keyof PlayerStatFormState] as string}
                                 disabled={disabled}
@@ -3103,29 +3448,55 @@ export function CalendarioClient({
                                 className={inputClass}
                                 aria-label={`${label} ${player.athleteName}`}
                               />
-                            </td>
+                            </div>
                           ))}
-                          <td className="px-1 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={player.goals}
-                              disabled={disabled}
-                              onChange={(event) => updatePlayerStat(player.athleteId, { goals: event.target.value })}
-                              className={inputClass}
-                              aria-label={`Goles ${player.athleteName}`}
-                            />
-                          </td>
+                        </div>
+                      </section>
+
+                      <section className="rounded-lg bg-white p-3 ring-1 ring-foreground/10">
+                        <p className="text-xs font-black uppercase text-muted-foreground">Aportación</p>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
                           {[
+                            ['goals', 'Goles'],
                             ['assists', 'Asistencias'],
-                            ['foulsCommitted', 'Faltas cometidas'],
-                            ['foulsReceived', 'Faltas recibidas'],
+                            ['shots', 'Tiros'],
+                            ['saves', 'Paradas'],
                           ].map(([field, label]) => (
-                            <td key={field} className="px-1 py-2 text-center">
+                            <div key={field} className="flex flex-col gap-1.5">
+                              <Label className="text-xs">{label}</Label>
                               <input
                                 type="number"
                                 min="0"
+                                step="1"
+                                value={player[field as keyof PlayerStatFormState] as string}
+                                disabled={disabled || (field === 'saves' && !isGoalkeeper)}
+                                onChange={(event) =>
+                                  updatePlayerStat(player.athleteId, {
+                                    [field]: event.target.value,
+                                  } as Partial<PlayerStatFormState>)
+                                }
+                                className={inputClass}
+                                aria-label={`${label} ${player.athleteName}`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="rounded-lg bg-white p-3 ring-1 ring-foreground/10">
+                        <p className="text-xs font-black uppercase text-muted-foreground">Disciplina</p>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          {[
+                            ['foulsCommitted', 'Faltas'],
+                            ['foulsReceived', 'Faltas recibidas'],
+                            ['yellowCards', 'Amarilla'],
+                          ].map(([field, label]) => (
+                            <div key={field} className="flex flex-col gap-1.5">
+                              <Label className="text-xs">{label}</Label>
+                              <input
+                                type="number"
+                                min="0"
+                                max={field === 'yellowCards' ? '2' : undefined}
                                 step="1"
                                 value={player[field as keyof PlayerStatFormState] as string}
                                 disabled={disabled}
@@ -3137,22 +3508,10 @@ export function CalendarioClient({
                                 className={inputClass}
                                 aria-label={`${label} ${player.athleteName}`}
                               />
-                            </td>
+                            </div>
                           ))}
-                          <td className="px-1 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="2"
-                              step="1"
-                              value={player.yellowCards}
-                              disabled={disabled}
-                              onChange={(event) => updatePlayerStat(player.athleteId, { yellowCards: event.target.value })}
-                              className={inputClass}
-                              aria-label={`Tarjetas amarillas ${player.athleteName}`}
-                            />
-                          </td>
-                          <td className="px-1 py-2 text-center">
+                          <label className="flex h-8 items-center justify-between gap-3 self-end rounded-lg bg-muted/50 px-3 text-sm font-black text-foreground">
+                            Roja
                             <input
                               type="checkbox"
                               checked={player.redCard}
@@ -3161,64 +3520,25 @@ export function CalendarioClient({
                               className="size-4 rounded border-border accent-primary disabled:opacity-50"
                               aria-label={`Tarjeta roja ${player.athleteName}`}
                             />
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={player.shots}
-                              disabled={disabled}
-                              onChange={(event) => updatePlayerStat(player.athleteId, { shots: event.target.value })}
-                              className={inputClass}
-                              aria-label={`Tiros ${player.athleteName}`}
-                            />
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={player.saves}
-                              disabled={disabled || !isGoalkeeper}
-                              onChange={(event) => updatePlayerStat(player.athleteId, { saves: event.target.value })}
-                              className={inputClass}
-                              aria-label={`Paradas ${player.athleteName}`}
-                            />
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              disabled={disabled}
-                              onClick={() => setEventPlayerId(player.athleteId)}
-                              className="h-8 w-full gap-1 px-1 text-[10px]"
-                              aria-label={`Eventos de ${player.athleteName}`}
-                            >
-                              <ClipboardList className="size-3" aria-hidden="true" />
-                              <span>
-                                {parseRequiredStat(player.goals) +
-                                  parseRequiredStat(player.yellowCards) +
-                                  (player.redCard || parseRequiredStat(player.yellowCards) >= 2 ? 1 : 0)}
-                              </span>
-                            </Button>
-                          </td>
-                          <td className="px-2 py-2">
-                            <input
-                              type="text"
-                              value={player.notes}
-                              disabled={disabled}
-                              onChange={(event) => updatePlayerStat(player.athleteId, { notes: event.target.value })}
-                              className="h-8 w-full min-w-0 rounded-md border border-input bg-white px-2 text-[11px] font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground"
-                              aria-label={`Observaciones ${player.athleteName}`}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )}
+                          </label>
+                        </div>
+                      </section>
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-1.5">
+                      <Label className="text-xs">Observaciones</Label>
+                      <input
+                        type="text"
+                        value={player.notes}
+                        disabled={disabled}
+                        onChange={(event) => updatePlayerStat(player.athleteId, { notes: event.target.value })}
+                        className="h-9 w-full min-w-0 rounded-lg border border-input bg-white px-3 text-sm font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:bg-muted disabled:text-muted-foreground"
+                        aria-label={`Observaciones ${player.athleteName}`}
+                      />
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           )}
         </div>
@@ -3241,17 +3561,31 @@ export function CalendarioClient({
       >
         {eventPlayer ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-muted/20 p-4">
-              <div className="flex items-center justify-between gap-3">
+            <div className="rounded-xl bg-primary p-4 text-white">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">Registro de eventos</p>
+              <p className="mt-2 text-xl font-black leading-tight">{eventPlayer.athleteName}</p>
+              <p className="mt-1 text-sm font-semibold text-white/75">
+                Añade el minuto de cada gol o tarjeta registrada en su ficha.
+              </p>
+            </div>
+
+            <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black text-foreground">Goles</p>
-                  <p className="text-xs font-semibold text-muted-foreground">{eventGoalCount}</p>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Goles</p>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">Minuto de cada gol asignado al jugador.</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {eventGoalCount > 0 ? (
-                    eventGoalMinutes.map((minute, index) => (
+                <div className="rounded-full bg-emerald-100 px-4 py-2 text-2xl font-black text-emerald-800">
+                  {eventGoalCount}
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {eventGoalCount > 0 ? (
+                  eventGoalMinutes.map((minute, index) => (
+                    <div key={`goal-${index}`} className="flex flex-col gap-1.5">
+                      <Label className="text-xs">Gol {index + 1}</Label>
                       <Input
-                        key={`goal-${index}`}
                         type="number"
                         min="1"
                         max="100"
@@ -3262,29 +3596,37 @@ export function CalendarioClient({
                             goalMinutes: setMinuteField(eventPlayer.goalMinutes, eventGoalCount, index, event.target.value),
                           })
                         }
-                        className="h-9 w-16 text-center font-bold"
+                        className="h-10 text-center font-black"
                         aria-label={`Minuto gol ${index + 1} ${eventPlayer.athleteName}`}
-                        placeholder={`${index + 1}`}
+                        placeholder="Min."
                       />
-                    ))
-                  ) : (
-                    <span className="col-span-3 text-sm font-semibold text-muted-foreground sm:col-span-5">Sin goles</span>
-                  )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="col-span-2 rounded-lg bg-muted px-3 py-3 text-sm font-semibold text-muted-foreground sm:col-span-4">
+                    Sin goles asignados. Sube el número de goles del jugador para indicar minutos.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Amarillas</p>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">Minuto de cada tarjeta amarilla.</p>
+                </div>
+                <div className="rounded-full bg-amber-100 px-4 py-2 text-2xl font-black text-amber-800">
+                  {eventYellowCount}
                 </div>
               </div>
-            </div>
 
-            <div className="rounded-lg border border-border bg-muted/20 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-foreground">Amarillas</p>
-                  <p className="text-xs font-semibold text-muted-foreground">{eventYellowCount}</p>
-                </div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {eventYellowCount > 0 ? (
-                    eventYellowMinutes.map((minute, index) => (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {eventYellowCount > 0 ? (
+                  eventYellowMinutes.map((minute, index) => (
+                    <div key={`yellow-${index}`} className="flex flex-col gap-1.5">
+                      <Label className="text-xs">Amarilla {index + 1}</Label>
                       <Input
-                        key={`yellow-${index}`}
                         type="number"
                         min="1"
                         max="100"
@@ -3295,38 +3637,45 @@ export function CalendarioClient({
                             yellowCardMinutes: setMinuteField(eventPlayer.yellowCardMinutes, eventYellowCount, index, event.target.value),
                           })
                         }
-                        className="h-9 w-16 text-center font-bold"
+                        className="h-10 text-center font-black"
                         aria-label={`Minuto amarilla ${index + 1} ${eventPlayer.athleteName}`}
-                        placeholder={`${index + 1}`}
+                        placeholder="Min."
                       />
-                    ))
-                  ) : (
-                    <span className="col-span-3 text-sm font-semibold text-muted-foreground sm:col-span-5">Sin amarillas</span>
-                  )}
-                </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="col-span-2 rounded-lg bg-muted px-3 py-3 text-sm font-semibold text-muted-foreground sm:col-span-4">
+                    Sin amarillas asignadas. Sube el número de amarillas para indicar minutos.
+                  </p>
+                )}
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-lg border border-border bg-muted/20 p-4">
-              <div className="flex items-center justify-between gap-3">
+            <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+              <div className="grid gap-4 sm:grid-cols-[1fr_120px] sm:items-end">
                 <div>
-                  <p className="text-sm font-black text-foreground">Roja</p>
-                  <p className="text-xs font-semibold text-muted-foreground">{eventHasRedCard ? 'Sí' : 'No'}</p>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-red-700">Roja</p>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                    {eventHasRedCard ? 'Indica el minuto de la expulsión.' : 'Activa la roja en la tarjeta del jugador para introducir el minuto.'}
+                  </p>
                 </div>
-                <Input
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={eventPlayer.redCardMinute}
-                  disabled={!eventHasRedCard}
-                  onChange={(event) => updatePlayerStat(eventPlayer.athleteId, { redCardMinute: event.target.value })}
-                  className="h-9 w-20 text-center font-bold"
-                  aria-label={`Minuto roja ${eventPlayer.athleteName}`}
-                  placeholder="Min."
-                />
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Minuto</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={eventPlayer.redCardMinute}
+                    disabled={!eventHasRedCard}
+                    onChange={(event) => updatePlayerStat(eventPlayer.athleteId, { redCardMinute: event.target.value })}
+                    className="h-10 text-center font-black"
+                    aria-label={`Minuto roja ${eventPlayer.athleteName}`}
+                    placeholder="Min."
+                  />
+                </div>
               </div>
-            </div>
+            </section>
           </div>
         ) : null}
       </AdminFormDialog>
@@ -3351,28 +3700,40 @@ export function CalendarioClient({
           </>
         }
       >
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
-              <AlertTriangle className="size-5" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm font-black text-foreground">
-                No has puesto todas las estadísticas de los jugadores.
-              </p>
-              <p className="mt-1 text-sm font-medium text-amber-900">
-                Puedes revisarlas ahora o guardar la ficha igualmente.
-              </p>
+        <div className="overflow-hidden rounded-xl bg-white ring-1 ring-amber-200">
+          <div className="bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
+                <AlertTriangle className="size-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-black leading-tight text-foreground">
+                  Hay estadísticas pendientes de asignar
+                </p>
+                <p className="mt-1 text-sm font-semibold text-amber-900">
+                  La ficha general tiene datos que todavía no cuadran con los jugadores.
+                </p>
+              </div>
+              <div className="ml-auto rounded-full bg-white px-3 py-1 text-sm font-black text-amber-800 ring-1 ring-amber-200">
+                {statWarnings.length}
+              </div>
             </div>
           </div>
 
-          <ul className="mt-4 space-y-2">
-            {statWarnings.map((warning) => (
-              <li key={warning} className="rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-amber-950 ring-1 ring-amber-200">
-                {warning}
-              </li>
+          <div className="space-y-2 p-4">
+            {statWarnings.map((warning, index) => (
+              <div key={warning} className="flex items-start gap-3 rounded-lg bg-amber-50/70 px-3 py-3 ring-1 ring-amber-100">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-amber-800">
+                  {index + 1}
+                </span>
+                <p className="text-sm font-semibold leading-relaxed text-amber-950">{warning}</p>
+              </div>
             ))}
-          </ul>
+          </div>
+
+          <div className="border-t border-amber-100 bg-amber-50/50 px-4 py-3 text-sm font-semibold text-amber-950">
+            Revisar jugadores te lleva a completar la ficha; guardar igualmente permite cerrar el partido aunque falten detalles individuales.
+          </div>
         </div>
       </AdminFormDialog>
 

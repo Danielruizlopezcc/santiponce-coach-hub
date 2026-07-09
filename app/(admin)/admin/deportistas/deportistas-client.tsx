@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { ReactNode } from 'react'
 import {
+  Camera,
   Eye,
   Loader2,
   Pencil,
@@ -32,6 +33,7 @@ import {
   deleteAthleteAction,
   type CreateAthleteState,
   updateAthleteAdminAction,
+  updateAthletePhotoAction,
 } from './actions'
 
 const ESTADO_STYLES: Record<AdminAthleteRow['estadoMatricula'], string> = {
@@ -177,6 +179,7 @@ const initialCreateState: CreateAthleteState = { ok: false, message: '' }
 export function DeportistasClient({ athletes, categories, teams, seasons, tutors }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showCreate, setShowCreate] = useState(false)
+  const [createGuardianId, setCreateGuardianId] = useState('')
   const [viewingAthlete, setViewingAthlete] = useState<AdminAthleteRow | null>(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -188,12 +191,20 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
   const [draft, setDraft] = useState<Draft | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const createFormRef = useRef<HTMLFormElement>(null)
+  const editPhotoInputRef = useRef<HTMLInputElement>(null)
   const [createState, createAction, createPending] = useActionState(createAthleteAction, initialCreateState)
 
   const hasActiveFilters = [search, categoryFilter, teamFilter, statusFilter, seasonFilter].some(Boolean)
   const assignedTeamCount = athletes.filter((athlete) => athlete.assignedTeamId).length
   const withoutTeamCount = athletes.filter((athlete) => !athlete.assignedTeamId).length
   const matriculatedCount = athletes.filter((athlete) => athlete.estadoMatricula === 'Matriculado').length
+  const selectedCreateTutor = tutors.find((tutor) => tutor.id === createGuardianId) ?? null
+  const createPhotoAllowed = selectedCreateTutor?.imageConsent === 'Aceptado'
+  const editAthlete = athletes.find((item) => item.id === editId) ?? null
+  const selectedEditTutor = draft?.guardianId
+    ? tutors.find((tutor) => tutor.id === draft.guardianId)
+    : null
+  const editPhotoAllowed = selectedEditTutor?.imageConsent === 'Aceptado'
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -260,6 +271,29 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
     })
   }
 
+  function handlePhotoUpload(athlete: AdminAthleteRow) {
+    const photo = editPhotoInputRef.current?.files?.[0]
+    if (!photo) {
+      setActionError('Selecciona una foto para subir.')
+      return
+    }
+
+    setActionError(null)
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.set('athleteId', athlete.id)
+      formData.set('photo', photo)
+      const result = await updateAthletePhotoAction(formData)
+      if (!result.ok) {
+        setActionError(result.message)
+        return
+      }
+      if (editPhotoInputRef.current) {
+        editPhotoInputRef.current.value = ''
+      }
+    })
+  }
+
   function handleDelete(id: string) {
     setActionError(null)
     startTransition(async () => {
@@ -275,6 +309,7 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
   useEffect(() => {
     if (createState.ok) {
       createFormRef.current?.reset()
+      setCreateGuardianId('')
       setShowCreate(false)
     }
   }, [createState.ok, createState.message])
@@ -376,7 +411,13 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
               icon={Shield}
             >
               <AthleteField label="Tutor" htmlFor="create-athlete-guardian">
-                <select id="create-athlete-guardian" name="guardianId" className={FORM_SELECT_CLASS}>
+                <select
+                  id="create-athlete-guardian"
+                  name="guardianId"
+                  value={createGuardianId}
+                  onChange={(event) => setCreateGuardianId(event.target.value)}
+                  className={FORM_SELECT_CLASS}
+                >
                   <option value="">Sin tutor asignado</option>
                   {tutors.map((tutor) => <option key={tutor.id} value={tutor.id}>{tutor.nombre}</option>)}
                 </select>
@@ -386,6 +427,32 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
               </p>
             </AthleteFormSection>
           </div>
+
+          <AthleteFormSection
+            title="Foto del deportista"
+            description="Solo se puede añadir si el tutor legal tiene aceptado el consentimiento de imagen."
+            icon={Camera}
+          >
+            <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+              <AthleteField label="Imagen" htmlFor="create-athlete-photo">
+                <Input
+                  id="create-athlete-photo"
+                  name="photo"
+                  type="file"
+                  accept="image/*"
+                  disabled={!createPhotoAllowed}
+                />
+              </AthleteField>
+              <span className={cn('rounded-full px-3 py-2 text-xs font-black', createPhotoAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                {createPhotoAllowed ? 'Consentimiento aceptado' : 'Sin consentimiento de imagen'}
+              </span>
+            </div>
+            <p className="mt-3 text-xs font-semibold leading-5 text-muted-foreground">
+              {createPhotoAllowed
+                ? 'Puedes subir una foto visible en la ficha deportiva del jugador.'
+                : 'Selecciona un tutor legal con consentimiento de imagen aceptado para activar la subida.'}
+            </p>
+          </AthleteFormSection>
 
           <AthleteFormSection
             title="Organización deportiva"
@@ -530,6 +597,60 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
       >
         {draft ? (
           <div className="space-y-4">
+            <AthleteFormSection
+              title="Foto del deportista"
+              description="La foto solo se puede actualizar si el tutor legal tiene consentimiento de imagen aceptado."
+              icon={Camera}
+            >
+              <div className="grid gap-4 md:grid-cols-[120px_1fr]">
+                <div className="flex size-28 items-center justify-center overflow-hidden rounded-xl bg-muted ring-1 ring-foreground/10">
+                  {editAthlete?.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={editAthlete.photoUrl} alt={`Foto de ${editAthlete.nombre}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <Camera className="size-8 text-muted-foreground" aria-hidden="true" />
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('rounded-full px-3 py-1 text-xs font-black', editPhotoAllowed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                      {editPhotoAllowed ? 'Consentimiento aceptado' : 'Sin consentimiento de imagen'}
+                    </span>
+                    {editAthlete?.photoUrl ? (
+                      <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">
+                        Foto actual guardada
+                      </span>
+                    ) : null}
+                  </div>
+                  <Input
+                    ref={editPhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    disabled={!editPhotoAllowed || isPending}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!editPhotoAllowed || isPending || !editAthlete}
+                      onClick={() => {
+                        if (editAthlete) handlePhotoUpload(editAthlete)
+                      }}
+                    >
+                      {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Camera className="size-3.5" />}
+                      Subir foto
+                    </Button>
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {editPhotoAllowed
+                        ? 'Selecciona una imagen para reemplazar la foto actual.'
+                        : 'Cambia a un tutor legal con consentimiento aceptado para poder subir foto.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AthleteFormSection>
+
             <AthleteFormSection
               title="Familia y matrícula"
               description="Tutor vinculado y situación administrativa del jugador."
@@ -696,57 +817,54 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Jugador</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Tutor</th>
-              <th className="min-w-48 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Categoría</th>
-              <th className="min-w-48 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Equipo</th>
-              <th className="min-w-40 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Temporada</th>
-              <th className="min-w-36 px-4 py-2.5 text-left text-xs font-bold text-blue-950">Estado</th>
-              <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-card">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                  No hay deportistas que coincidan con la búsqueda.
-                </td>
-              </tr>
-            ) : null}
+      {filtered.length === 0 ? (
+        <div className="rounded-xl bg-white px-4 py-14 text-center text-sm font-semibold text-muted-foreground ring-1 ring-foreground/10">
+          No hay deportistas que coincidan con la búsqueda.
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((athlete) => {
+            const isDeleting = deleteId === athlete.id
 
-            {filtered.map((athlete) => {
-              const isDeleting = deleteId === athlete.id
+            return (
+              <article
+                key={athlete.id}
+                className={cn(
+                  'overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-foreground/10 transition-colors',
+                  isDeleting && 'bg-destructive/5 ring-destructive/25',
+                )}
+              >
+                <div className="bg-primary p-4 text-white">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                        {athlete.categoriaSolicitada}
+                      </p>
+                      <h3 className="mt-2 truncate text-xl font-black leading-tight">{athlete.nombre}</h3>
+                      <p className="mt-1 truncate text-sm font-semibold text-white/75">{athlete.tutor}</p>
+                    </div>
+                    <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-black', ESTADO_STYLES[athlete.estadoMatricula])}>
+                      {athlete.estadoMatricula}
+                    </span>
+                  </div>
+                </div>
 
-              return (
-                <tr key={athlete.id} className={cn('transition-colors hover:bg-muted/30', isDeleting && 'bg-destructive/5')}>
-                  <td className="px-4 py-3 font-medium">
-                    <p>{athlete.nombre}</p>
-                  </td>
-                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                    {athlete.tutor}
-                  </td>
-                  <td className="px-4 py-3">
-                    {athlete.categoriaSolicitada}
-                  </td>
-                  <td className="px-4 py-3">
-                    {athlete.equipoAsignado}
-                  </td>
-                  <td className="px-4 py-3">
-                    {athlete.temporada}
-                  </td>
-                  <td className="px-4 py-3">
-                      <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', ESTADO_STYLES[athlete.estadoMatricula])}>
-                        {athlete.estadoMatricula}
-                      </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                <div className="p-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Equipo</p>
+                      <p className="mt-2 text-sm font-black text-foreground">{athlete.equipoAsignado}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Temporada</p>
+                      <p className="mt-2 text-sm font-black text-foreground">{athlete.temporada}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-border pt-3">
                     {isDeleting ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="mr-auto text-xs font-semibold text-muted-foreground">¿Eliminar deportista?</span>
                         <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(athlete.id)}>
                           Sí, eliminar
                         </Button>
@@ -755,25 +873,38 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon-sm" variant="ghost" aria-label="Ver ficha del deportista" onClick={() => setViewingAthlete(athlete)}>
-                          <Eye className="size-4" />
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setViewingAthlete(athlete)}>
+                          <Eye className="size-3.5" aria-hidden="true" />
+                          Ficha
                         </Button>
-                        <Button size="icon-sm" variant="ghost" aria-label="Editar deportista" onClick={() => openEdit(athlete)}>
-                          <Pencil className="size-4" />
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(athlete)}>
+                          <Pencil className="size-3.5" aria-hidden="true" />
+                          Editar
                         </Button>
-                        <Button size="icon-sm" variant="destructive" aria-label="Eliminar deportista" onClick={() => { setViewingAthlete(null); setEditId(null); setDraft(null); setDeleteId(athlete.id) }}>
-                          <Trash2 className="size-4" />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => {
+                            setViewingAthlete(null)
+                            setEditId(null)
+                            setDraft(null)
+                            setDeleteId(athlete.id)
+                          }}
+                        >
+                          <Trash2 className="size-3.5" aria-hidden="true" />
+                          Eliminar
                         </Button>
                       </div>
                     )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
 
       <AdminErrorDialog
         message={

@@ -110,6 +110,8 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
   const matriculatedMembers = team.members.filter((m) => m.estadoMatricula === 'Matriculado').length
   const positionedMembers = team.members.filter((m) => m.position).length
   const numberedMembers = team.members.filter((m) => m.shirtNumber).length
+  const selectedAvailableAthlete = team.available.find((athlete) => athlete.id === selectedAdd) ?? null
+  const selectedPositionLabel = POSITION_OPTIONS.find((position) => position.value === selectedPosition)?.label ?? 'Sin posición'
 
   function openEdit() {
     setEditName(team.nombre)
@@ -304,91 +306,86 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-blue-50/80 text-blue-950 font-bold">
-                <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Deportista</th>
-                <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Tutor</th>
-                <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Dorsal</th>
-                <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Posición</th>
-                <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Matrícula</th>
-                <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {team.members.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <Users className="size-8 opacity-25" aria-hidden="true" />
-                      <p className="text-sm">El equipo aún no tiene jugadores</p>
-                      <p className="text-xs">Añade uno desde la sección inferior</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {team.members.map((member) => (
-                <tr
+        {team.members.length === 0 ? (
+          <div className="px-4 py-12 text-center">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <Users className="size-8 opacity-25" aria-hidden="true" />
+              <p className="text-sm font-semibold">El equipo aún no tiene jugadores</p>
+              <p className="text-xs">Añade uno desde la sección inferior</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {team.members.map((member) => {
+              const positionLabel = POSITION_OPTIONS.find((position) => position.value === member.position)?.label ?? 'Sin posición'
+              const isRemoving = confirmRemoveId === member.id
+
+              return (
+                <article
                   key={member.id}
                   className={cn(
-                    'transition-colors hover:bg-muted/30',
-                    confirmRemoveId === member.id && 'bg-destructive/5',
+                    'rounded-xl bg-white p-4 shadow-sm ring-1 ring-foreground/10 transition-colors',
+                    isRemoving && 'bg-destructive/5 ring-destructive/25',
                   )}
                 >
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-foreground">{member.nombre}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground sm:hidden">{member.tutor}</p>
-                    <p className="mt-1 text-xs text-muted-foreground md:hidden">
-                      {POSITION_OPTIONS.find((position) => position.value === member.position)?.label ?? 'Sin posición'}
-                    </p>
-                  </td>
-                  <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{member.tutor}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={member.shirtNumber ?? ''}
-                      disabled={isPending && updatingShirtNumberId === member.id}
-                      onChange={(event) => handleShirtNumberChange(member.id, event.target.value)}
-                      aria-label={`Dorsal de ${member.nombre}`}
-                      className="h-9 min-w-24 rounded-md border border-input bg-white px-3 text-sm font-medium text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <option value="">Sin dorsal</option>
-                      {Array.from({ length: 99 }, (_, index) => index + 1).map((number) => (
-                        <option key={number} value={number}>
-                          {number}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="hidden px-4 py-3 md:table-cell">
-                    <select
-                      value={member.position ?? ''}
-                      disabled={isPending && updatingPositionId === member.id}
-                      onChange={(event) =>
-                        handlePositionChange(member.id, event.target.value as PlayerPosition | '')
-                      }
-                      aria-label={`Posición de ${member.nombre}`}
-                      className="h-9 min-w-40 rounded-md border border-input bg-white px-3 text-sm font-medium text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <option value="">Sin posición</option>
-                      {POSITION_OPTIONS.map((position) => (
-                        <option key={position.value} value={position.value}>
-                          {position.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', MATRICULA_STYLES[member.estadoMatricula])}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-black text-foreground">{member.nombre}</h3>
+                      <p className="mt-1 truncate text-sm font-semibold text-muted-foreground">{member.tutor}</p>
+                    </div>
+                    <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-black', MATRICULA_STYLES[member.estadoMatricula])}>
                       {member.estadoMatricula}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {confirmRemoveId === member.id ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Quitar?</span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
+                      <Label className="text-xs font-black uppercase text-primary">Dorsal</Label>
+                      <select
+                        value={member.shirtNumber ?? ''}
+                        disabled={isPending && updatingShirtNumberId === member.id}
+                        onChange={(event) => handleShirtNumberChange(member.id, event.target.value)}
+                        aria-label={`Dorsal de ${member.nombre}`}
+                        className="mt-2 h-9 w-full rounded-md border border-input bg-white px-3 text-sm font-medium text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <option value="">Sin dorsal</option>
+                        {Array.from({ length: 99 }, (_, index) => index + 1).map((number) => (
+                          <option key={number} value={number}>
+                            {number}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Posición</Label>
+                      <select
+                        value={member.position ?? ''}
+                        disabled={isPending && updatingPositionId === member.id}
+                        onChange={(event) =>
+                          handlePositionChange(member.id, event.target.value as PlayerPosition | '')
+                        }
+                        aria-label={`Posición de ${member.nombre}`}
+                        className="mt-2 h-9 w-full rounded-md border border-input bg-white px-3 text-sm font-medium text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <option value="">Sin posición</option>
+                        {POSITION_OPTIONS.map((position) => (
+                          <option key={position.value} value={position.value}>
+                            {position.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-muted/20 px-3 py-2">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      Rol actual: <span className="font-black text-foreground">{positionLabel}</span>
+                    </p>
+                    {isRemoving ? (
+                      <div className="flex items-center gap-2">
                         <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleRemove(member.id)}>
-                          Sí
+                          Quitar
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => setConfirmRemoveId(null)}>
                           No
@@ -405,18 +402,18 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
                         Quitar
                       </Button>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {/* ── Añadir jugador ───────────────────────────────────────── */}
-      <section className="rounded-2xl border border-border bg-muted/30 p-5 shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="px-5 pt-5">
             <div className="flex items-center gap-2">
               <UserPlus className="size-4 text-blue-700" aria-hidden="true" />
               <h2 className="text-base font-semibold text-foreground">Incorporar jugador</h2>
@@ -425,51 +422,86 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
               Solo aparecen deportistas de esta categoría y temporada que todavía no tienen equipo asignado.
             </p>
           </div>
-          <span className="rounded-full bg-background px-3 py-1 text-xs font-bold text-muted-foreground ring-1 ring-border">
+          <span className="mr-5 mt-5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
             {team.available.length} disponibles
           </span>
         </div>
 
         {team.available.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <div className="mx-5 mb-5 rounded-xl bg-muted/40 px-4 py-8 text-center text-sm font-semibold text-muted-foreground">
             No hay deportistas sin equipo disponibles para esta temporada.
-          </p>
+          </div>
         ) : (
-          <>
-            <p className="mb-3 text-xs text-muted-foreground">
-              {team.available.length} deportista{team.available.length !== 1 ? 's' : ''} de categoría {team.categoria} sin equipo asignado.
-            </p>
-            <div className="grid gap-2 md:grid-cols-[1fr_190px_auto]">
-              <select
-                value={selectedAdd}
-                onChange={(e) => setSelectedAdd(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Selecciona un deportista…</option>
-                {team.available.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.nombre} — {a.tutor}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedPosition}
-                onChange={(e) => setSelectedPosition(e.target.value as PlayerPosition | '')}
-                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Posición…</option>
-                {POSITION_OPTIONS.map((position) => (
-                  <option key={position.value} value={position.value}>
-                    {position.label}
-                  </option>
-                ))}
-              </select>
-              <Button disabled={!selectedAdd || !selectedPosition || isPending} onClick={handleAdd}>
-                <UserPlus className="size-4" aria-hidden="true" />
-                Añadir
-              </Button>
+          <div className="grid gap-0 border-t border-border lg:grid-cols-[1fr_320px]">
+            <div className="space-y-4 p-5">
+              <p className="text-xs font-semibold text-muted-foreground">
+                {team.available.length} deportista{team.available.length !== 1 ? 's' : ''} de categoría {team.categoria} sin equipo asignado.
+              </p>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl bg-blue-50/70 p-4 ring-1 ring-blue-100">
+                  <Label className="text-xs font-black uppercase text-primary">Deportista</Label>
+                  <select
+                    value={selectedAdd}
+                    onChange={(e) => setSelectedAdd(e.target.value)}
+                    className="mt-2 h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Selecciona un deportista...</option>
+                    {team.available.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre} - {a.tutor}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="rounded-xl bg-muted/35 p-4 ring-1 ring-foreground/10">
+                  <Label className="text-xs font-black uppercase text-muted-foreground">Rol inicial</Label>
+                  <select
+                    value={selectedPosition}
+                    onChange={(e) => setSelectedPosition(e.target.value as PlayerPosition | '')}
+                    className="mt-2 h-10 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Posición...</option>
+                    {POSITION_OPTIONS.map((position) => (
+                      <option key={position.value} value={position.value}>
+                        {position.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-          </>
+
+            <aside className="border-t border-border bg-blue-50/60 p-5 lg:border-l lg:border-t-0">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Vista previa</p>
+              {selectedAvailableAthlete ? (
+                <div className="mt-3 rounded-xl bg-white p-4 ring-1 ring-blue-100">
+                  <p className="text-lg font-black text-foreground">{selectedAvailableAthlete.nombre}</p>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">{selectedAvailableAthlete.tutor}</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-muted/40 p-3">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Equipo</p>
+                      <p className="mt-1 text-sm font-black text-foreground">{team.nombre}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 p-3">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Posición</p>
+                      <p className="mt-1 text-sm font-black text-foreground">{selectedPositionLabel}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 rounded-xl bg-white px-4 py-8 text-center text-sm font-semibold text-muted-foreground ring-1 ring-blue-100">
+                  Selecciona un deportista para previsualizar el alta.
+                </div>
+              )}
+
+              <Button className="mt-4 w-full" disabled={!selectedAdd || !selectedPosition || isPending} onClick={handleAdd}>
+                <UserPlus className="size-4" aria-hidden="true" />
+                Añadir a plantilla
+              </Button>
+            </aside>
+          </div>
         )}
       </section>
 
@@ -482,65 +514,82 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
           </SheetHeader>
 
           <div className="flex flex-col gap-4 px-4 py-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-name">Nombre</Label>
-              <Input
-                id="edit-name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                autoFocus
-              />
-            </div>
+            <section className="rounded-xl bg-blue-50/70 p-4 ring-1 ring-blue-100">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">Identidad</p>
+              <div className="mt-3 space-y-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="edit-name">Nombre</Label>
+                  <Input
+                    id="edit-name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-cat">Categoría</Label>
-              <select
-                id="edit-cat"
-                value={editCat}
-                onChange={(e) => setEditCat(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
-            </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="edit-notes">Notas (opcional)</Label>
+                  <Input
+                    id="edit-notes"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="Observaciones internas..."
+                  />
+                </div>
+              </div>
+            </section>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-season">Temporada</Label>
-              <select
-                id="edit-season"
-                value={editSeason}
-                onChange={(e) => setEditSeason(e.target.value)}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {seasons.map((s) => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
-            </div>
+            <section className="rounded-xl bg-white p-4 ring-1 ring-border">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Categoría y temporada</p>
+              <div className="mt-3 space-y-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="edit-cat">Categoría</Label>
+                  <select
+                    id="edit-cat"
+                    value={editCat}
+                    onChange={(e) => setEditCat(e.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-notes">Notas (opcional)</Label>
-              <Input
-                id="edit-notes"
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="Observaciones internas…"
-              />
-            </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="edit-season">Temporada</Label>
+                  <select
+                    id="edit-season"
+                    value={editSeason}
+                    onChange={(e) => setEditSeason(e.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {seasons.map((s) => (
+                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </section>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="edit-active"
-                type="checkbox"
-                checked={editActive}
-                onChange={(e) => setEditActive(e.target.checked)}
-                className="size-4 rounded border-border accent-primary"
-              />
-              <Label htmlFor="edit-active">Equipo activo</Label>
-            </div>
-
+            <section className="rounded-xl bg-white p-4 ring-1 ring-border">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Estado</p>
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-muted/35 px-3 py-3">
+                <div>
+                  <Label htmlFor="edit-active" className="font-black">Equipo activo</Label>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                    Disponible en planificación y asignaciones.
+                  </p>
+                </div>
+                <input
+                  id="edit-active"
+                  type="checkbox"
+                  checked={editActive}
+                  onChange={(e) => setEditActive(e.target.checked)}
+                  className="size-4 rounded border-border accent-primary"
+                />
+              </div>
+            </section>
           </div>
 
           <SheetFooter>

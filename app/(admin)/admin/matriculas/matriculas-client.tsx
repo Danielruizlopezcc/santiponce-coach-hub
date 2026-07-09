@@ -182,7 +182,7 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
           </h2>
           <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
             Esta vista sirve para validar el estado administrativo de cada matrícula. Las cuotas
-            periódicas se gestionan en Cuotas de deportistas; aquí se revisa la matrícula inicial y
+            periódicas se gestionan en Contabilidad; aquí se revisa la matrícula inicial y
             su estado de pago.
           </p>
         </div>
@@ -293,65 +293,75 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
         </div>
       </div>
 
-      {/* ── Tabla ───────────────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-blue-50 text-blue-950 font-bold">
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Deportista</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 md:table-cell">Tutor</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 lg:table-cell">Temporada</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Matrícula</th>
-              <th className="px-4 py-2.5 text-left text-xs font-bold text-blue-950">Pago</th>
-              <th className="hidden px-4 py-2.5 text-left text-xs font-bold text-blue-950 sm:table-cell">Importe</th>
-              <th className="px-4 py-2.5 text-right text-xs font-bold text-blue-950">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-card">
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-14 text-center text-sm text-muted-foreground">
-                  No hay matrículas que coincidan con la búsqueda.
-                </td>
-              </tr>
-            )}
+      {filtered.length === 0 ? (
+        <div className="rounded-xl bg-white px-4 py-14 text-center text-sm font-semibold text-muted-foreground ring-1 ring-foreground/10">
+          No hay matrículas que coincidan con la búsqueda.
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {filtered.map((row) => {
+            const isConfirming = confirmId === row.id
+            const isRejecting  = rejectId  === row.id
+            const isEditing    = editId    === row.id
+            const isDeleting   = deleteId  === row.id
+            const canAct       = row.estadoMatricula === 'En revisión'
 
-            {filtered.map((row) => {
-              const isConfirming = confirmId === row.id
-              const isRejecting  = rejectId  === row.id
-              const isEditing    = editId    === row.id
-              const isDeleting   = deleteId  === row.id
-              const canAct       = row.estadoMatricula === 'En revisión'
+            return (
+              <article
+                key={row.id}
+                className={cn(
+                  'overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-foreground/10 transition-colors',
+                  isConfirming && 'ring-emerald-200',
+                  isRejecting && 'bg-destructive/5 ring-destructive/25',
+                  isDeleting && 'bg-destructive/5 ring-destructive/25',
+                )}
+              >
+                <div className="bg-primary p-4 text-white">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                        Matrícula · {row.temporada}
+                      </p>
+                      <h3 className="mt-2 truncate text-xl font-black leading-tight">{row.deportista}</h3>
+                      <p className="mt-1 truncate text-sm font-semibold text-white/75">{row.tutor}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', ESTADO_STYLES[row.estadoMatricula])}>
+                        {row.estadoMatricula}
+                      </span>
+                      <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', PAGO_STYLES[row.estadoPago])}>
+                        {row.estadoPago}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-              return (
-                <tr
-                  key={row.id}
-                  className={cn(
-                    'transition-colors hover:bg-muted/30',
-                    isConfirming && 'bg-emerald-50',
-                    isRejecting  && 'bg-destructive/5',
-                  )}
-                >
-                  <td className="px-4 py-3 font-medium">{row.deportista}</td>
-                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{row.tutor}</td>
-                  <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{row.temporada}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', ESTADO_STYLES[row.estadoMatricula])}>
-                      {row.estadoMatricula}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', PAGO_STYLES[row.estadoPago])}>
-                      {row.estadoPago}
-                    </span>
-                  </td>
-                  <td className="hidden px-4 py-3 sm:table-cell">{formatEuro(row.importe)}</td>
-                  <td className="px-4 py-3 text-right">
+                <div className="p-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Temporada</p>
+                      <p className="mt-2 text-sm font-black text-foreground">{row.temporada}</p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50/70 p-3 ring-1 ring-emerald-100">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Importe</p>
+                      <p className="mt-2 text-sm font-black text-foreground">{formatEuro(row.importe)}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Situación</p>
+                      <p className="mt-2 text-sm font-black text-foreground">
+                        {row.estadoMatricula === 'Pendiente'
+                          ? 'Sin iniciar checkout'
+                          : row.estadoMatricula === 'En revisión'
+                            ? 'Requiere revisión'
+                            : 'Validada'}
+                      </p>
+                    </div>
+                  </div>
 
-                    {/* Confirmación de pago */}
-                    {isConfirming && (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Marcar como cobro validado?</span>
+                  <div className="mt-4 border-t border-border pt-3">
+                    {isConfirming ? (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="mr-auto text-xs font-semibold text-muted-foreground">¿Marcar como cobro validado?</span>
                         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" disabled={isPending} onClick={() => handleConfirm(row.id)}>
                           Sí, validar
                         </Button>
@@ -359,12 +369,11 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
                           Cancelar
                         </Button>
                       </div>
-                    )}
+                    ) : null}
 
-                    {/* Confirmación de rechazo */}
-                    {isRejecting && (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Cancelar el intento y devolver a pendiente?</span>
+                    {isRejecting ? (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="mr-auto text-xs font-semibold text-muted-foreground">¿Cancelar el intento y devolver a pendiente?</span>
                         <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleReject(row.id)}>
                           Sí, devolver
                         </Button>
@@ -372,15 +381,14 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
                           Cancelar
                         </Button>
                       </div>
-                    )}
+                    ) : null}
 
-                    {/* Acciones normales */}
-                    {isEditing && (
-                      <div className="flex items-center justify-end gap-2">
+                    {isEditing ? (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <select
                           value={editStatus}
                           onChange={(event) => setEditStatus(event.target.value as typeof editStatus)}
-                          className="h-7 rounded-lg border border-input bg-white px-2 text-xs"
+                          className="mr-auto h-9 rounded-lg border border-input bg-white px-3 text-xs font-semibold text-foreground"
                         >
                           <option value="pendiente">Pendiente</option>
                           <option value="en_revision">En revisión</option>
@@ -393,11 +401,11 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
                           Cancelar
                         </Button>
                       </div>
-                    )}
+                    ) : null}
 
-                    {isDeleting && (
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground">¿Eliminar?</span>
+                    {isDeleting ? (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="mr-auto text-xs font-semibold text-muted-foreground">¿Eliminar matrícula?</span>
                         <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.id)}>
                           Sí, eliminar
                         </Button>
@@ -405,17 +413,17 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
                           Cancelar
                         </Button>
                       </div>
-                    )}
+                    ) : null}
 
-                    {!isConfirming && !isRejecting && !isEditing && !isDeleting && (
-                      <div className="flex items-center justify-end gap-1">
-                        {row.estadoMatricula === 'Matriculado' && (
-                          <span className="flex items-center gap-1 text-xs text-emerald-600">
+                    {!isConfirming && !isRejecting && !isEditing && !isDeleting ? (
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                        {row.estadoMatricula === 'Matriculado' ? (
+                          <span className="mr-auto flex items-center gap-1 text-xs font-semibold text-emerald-600">
                             <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                            Pagado
+                            Matrícula cerrada
                           </span>
-                        )}
-                        {canAct && (
+                        ) : null}
+                        {canAct ? (
                           <>
                             <Button
                               size="sm"
@@ -434,7 +442,7 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
                               Devolver a pendiente
                             </Button>
                           </>
-                        )}
+                        ) : null}
                         <Button size="icon-sm" variant="ghost" aria-label="Editar matrícula" onClick={() => openEdit(row)}>
                           <Pencil className="size-4" aria-hidden="true" />
                         </Button>
@@ -446,18 +454,15 @@ export function MatriculasClient({ enrollments, embedded = false }: MatriculasCl
                         >
                           <Trash2 className="size-4" aria-hidden="true" />
                         </Button>
-                        {row.estadoMatricula === 'Pendiente' && (
-                          <span className="text-xs text-muted-foreground">Sin iniciar checkout</span>
-                        )}
                       </div>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
 
       <AdminErrorDialog message={actionError} onClose={() => setActionError(null)} />
     </>

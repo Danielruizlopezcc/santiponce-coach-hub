@@ -20,11 +20,11 @@ const ACTION_LABELS: Record<string, string> = {
   'coach.update': 'Entrenador actualizado',
   'coach.delete': 'Entrenador eliminado',
   'coach.notice': 'Aviso enviado a entrenador',
-  'tutor.create': 'Tutor creado',
-  'tutor.update': 'Tutor actualizado',
-  'tutor.approve': 'Tutor aprobado',
-  'tutor.reject': 'Tutor rechazado',
-  'tutor.delete': 'Tutor eliminado',
+  'tutor.create': 'Tutor legal creado',
+  'tutor.update': 'Tutor legal actualizado',
+  'tutor.approve': 'Tutor legal aprobado',
+  'tutor.reject': 'Tutor legal rechazado',
+  'tutor.delete': 'Tutor legal eliminado',
   'member.create': 'Socio creado',
   'member.update': 'Socio actualizado',
   'member.delete': 'Socio eliminado',
@@ -62,7 +62,7 @@ const MODULE_META: Record<AuditModule, {
   },
   familias: {
     label: 'Familias',
-    description: 'Tutores, socios y matrículas',
+    description: 'Tutores legales, socios y matrículas',
     icon: Users,
     tone: 'bg-emerald-100 text-emerald-700',
     dot: 'bg-emerald-500',
@@ -218,8 +218,8 @@ export function AuditoriaClient({ logs }: AuditoriaClientProps) {
           const Icon = meta.icon
 
           return (
-            <article key={log.id} className="rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20">
-              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+            <article key={log.id} className="rounded-xl border border-border bg-white p-3 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20">
+              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black', meta.tone)}>
@@ -230,10 +230,10 @@ export function AuditoriaClient({ logs }: AuditoriaClientProps) {
                       {log.createdAt}
                     </span>
                   </div>
-                  <p className="mt-3 text-lg font-black text-foreground">{ACTION_LABELS[log.action] ?? log.action}</p>
+                  <p className="mt-2 text-lg font-black text-foreground">{ACTION_LABELS[log.action] ?? log.action}</p>
                   <p className="mt-1 text-sm font-semibold leading-6 text-muted-foreground">{log.summary}</p>
 
-                  <div className="mt-4 grid gap-2 text-sm md:grid-cols-3">
+                  <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
                       <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Administrador</p>
                       <p className="mt-1 truncate font-semibold text-foreground">{log.actorName}</p>

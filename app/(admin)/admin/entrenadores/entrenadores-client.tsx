@@ -411,8 +411,8 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
             const hasTeam = coach.equipo && coach.equipo !== 'Sin equipo'
 
             return (
-              <article key={coach.id} className={cn('rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20', isDeleting && 'border-destructive/30 bg-destructive/5')}>
-                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+              <article key={coach.id} className={cn('rounded-xl border border-border bg-white p-3 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20', isDeleting && 'border-destructive/30 bg-destructive/5')}>
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
@@ -427,10 +427,10 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
                         {coach.estado}
                       </span>
                     </div>
-                    <p className="mt-3 text-lg font-black text-foreground">{coach.nombre}</p>
+                    <p className="mt-2 text-lg font-black text-foreground">{coach.nombre}</p>
                     <p className="mt-1 truncate text-sm font-semibold text-muted-foreground">{coach.email}</p>
 
-                    <div className="mt-4 grid gap-2 text-sm md:grid-cols-3">
+                    <div className="mt-3 grid gap-2 text-sm md:grid-cols-3">
                       <div className="rounded-lg bg-slate-50 px-3 py-2">
                         <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Equipo asignado</p>
                         <p className="mt-1 truncate font-semibold text-foreground">{coach.equipo || 'Sin equipo'}</p>

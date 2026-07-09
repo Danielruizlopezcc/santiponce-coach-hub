@@ -11,8 +11,8 @@ export default async function AdminTutoresPage() {
 
   return (
     <PageContainer
-      title="Tutores / Socios"
-      description="Gestión de tutores, familias y socios del club."
+      title="Tutores legales / Socios"
+      description="Gestión de tutores legales, familias y socios del club."
       className="max-w-7xl"
     >
       <TutorsMembersClient

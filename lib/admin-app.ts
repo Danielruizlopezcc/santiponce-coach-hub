@@ -93,6 +93,7 @@ export type AdminTutorRow = {
 export type AdminTutorOption = {
   id: string
   nombre: string
+  imageConsent: AdminTutorRow['imageConsent']
 }
 
 export type AdminMemberRow = {
@@ -121,8 +122,10 @@ export type AdminCoachTeamOption = {
 export type AdminAthleteRow = {
   id: string
   nombre: string
+  photoUrl: string | null
   guardianId: string | null
   tutor: string
+  imageConsent: AdminTutorRow['imageConsent']
   categoriaSolicitadaId: string
   categoriaSolicitada: string
   assignedTeamId: string | null
@@ -272,6 +275,7 @@ export type AdminTrainingSessionRow = {
   durationLabel: string
   location: TrainingLocation
   notes: string
+  seriesId?: string
 }
 
 export type AdminTeamColorMap = Record<string, string>
@@ -285,6 +289,7 @@ type StoredTrainingSession = {
   durationMinutes: number
   location: TrainingLocation
   notes: string
+  seriesId?: string
 }
 
 type StoredMatchScheduleMeta = {
@@ -600,7 +605,7 @@ async function getAdminCollections() {
       () => supabase
         .from('athletes')
         .select(
-          'id, guardian_id, first_name, last_name, status, requested_category_id, assigned_team_id, position, season_id, created_at',
+          'id, guardian_id, first_name, last_name, photo_url, status, requested_category_id, assigned_team_id, position, season_id, created_at',
         ),
       'athletes',
     ),
@@ -997,31 +1002,60 @@ export async function getAdminMembers(): Promise<AdminMemberRow[]> {
 }
 
 export async function getAdminTutorOptions(): Promise<AdminTutorOption[]> {
-  const { guardians } = await getAdminCollections()
+  const { guardians, consents, consentDocuments } = await getAdminCollections()
+  const imageRightsDocument = consentDocuments.find((document) => document.code === 'image_rights')
 
   return guardians
     .filter((guardian) => (guardian.approval_status ?? (guardian.is_approved ? 'approved' : 'pending')) === 'approved')
     .map((guardian) => ({
       id: guardian.id,
       nombre: `${guardian.first_name} ${guardian.last_name}`.trim(),
+      imageConsent: (() => {
+        const imageConsentRecord = imageRightsDocument
+          ? consents.find((consent) => consent.guardian_id === guardian.id && consent.document_id === imageRightsDocument.id)
+          : null
+        return imageConsentRecord?.accepted && !imageConsentRecord.revoked_at
+          ? 'Aceptado'
+          : imageConsentRecord
+            ? 'No aceptado'
+            : 'Sin registrar'
+      })() as AdminTutorRow['imageConsent'],
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 
 export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
-  const { guardians, athletes, categories, teams, seasons, payments } = await getAdminCollections()
+  const { guardians, athletes, categories, teams, seasons, payments, consents, consentDocuments } = await getAdminCollections()
   const guardianById = createGuardianNameLookup(guardians)
   const categoryById = new Map(categories.map((category) => [category.id, category.name]))
   const teamById = new Map(teams.map((team) => [team.id, team.name]))
   const seasonById = new Map(seasons.map((season) => [season.id, season.name]))
   const latestEnrollmentPaymentByAthlete = createLatestEnrollmentPaymentByAthlete(payments)
+  const imageRightsDocument = consentDocuments.find((document) => document.code === 'image_rights')
+  const imageConsentByGuardian = new Map<string, AdminTutorRow['imageConsent']>()
+
+  for (const guardian of guardians) {
+    const imageConsentRecord = imageRightsDocument
+      ? consents.find((consent) => consent.guardian_id === guardian.id && consent.document_id === imageRightsDocument.id)
+      : null
+    imageConsentByGuardian.set(
+      guardian.id,
+      imageConsentRecord?.accepted && !imageConsentRecord.revoked_at
+        ? 'Aceptado'
+        : imageConsentRecord
+          ? 'No aceptado'
+          : 'Sin registrar',
+    )
+  }
 
   return athletes
     .map((athlete) => ({
       id: athlete.id,
       nombre: `${athlete.first_name} ${athlete.last_name}`.trim(),
+      photoUrl: athlete.photo_url ?? null,
       guardianId: athlete.guardian_id ?? null,
       tutor: athlete.guardian_id ? guardianById.get(athlete.guardian_id)?.name ?? 'Tutor no disponible' : 'Sin tutor',
+      imageConsent: athlete.guardian_id ? imageConsentByGuardian.get(athlete.guardian_id) ?? 'Sin registrar' : 'Sin registrar',
       categoriaSolicitadaId: athlete.requested_category_id,
       categoriaSolicitada:
         categoryById.get(athlete.requested_category_id) ?? 'Categoría pendiente',
@@ -1400,6 +1434,7 @@ export async function getAdminTrainingSessions(): Promise<AdminTrainingSessionRo
       durationLabel: formatDuration(durationMinutes),
       location: training.location as TrainingLocation,
       notes: training.notes ?? '',
+      seriesId: training.seriesId,
     }
   })
 }
@@ -1541,6 +1576,8 @@ export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetai
   const teamAthletes = athletes.filter((a) => a.assigned_team_id === teamId)
   const totalMembers = teamAthletes.length
   const shirtNumbers = await getTeamShirtNumbers()
+  const categoryName = categoryById.get(team.category_id) ?? 'Sin categoría'
+  const sortInfo = getTeamCategorySortInfo(team.name, categoryName)
 
   const members: AdminTeamMember[] = teamAthletes.map((a) => ({
     id: a.id,
@@ -1567,7 +1604,7 @@ export async function getAdminTeamDetail(teamId: string): Promise<AdminTeamDetai
   return {
     id: team.id,
     nombre: team.name,
-    categoria: categoryById.get(team.category_id) ?? 'Sin categoría',
+    categoria: sortInfo.label,
     categoryId: team.category_id,
     temporada: seasonById.get(team.season_id) ?? CLUB.season,
     seasonId: team.season_id,
@@ -1803,15 +1840,23 @@ export async function getAdminManagers(): Promise<AdminManagerRow[]> {
   const users = await getAdminUsers()
   return users
     .filter((user) => user.rol === 'Administrador' || user.rol === 'Coordinador deportivo')
-    .map((user) => ({
-      id: user.id,
-      nombre: user.nombre,
-      email: user.email,
-      role: user.rol === 'Administrador' ? 'admin' : 'sports_coordinator',
-      rol: user.rol,
-      estado: 'Activo',
-      fechaAlta: user.fechaAlta,
-    }))
+    .map((user) => {
+      const role = user.rol === 'Administrador' ? 'admin' : 'sports_coordinator'
+      const nombre =
+        role === 'sports_coordinator'
+          ? user.nombre.replace(/^Coordinadore\b/i, 'Coordinador')
+          : user.nombre
+
+      return {
+        id: user.id,
+        nombre,
+        email: user.email,
+        role,
+        rol: user.rol,
+        estado: 'Activo',
+        fechaAlta: user.fechaAlta,
+      }
+    })
 }
 
 export async function getAdminCoaches(): Promise<AdminCoachRow[]> {

@@ -23,7 +23,7 @@ export default async function AdminPagosPage() {
 
   return (
     <PageContainer
-      title="Cuotas de deportistas"
+      title="Contabilidad"
       description="Gestión separada de cobros a familias, cuotas asignadas y movimientos contables del club."
       className="max-w-7xl"
     >

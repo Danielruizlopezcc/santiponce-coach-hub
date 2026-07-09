@@ -263,6 +263,9 @@ const createTrainingSchema = trainingBaseSchema.omit({ id: true }).refine((value
   message: 'Introduce una duración mayor que cero.',
   path: ['durationHours'],
 })
+const createRecurringTrainingSchema = createTrainingSchema.extend({
+  repeatMonths: z.number().int().min(1, 'Indica al menos 1 mes.').max(12, 'El máximo permitido es 12 meses.'),
+})
 const updateTrainingSchema = trainingBaseSchema.required({ id: true }).refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
   message: 'Introduce una duración mayor que cero.',
   path: ['durationHours'],
@@ -278,6 +281,7 @@ type StoredTrainingSession = {
   durationMinutes: number
   location: z.infer<typeof trainingLocationSchema>
   notes: string
+  seriesId?: string
 }
 type StoredMatchScheduleMeta = {
   matchId: string
@@ -475,6 +479,51 @@ function timeToMinutes(value: string | null | undefined) {
 
 function rangesOverlap(startA: number, durationA: number, startB: number, durationB: number) {
   return startA < startB + durationB && startB < startA + durationA
+}
+
+function parseDateKey(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
+  return new Date(year, month - 1, day)
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date)
+  next.setMonth(next.getMonth() + months)
+  return next
+}
+
+function getWeeklyTrainingDates(startDate: string, repeatMonths: number) {
+  const firstDate = parseDateKey(startDate)
+  if (!firstDate) throw new Error('Introduce una fecha de inicio válida.')
+
+  const endDate = addMonths(firstDate, repeatMonths)
+  const dates: string[] = []
+  let current = firstDate
+
+  while (current <= endDate) {
+    dates.push(toDateKey(current))
+    current = addDays(current, 7)
+  }
+
+  if (dates.length > 60) {
+    throw new Error('La recurrencia genera demasiados entrenamientos. Reduce el número de meses.')
+  }
+
+  return dates
 }
 
 function fieldsConflict(left: z.infer<typeof fieldLocationSchema>, right: z.infer<typeof fieldLocationSchema>) {
@@ -719,6 +768,37 @@ export async function createTrainingAction(input: TrainingInput): Promise<void> 
   revalidateCalendarPaths()
 }
 
+export async function createRecurringTrainingAction(input: TrainingInput & { repeatMonths: number }): Promise<void> {
+  await requireSportsAdminAction()
+  const parsed = createRecurringTrainingSchema.parse(input)
+  const teamInfo = await getTeamScheduleInfo(parsed.teamId)
+  const trainings = await readStoredTrainings()
+  const durationMinutes = parsed.durationHours * 60 + parsed.durationMinutes
+  const dates = getWeeklyTrainingDates(parsed.trainingDate, parsed.repeatMonths)
+  const seriesId = crypto.randomUUID()
+
+  for (const date of dates) {
+    await assertFieldIsAvailable({
+      kind: 'training',
+      teamId: parsed.teamId,
+      date,
+      startTime: parsed.startTime,
+      durationMinutes,
+      location: parsed.location,
+    })
+  }
+
+  await writeStoredTrainings([
+    ...trainings,
+    ...dates.map((trainingDate) => ({
+      id: crypto.randomUUID(),
+      seriesId,
+      ...toTrainingPayload({ ...parsed, trainingDate }, teamInfo.seasonId),
+    })),
+  ])
+  revalidateCalendarPaths()
+}
+
 export async function updateTrainingAction(input: TrainingInput & { id: string }): Promise<void> {
   await requireSportsAdminAction()
   const parsed = updateTrainingSchema.parse(input)
@@ -740,6 +820,7 @@ export async function updateTrainingAction(input: TrainingInput & { id: string }
     training.id === parsed.id
       ? {
           id: parsed.id,
+          seriesId: training.seriesId,
           ...toTrainingPayload(parsed, teamInfo.seasonId),
         }
       : training,
@@ -755,6 +836,15 @@ export async function deleteTrainingAction(id: string): Promise<void> {
   const trainings = await readStoredTrainings()
 
   await writeStoredTrainings(trainings.filter((training) => training.id !== parsedId))
+  revalidateCalendarPaths()
+}
+
+export async function deleteTrainingSeriesAction(seriesId: string): Promise<void> {
+  await requireSportsAdminAction()
+  const parsedSeriesId = z.string().uuid().parse(seriesId)
+  const trainings = await readStoredTrainings()
+
+  await writeStoredTrainings(trainings.filter((training) => training.seriesId !== parsedSeriesId))
   revalidateCalendarPaths()
 }
 
