@@ -130,6 +130,7 @@ type PlayerStatFormState = {
   athleteId: string
   athleteName: string
   position: MatchPlayerPosition | ''
+  defaultPosition: MatchPlayerPosition | ''
   isCalledUp: boolean
   isStarter: boolean
   shirtNumber: string
@@ -639,6 +640,7 @@ function playerStatToForm(stat: AdminMatchPlayerStat): PlayerStatFormState {
     athleteId: stat.athleteId,
     athleteName: stat.athleteName,
     position: stat.position ?? '',
+    defaultPosition: stat.position ?? '',
     isCalledUp: stat.isCalledUp,
     isStarter: stat.isStarter,
     shirtNumber: stat.shirtNumber === null ? '' : String(stat.shirtNumber),
@@ -1301,6 +1303,10 @@ export function CalendarioClient({
           patch.saves
         ) {
           next.isCalledUp = true
+        }
+
+        if (!stat.isCalledUp && next.isCalledUp && !next.position && next.defaultPosition) {
+          next.position = next.defaultPosition
         }
 
         if (patch.position !== undefined && patch.position !== 'goalkeeper') {
@@ -2549,7 +2555,7 @@ export function CalendarioClient({
                         {match.matchType === 'league' ? match.roundLabel : 'Amistoso'}
                       </p>
                       <h3 className="mt-2 truncate text-xl font-black leading-tight">
-                        {match.teamName} vs {match.opponentName}
+                        {match.isHome ? match.teamName : match.opponentName} vs {match.isHome ? match.opponentName : match.teamName}
                       </h3>
                       <p className="mt-1 text-sm font-semibold text-white/75">
                         {MATCH_TYPE_LABELS[match.matchType]} · {match.durationLabel}

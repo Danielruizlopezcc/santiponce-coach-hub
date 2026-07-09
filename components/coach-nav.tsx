@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, CalendarDays } from 'lucide-react'
+import { BarChart3, CalendarDays, Dumbbell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ITEMS = [
   { label: 'Calendario', href: '/entrenador/calendario', icon: CalendarDays },
+  { label: 'Entrenamientos', href: '/entrenador/entrenamientos', icon: Dumbbell },
   { label: 'Partidos', href: '/entrenador/partidos', icon: CalendarDays },
   { label: 'Estadísticas', href: '/entrenador/estadisticas', icon: BarChart3 },
 ]

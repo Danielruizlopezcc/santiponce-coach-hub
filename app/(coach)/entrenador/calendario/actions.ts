@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 const matchStatusSchema = z.enum(['scheduled', 'played', 'postponed', 'cancelled'])
 const matchTypeSchema = z.enum(['league', 'friendly'])
+const trainingLocationSchema = z.enum(['Campo 1', 'Campo 2', 'Campo completo', 'Anexo'])
 
 const playerStatSchema = z.object({
   athleteId: z.string().uuid(),
@@ -233,13 +234,109 @@ const createMatchSchema = matchBaseSchema.omit({ id: true }).superRefine(validat
 
 type MatchInput = z.infer<typeof matchSchema>
 
+const trainingBaseSchema = z.object({
+  id: z.string().uuid().optional(),
+  teamId: z.string().uuid('Selecciona un equipo.'),
+  trainingDate: z.string().min(1, 'Introduce la fecha del entrenamiento.'),
+  startTime: z.string().min(1, 'Introduce la hora del entrenamiento.'),
+  durationHours: z.number().int().min(0).max(6),
+  durationMinutes: z.number().int().min(0).max(59),
+  location: trainingLocationSchema,
+  notes: z.string().trim().max(300, 'Las notas son demasiado largas.').optional(),
+})
+
+const createTrainingSchema = trainingBaseSchema.omit({ id: true }).refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
+  message: 'Introduce una duración mayor que cero.',
+  path: ['durationHours'],
+})
+const createRecurringTrainingSchema = createTrainingSchema.extend({
+  repeatMonths: z.number().int().min(1, 'Indica al menos 1 mes.').max(12, 'El máximo permitido es 12 meses.'),
+})
+const updateTrainingSchema = trainingBaseSchema.required({ id: true }).refine((value) => value.durationHours > 0 || value.durationMinutes > 0, {
+  message: 'Introduce una duración mayor que cero.',
+  path: ['durationHours'],
+})
+
+type TrainingInput = z.infer<typeof trainingBaseSchema>
+type StoredTrainingSession = {
+  id: string
+  teamId: string
+  seasonId: string
+  trainingDate: string
+  startTime: string
+  durationMinutes: number
+  location: z.infer<typeof trainingLocationSchema>
+  notes: string
+  seriesId?: string
+}
+
+const TRAINING_SETTINGS_KEY = 'coordinator_training_sessions'
+
 function revalidateCoachCalendarPaths() {
   revalidatePath('/entrenador')
   revalidatePath('/entrenador/calendario')
   revalidatePath('/entrenador/partidos')
+  revalidatePath('/entrenador/entrenamientos')
   revalidatePath('/calendario')
   revalidatePath('/admin/calendario')
   revalidatePath('/admin')
+}
+
+function toTrainingPayload(parsed: TrainingInput, seasonId: string) {
+  return {
+    teamId: parsed.teamId,
+    seasonId,
+    trainingDate: parsed.trainingDate,
+    startTime: parsed.startTime,
+    durationMinutes: parsed.durationHours * 60 + parsed.durationMinutes,
+    location: parsed.location,
+    notes: parsed.notes?.trim() || '',
+  }
+}
+
+function getWeeklyTrainingDates(startDate: string, repeatMonths: number) {
+  const [year, month, day] = startDate.split('-').map(Number)
+  const start = new Date(year, month - 1, day)
+  const end = new Date(start)
+  end.setMonth(end.getMonth() + repeatMonths)
+
+  const dates: string[] = []
+  const current = new Date(start)
+  while (current < end) {
+    const yyyy = current.getFullYear()
+    const mm = String(current.getMonth() + 1).padStart(2, '0')
+    const dd = String(current.getDate()).padStart(2, '0')
+    dates.push(`${yyyy}-${mm}-${dd}`)
+    current.setDate(current.getDate() + 7)
+  }
+
+  return dates
+}
+
+async function readStoredTrainings(): Promise<StoredTrainingSession[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', TRAINING_SETTINGS_KEY)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  try {
+    return JSON.parse(data?.value ?? '[]') as StoredTrainingSession[]
+  } catch {
+    return []
+  }
+}
+
+async function writeStoredTrainings(trainings: StoredTrainingSession[]) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert({ key: TRAINING_SETTINGS_KEY, value: JSON.stringify(trainings) }, { onConflict: 'key' })
+
+  if (error) throw new Error(error.message)
 }
 
 async function assertCoachCanUseTeam(coachUserId: string, teamId: string) {
@@ -269,6 +366,23 @@ async function assertCoachCanUseMatch(coachUserId: string, matchId: string) {
   }
 
   await assertCoachCanUseTeam(coachUserId, match.team_id)
+}
+
+async function assertCoachCanUseTraining(coachUserId: string, trainingId: string) {
+  const trainings = await readStoredTrainings()
+  const training = trainings.find((item) => item.id === trainingId)
+  if (!training) throw new Error('No se ha encontrado el entrenamiento.')
+  await assertCoachCanUseTeam(coachUserId, training.teamId)
+}
+
+async function assertCoachCanUseTrainingSeries(coachUserId: string, seriesId: string) {
+  const trainings = await readStoredTrainings()
+  const seriesTrainings = trainings.filter((item) => item.seriesId === seriesId)
+  if (seriesTrainings.length === 0) throw new Error('No se ha encontrado la serie de entrenamientos.')
+
+  for (const training of seriesTrainings) {
+    await assertCoachCanUseTeam(coachUserId, training.teamId)
+  }
 }
 
 async function getTeamSeasonId(teamId: string) {
@@ -403,6 +517,85 @@ export async function createCoachMatchAction(input: MatchInput): Promise<void> {
     .insert(toMatchPayload(parsed, seasonId))
 
   if (error) throw new Error(error.message)
+  revalidateCoachCalendarPaths()
+}
+
+export async function createCoachTrainingAction(input: TrainingInput): Promise<void> {
+  const coach = await requireCoachAction()
+  const parsed = createTrainingSchema.parse(input)
+  await assertCoachCanUseTeam(coach.id, parsed.teamId)
+  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const trainings = await readStoredTrainings()
+
+  await writeStoredTrainings([
+    ...trainings,
+    {
+      id: crypto.randomUUID(),
+      ...toTrainingPayload(parsed, seasonId),
+    },
+  ])
+  revalidateCoachCalendarPaths()
+}
+
+export async function createCoachRecurringTrainingAction(input: TrainingInput & { repeatMonths: number }): Promise<void> {
+  const coach = await requireCoachAction()
+  const parsed = createRecurringTrainingSchema.parse(input)
+  await assertCoachCanUseTeam(coach.id, parsed.teamId)
+  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const trainings = await readStoredTrainings()
+  const seriesId = crypto.randomUUID()
+  const dates = getWeeklyTrainingDates(parsed.trainingDate, parsed.repeatMonths)
+
+  await writeStoredTrainings([
+    ...trainings,
+    ...dates.map((trainingDate) => ({
+      id: crypto.randomUUID(),
+      seriesId,
+      ...toTrainingPayload({ ...parsed, trainingDate }, seasonId),
+    })),
+  ])
+  revalidateCoachCalendarPaths()
+}
+
+export async function updateCoachTrainingAction(input: TrainingInput & { id: string }): Promise<void> {
+  const coach = await requireCoachAction()
+  const parsed = updateTrainingSchema.parse(input)
+  await assertCoachCanUseTraining(coach.id, parsed.id)
+  await assertCoachCanUseTeam(coach.id, parsed.teamId)
+  const seasonId = await getTeamSeasonId(parsed.teamId)
+  const trainings = await readStoredTrainings()
+
+  await writeStoredTrainings(
+    trainings.map((training) =>
+      training.id === parsed.id
+        ? {
+            id: parsed.id,
+            seriesId: training.seriesId,
+            ...toTrainingPayload(parsed, seasonId),
+          }
+        : training,
+    ),
+  )
+  revalidateCoachCalendarPaths()
+}
+
+export async function deleteCoachTrainingAction(id: string): Promise<void> {
+  const coach = await requireCoachAction()
+  const parsedId = z.string().uuid().parse(id)
+  await assertCoachCanUseTraining(coach.id, parsedId)
+  const trainings = await readStoredTrainings()
+
+  await writeStoredTrainings(trainings.filter((training) => training.id !== parsedId))
+  revalidateCoachCalendarPaths()
+}
+
+export async function deleteCoachTrainingSeriesAction(seriesId: string): Promise<void> {
+  const coach = await requireCoachAction()
+  const parsedSeriesId = z.string().uuid().parse(seriesId)
+  await assertCoachCanUseTrainingSeries(coach.id, parsedSeriesId)
+  const trainings = await readStoredTrainings()
+
+  await writeStoredTrainings(trainings.filter((training) => training.seriesId !== parsedSeriesId))
   revalidateCoachCalendarPaths()
 }
 
