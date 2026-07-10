@@ -11,6 +11,7 @@ import {
   deleteCoachTrainingAction,
   deleteCoachTrainingSeriesAction,
   updateCoachMatchAction,
+  updateCoachTrainingAttendanceAction,
   updateCoachTrainingAction,
 } from '../calendario/actions'
 
@@ -45,6 +46,7 @@ export default async function CoachTrainingsPage() {
           createTraining: createCoachTrainingAction,
           createRecurringTraining: createCoachRecurringTrainingAction,
           updateTraining: updateCoachTrainingAction,
+          updateTrainingAttendance: updateCoachTrainingAttendanceAction,
           deleteTraining: deleteCoachTrainingAction,
           deleteTrainingSeries: deleteCoachTrainingSeriesAction,
         }}

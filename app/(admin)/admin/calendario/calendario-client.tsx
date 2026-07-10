@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CLUB } from '@/lib/club'
 import type { AdminMatchPlayerStat, AdminMatchRow, AdminMatchStatus, AdminMatchType, AdminTeamColorMap, AdminTeamRow, AdminTrainingSessionRow, TrainingLocation } from '@/lib/admin-app'
+import type { TrainingAttendanceStatus } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import {
   createMatchAction as adminCreateMatchAction,
@@ -21,6 +22,7 @@ import {
   resetTeamColorAction as adminResetTeamColorAction,
   updateTeamColorAction as adminUpdateTeamColorAction,
   updateMatchAction as adminUpdateMatchAction,
+  updateTrainingAttendanceAction as adminUpdateTrainingAttendanceAction,
   updateTrainingAction as adminUpdateTrainingAction,
 } from './actions'
 
@@ -226,6 +228,14 @@ type TrainingActionInput = {
   notes: string
 }
 
+type TrainingAttendanceActionInput = {
+  trainingId: string
+  attendance: Array<{
+    athleteId: string
+    status: TrainingAttendanceStatus
+  }>
+}
+
 type CalendarActions = {
   createMatch: (input: MatchActionInput) => Promise<void>
   updateMatch: (input: MatchActionInput & { id: string }) => Promise<void>
@@ -233,6 +243,7 @@ type CalendarActions = {
   createTraining?: (input: TrainingActionInput) => Promise<void>
   createRecurringTraining?: (input: TrainingActionInput & { repeatMonths: number }) => Promise<void>
   updateTraining?: (input: TrainingActionInput & { id: string }) => Promise<void>
+  updateTrainingAttendance?: (input: TrainingAttendanceActionInput) => Promise<void>
   deleteTraining?: (id: string) => Promise<void>
   deleteTrainingSeries?: (seriesId: string) => Promise<void>
 }
@@ -316,6 +327,13 @@ const POSITION_OPTIONS: Array<{ value: PlayerStatFormState['position']; label: s
   { value: 'defender', label: 'Defensa' },
   { value: 'midfielder', label: 'Medio' },
   { value: 'forward', label: 'Delantero' },
+]
+
+const TRAINING_ATTENDANCE_OPTIONS: Array<{ value: TrainingAttendanceStatus; label: string; shortLabel: string; className: string }> = [
+  { value: 'attended', label: 'Asistido', shortLabel: 'Asist.', className: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+  { value: 'justified_absence', label: 'Falta justificada', shortLabel: 'Just.', className: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  { value: 'unjustified_absence', label: 'Falta injustificada', shortLabel: 'Injust.', className: 'bg-red-50 text-red-800 ring-red-200' },
+  { value: 'late', label: 'Llega tarde', shortLabel: 'Tarde', className: 'bg-sky-50 text-sky-800 ring-sky-200' },
 ]
 
 function createEmptyForm(defaultTeamId = '', defaultLocation: TrainingLocation = 'Campo 1'): MatchFormState {
@@ -741,6 +759,9 @@ export function CalendarioClient({
   const [trainingSheetOpen, setTrainingSheetOpen] = useState(false)
   const [trainingMode, setTrainingMode] = useState<SheetMode>('create')
   const [editingTraining, setEditingTraining] = useState<AdminTrainingSessionRow | null>(null)
+  const [attendanceTraining, setAttendanceTraining] = useState<AdminTrainingSessionRow | null>(null)
+  const [trainingAttendanceForm, setTrainingAttendanceForm] = useState<Record<string, TrainingAttendanceStatus | undefined>>({})
+  const [trainingAttendanceWarnings, setTrainingAttendanceWarnings] = useState<string[]>([])
   const [deleteTrainingId, setDeleteTrainingId] = useState<string | null>(null)
   const [trainingForm, setTrainingForm] = useState<TrainingFormState>(() => createEmptyTrainingForm(teams[0]?.id ?? ''))
   const [recurringTrainingForm, setRecurringTrainingForm] = useState<RecurringTrainingFormState>({
@@ -810,6 +831,7 @@ export function CalendarioClient({
     createTraining: adminCreateTrainingAction,
     createRecurringTraining: adminCreateRecurringTrainingAction,
     updateTraining: adminUpdateTrainingAction,
+    updateTrainingAttendance: adminUpdateTrainingAttendanceAction,
     deleteTraining: adminDeleteTrainingAction,
     deleteTrainingSeries: adminDeleteTrainingSeriesAction,
   }
@@ -1002,6 +1024,10 @@ export function CalendarioClient({
   const calledUpPlayersCount = playerForm.filter((player) => player.isCalledUp).length
   const starterPlayersCount = playerForm.filter((player) => player.isStarter).length
   const playerStatTotals = getPlayerStatTotals()
+  const attendanceCounts = TRAINING_ATTENDANCE_OPTIONS.map((option) => ({
+    ...option,
+    count: Object.values(trainingAttendanceForm).filter((status) => status === option.value).length,
+  }))
 
   function setField<K extends keyof MatchFormState>(field: K, value: MatchFormState[K]) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -1155,6 +1181,19 @@ export function CalendarioClient({
     setTrainingForm(trainingToForm(training))
     setTrainingError(null)
     setTrainingSheetOpen(true)
+  }
+
+  function openTrainingAttendance(training: AdminTrainingSessionRow) {
+    setTrainingSheetOpen(false)
+    setDeleteTrainingId(null)
+    setAttendanceTraining(training)
+    setTrainingAttendanceForm(
+      Object.fromEntries(
+        training.attendance.map((row) => [row.athleteId, row.status ?? undefined]),
+      ),
+    )
+    setTrainingAttendanceWarnings([])
+    setTrainingError(null)
   }
 
   function openResult(match: AdminMatchRow) {
@@ -1816,6 +1855,44 @@ export function CalendarioClient({
     })
   }
 
+  function updateTrainingAttendance(athleteId: string, status: TrainingAttendanceStatus) {
+    setTrainingAttendanceForm((current) => ({
+      ...current,
+      [athleteId]: current[athleteId] === status ? undefined : status,
+    }))
+  }
+
+  function handleTrainingAttendanceSubmit(forceSave = false) {
+    if (!attendanceTraining) return
+    const updateAttendance = calendarActions.updateTrainingAttendance ?? adminUpdateTrainingAttendanceAction
+    const missingPlayers = attendanceTraining.attendance.filter((row) => !trainingAttendanceForm[row.athleteId])
+
+    if (!forceSave && missingPlayers.length > 0) {
+      setTrainingAttendanceWarnings(
+        missingPlayers.map((player) => `${player.athleteName} no tiene asistencia seleccionada.`),
+      )
+      return
+    }
+
+    startTransition(async () => {
+      try {
+        await updateAttendance({
+          trainingId: attendanceTraining.id,
+          attendance: attendanceTraining.attendance
+            .map((row) => {
+              const status = trainingAttendanceForm[row.athleteId]
+              return status ? { athleteId: row.athleteId, status } : null
+            })
+            .filter((row): row is { athleteId: string; status: TrainingAttendanceStatus } => Boolean(row)),
+        })
+        setAttendanceTraining(null)
+        setTrainingAttendanceWarnings([])
+      } catch (error) {
+        setTrainingError(error instanceof Error ? error.message : 'No se ha podido guardar la asistencia.')
+      }
+    })
+  }
+
   const eventPlayer = eventPlayerId ? playerForm.find((player) => player.athleteId === eventPlayerId) ?? null : null
   const eventGoalCount = eventPlayer ? parseRequiredStat(eventPlayer.goals) : 0
   const eventYellowCount = eventPlayer ? parseRequiredStat(eventPlayer.yellowCards) : 0
@@ -2359,6 +2436,10 @@ export function CalendarioClient({
                         </div>
                       ) : (
                         <div className="flex flex-wrap justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => openTrainingAttendance(training)}>
+                            <ClipboardList className="size-3.5" aria-hidden="true" />
+                            Asistencia
+                          </Button>
                           <Button size="sm" variant="ghost" onClick={() => openTrainingEdit(training)}>
                             <Pencil className="size-3.5" aria-hidden="true" />
                             Editar
@@ -3944,6 +4025,179 @@ export function CalendarioClient({
               </div>
             )}
           </aside>
+        </div>
+      </AdminFormDialog>
+
+      <AdminFormDialog
+        open={Boolean(attendanceTraining)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAttendanceTraining(null)
+            setTrainingAttendanceWarnings([])
+          }
+        }}
+        title="Ficha de asistencia"
+        description={attendanceTraining ? `${attendanceTraining.teamName} · ${attendanceTraining.dateLabel} · ${attendanceTraining.timeLabel}` : undefined}
+        maxWidth="2xl"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setAttendanceTraining(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => handleTrainingAttendanceSubmit()} disabled={isPending || !attendanceTraining}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : <ClipboardList className="size-4" />}
+              Guardar asistencia
+            </Button>
+          </>
+        }
+      >
+        {attendanceTraining ? (
+          <div className="space-y-4">
+            <section className="rounded-xl bg-blue-50/70 p-4 ring-1 ring-blue-100">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Entrenamiento</p>
+                  <h3 className="mt-1 text-2xl font-black leading-tight text-foreground">{attendanceTraining.teamName}</h3>
+                  <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                    {attendanceTraining.categoryName} · {attendanceTraining.location} · {attendanceTraining.durationLabel}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white px-4 py-3 text-right ring-1 ring-foreground/10">
+                  <p className="text-sm font-black text-foreground">{attendanceTraining.dateLabel}</p>
+                  <p className="text-xs font-semibold text-muted-foreground">{attendanceTraining.timeLabel}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                {attendanceCounts.map((option) => (
+                  <div key={option.value} className={cn('rounded-lg px-3 py-2 ring-1', option.className)}>
+                    <p className="text-[11px] font-black uppercase">{option.shortLabel}</p>
+                    <p className="mt-1 text-2xl font-black">{option.count}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="overflow-hidden rounded-xl border border-border bg-white">
+              {attendanceTraining.attendance.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm font-semibold text-muted-foreground">
+                  Este equipo no tiene jugadores asignados todavía.
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {attendanceTraining.attendance.map((player) => {
+                    const selectedStatus = trainingAttendanceForm[player.athleteId]
+
+                    return (
+                      <div
+                        key={player.athleteId}
+                        className={cn(
+                          'grid gap-3 px-4 py-3 lg:grid-cols-[minmax(180px,0.45fr)_1fr] lg:items-center',
+                          !selectedStatus && 'bg-amber-50/35',
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-black text-foreground">{player.athleteName}</p>
+                            {player.shirtNumber ? (
+                              <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-black text-primary">
+                                {player.shirtNumber}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
+                            {player.position ? POSITION_OPTIONS.find((option) => option.value === player.position)?.label ?? player.position : 'Sin posicion'}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-4" role="radiogroup" aria-label={`Asistencia de ${player.athleteName}`}>
+                          {TRAINING_ATTENDANCE_OPTIONS.map((option) => (
+                            <label
+                              key={option.value}
+                              onClick={() => updateTrainingAttendance(player.athleteId, option.value)}
+                              className={cn(
+                                'flex cursor-pointer items-center justify-center rounded-lg px-2 py-2 text-center text-xs font-black ring-1 transition-colors',
+                                selectedStatus === option.value
+                                  ? option.className
+                                  : 'bg-white text-muted-foreground ring-border hover:bg-muted/40',
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name={`attendance-${player.athleteId}`}
+                                value={option.value}
+                                checked={selectedStatus === option.value}
+                                readOnly
+                                className="sr-only"
+                              />
+                              {option.label}
+                            </label>
+                          ))}
+                        </div>
+                        {!selectedStatus ? (
+                          <p className="text-xs font-semibold text-amber-800 lg:col-start-2">
+                            Pendiente de seleccionar.
+                          </p>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        ) : null}
+      </AdminFormDialog>
+
+      <AdminFormDialog
+        open={trainingAttendanceWarnings.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setTrainingAttendanceWarnings([])
+        }}
+        title="Asistencia incompleta"
+        description="Hay jugadores sin estado de asistencia seleccionado."
+        maxWidth="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setTrainingAttendanceWarnings([])} disabled={isPending}>
+              Revisar jugadores
+            </Button>
+            <Button onClick={() => handleTrainingAttendanceSubmit(true)} disabled={isPending}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : <ClipboardList className="size-4" />}
+              Guardar de todas formas
+            </Button>
+          </>
+        }
+      >
+        <div className="overflow-hidden rounded-xl bg-white ring-1 ring-amber-200">
+          <div className="bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
+                <AlertTriangle className="size-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-black leading-tight text-foreground">
+                  No has rellenado toda la asistencia
+                </p>
+                <p className="mt-1 text-sm font-semibold text-amber-900">
+                  Puedes volver a revisar la ficha o guardar solo los jugadores que ya tienen una opción marcada.
+                </p>
+              </div>
+              <div className="ml-auto rounded-full bg-white px-3 py-1 text-sm font-black text-amber-800 ring-1 ring-amber-200">
+                {trainingAttendanceWarnings.length}
+              </div>
+            </div>
+          </div>
+
+          <div className="max-h-72 space-y-2 overflow-y-auto p-4">
+            {trainingAttendanceWarnings.map((warning, index) => (
+              <div key={warning} className="flex items-start gap-3 rounded-lg bg-amber-50/70 px-3 py-3 ring-1 ring-amber-100">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-amber-800">
+                  {index + 1}
+                </span>
+                <p className="text-sm font-semibold leading-relaxed text-amber-950">{warning}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </AdminFormDialog>
 

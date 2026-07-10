@@ -79,7 +79,7 @@ export function LandingHero({
   showAuthCta = true,
 }: LandingHeroProps) {
   const carouselNews = news.slice(0, 3)
-  const latestNews = news.slice(0, 8)
+  const latestNews = news.slice(0, 4)
   const featuredTeams = teams.slice(0, 6)
   const featuredSponsors = sponsors.slice(0, 8)
 

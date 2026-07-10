@@ -16,6 +16,7 @@ import {
 const matchStatusSchema = z.enum(['scheduled', 'played', 'postponed', 'cancelled'])
 const matchTypeSchema = z.enum(['league', 'friendly'])
 const trainingLocationSchema = z.enum(['Campo 1', 'Campo 2', 'Campo completo', 'Anexo'])
+const trainingAttendanceStatusSchema = z.enum(['attended', 'justified_absence', 'unjustified_absence', 'late'])
 
 const playerStatSchema = z.object({
   athleteId: z.string().uuid(),
@@ -264,8 +265,16 @@ const updateTrainingSchema = trainingBaseSchema.required({ id: true }).refine((v
   message: 'Introduce una duración mayor que cero.',
   path: ['durationHours'],
 })
+const trainingAttendanceSchema = z.object({
+  trainingId: z.string().uuid(),
+  attendance: z.array(z.object({
+    athleteId: z.string().uuid(),
+    status: trainingAttendanceStatusSchema,
+  })),
+})
 
 type TrainingInput = z.infer<typeof trainingBaseSchema>
+type TrainingAttendanceInput = z.infer<typeof trainingAttendanceSchema>
 function revalidateCoachCalendarPaths() {
   revalidatePath('/entrenador')
   revalidatePath('/entrenador/calendario')
@@ -421,6 +430,82 @@ async function saveMatchPlayerStats(matchId: string, teamId: string, seasonId: s
   if (error) throw new Error(error.message)
 }
 
+async function saveTrainingAttendance(input: TrainingAttendanceInput) {
+  const supabase = createAdminClient()
+  const trainings = await listTrainingSessions(supabase)
+  const training = trainings.find((item) => item.id === input.trainingId)
+
+  if (!training) throw new Error('No se ha encontrado el entrenamiento.')
+
+  const athleteIds = input.attendance.map((row) => row.athleteId)
+  const uniqueAthleteIds = new Set(athleteIds)
+
+  if (uniqueAthleteIds.size !== athleteIds.length) {
+    throw new Error('Hay jugadores duplicados en la ficha de asistencia.')
+  }
+
+  const { data: athletes, error: athletesError } = athleteIds.length > 0
+    ? await supabase
+        .from('athletes')
+        .select('id, assigned_team_id')
+        .in('id', athleteIds)
+    : { data: [], error: null }
+
+  if (athletesError) throw new Error(athletesError.message)
+
+  const validAthleteIds = new Set(
+    (athletes ?? [])
+      .filter((athlete) => athlete.assigned_team_id === training.teamId)
+      .map((athlete) => athlete.id),
+  )
+
+  if (validAthleteIds.size !== uniqueAthleteIds.size) {
+    throw new Error('Solo puedes guardar asistencia de jugadores de ese equipo.')
+  }
+
+  const { error: trainingUpsertError } = await supabase
+    .from('training_sessions')
+    .upsert(
+      {
+        id: training.id,
+        team_id: training.teamId,
+        season_id: training.seasonId,
+        training_date: training.trainingDate,
+        start_time: training.startTime,
+        duration_minutes: training.durationMinutes,
+        location: training.location,
+        notes: training.notes || null,
+        series_id: training.seriesId ?? null,
+      },
+      { onConflict: 'id' },
+    )
+
+  if (trainingUpsertError) throw new Error(trainingUpsertError.message)
+
+  const { error: deleteError } = await supabase
+    .from('training_attendance')
+    .delete()
+    .eq('training_session_id', training.id)
+
+  if (deleteError) throw new Error(deleteError.message)
+  if (input.attendance.length === 0) return
+
+  const { error } = await supabase
+    .from('training_attendance')
+    .upsert(
+      input.attendance.map((row) => ({
+        training_session_id: training.id,
+        team_id: training.teamId,
+        season_id: training.seasonId,
+        athlete_id: row.athleteId,
+        status: row.status,
+      })),
+      { onConflict: 'training_session_id,athlete_id' },
+    )
+
+  if (error) throw new Error(error.message)
+}
+
 function toMatchPayload(parsed: MatchInput, seasonId: string) {
   const isPlayed = parsed.status === 'played'
   const isLeague = parsed.matchType === 'league'
@@ -550,6 +635,20 @@ export async function deleteCoachTrainingSeriesAction(seriesId: string): Promise
 
   await deleteTrainingSeries(createAdminClient(), parsedSeriesId)
   revalidateCoachCalendarPaths()
+}
+
+export async function updateCoachTrainingAttendanceAction(input: TrainingAttendanceInput): Promise<void> {
+  const coach = await requireCoachAction()
+  const parsed = trainingAttendanceSchema.parse(input)
+  const trainings = await listTrainingSessions(createAdminClient())
+  const training = trainings.find((item) => item.id === parsed.trainingId)
+
+  if (!training) throw new Error('No se ha encontrado el entrenamiento.')
+  await assertCoachCanUseTeam(coach.id, training.teamId)
+  await saveTrainingAttendance(parsed)
+  revalidateCoachCalendarPaths()
+  revalidatePath('/entrenador/estadisticas')
+  revalidatePath('/admin/estadisticas')
 }
 
 export async function updateCoachMatchAction(input: MatchInput & { id: string }): Promise<void> {

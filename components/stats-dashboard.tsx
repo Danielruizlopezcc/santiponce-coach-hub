@@ -4,12 +4,13 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowRight, BarChart3, CalendarDays, GitCompare, ListFilter, Medal, Shield, Trophy, Users } from 'lucide-react'
 import { CLUB } from '@/lib/club'
-import type { AdminMatchPlayerStat, AdminMatchRow, AdminTeamRow } from '@/lib/admin-app'
+import type { AdminMatchPlayerStat, AdminMatchRow, AdminTeamRow, AdminTrainingSessionRow, TrainingAttendanceStatus } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 
 type StatsDashboardProps = {
   matches: AdminMatchRow[]
   teams: AdminTeamRow[]
+  trainings?: AdminTrainingSessionRow[]
   scope: 'coach' | 'admin'
 }
 
@@ -55,6 +56,7 @@ type PlayerMetricKey =
   | 'redCards'
   | 'foulsCommitted'
   | 'foulsReceived'
+  | 'trainingAttendanceRate'
 
 type PlayerSummary = {
   athleteId: string
@@ -73,6 +75,12 @@ type PlayerSummary = {
   redCards: number
   foulsCommitted: number
   foulsReceived: number
+  trainingSessions: number
+  trainingAttended: number
+  trainingLate: number
+  trainingJustifiedAbsences: number
+  trainingUnjustifiedAbsences: number
+  trainingAttendanceRate: number
   matchRows: Array<{ match: AdminMatchRow; stat: AdminMatchPlayerStat }>
 }
 
@@ -126,6 +134,13 @@ const TABS: Array<{
   },
 ]
 
+const ATTENDANCE_LABELS: Record<TrainingAttendanceStatus, string> = {
+  attended: 'Asistido',
+  justified_absence: 'Falta justificada',
+  unjustified_absence: 'Falta injustificada',
+  late: 'Llega tarde',
+}
+
 const TEAM_STATS: TeamStatDefinition[] = [
   { key: 'possession', label: 'Posesión media', group: 'Control', aggregate: 'average', suffix: '%' },
   { key: 'corners', label: 'Corners', group: 'Control', aggregate: 'sum' },
@@ -150,6 +165,7 @@ const PLAYER_METRICS: Array<{ key: PlayerMetricKey; label: string }> = [
   { key: 'saves', label: 'Paradas' },
   { key: 'yellowCards', label: 'Amarillas' },
   { key: 'redCards', label: 'Rojas' },
+  { key: 'trainingAttendanceRate', label: 'Asistencia entrenos' },
 ]
 
 const MATCH_PLAYER_SORT_OPTIONS: Array<{ key: MatchPlayerSortKey; label: string }> = [
@@ -320,7 +336,7 @@ function EmptyState({ text }: { text: string }) {
   )
 }
 
-export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
+export function StatsDashboard({ matches, teams, trainings = [], scope }: StatsDashboardProps) {
   const [tab, setTab] = useState<TabKey>('summary')
   const [compareTab, setCompareTab] = useState<CompareTabKey>('teams')
   const [seasonId, setSeasonId] = useState('all')
@@ -363,6 +379,13 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
       return true
     })
   }, [location, matchType, matches, seasonId, teamId])
+  const filteredTrainings = useMemo(() => {
+    return trainings.filter((training) => {
+      if (seasonId !== 'all' && training.seasonId !== seasonId) return false
+      if (teamId !== 'all' && training.teamId !== teamId) return false
+      return true
+    })
+  }, [seasonId, teamId, trainings])
 
   const playedMatches = useMemo(
     () => filteredMatches.filter((match) => match.status === 'played' && getClubScore(match) !== null && getOpponentScore(match) !== null),
@@ -424,6 +447,12 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
           redCards: 0,
           foulsCommitted: 0,
           foulsReceived: 0,
+          trainingSessions: 0,
+          trainingAttended: 0,
+          trainingLate: 0,
+          trainingJustifiedAbsences: 0,
+          trainingUnjustifiedAbsences: 0,
+          trainingAttendanceRate: 0,
           matchRows: [],
         }
 
@@ -443,11 +472,55 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
       }
     }
 
+    for (const training of filteredTrainings) {
+      for (const attendance of training.attendance) {
+        if (!attendance.status) continue
+        const current = byPlayer.get(attendance.athleteId) ?? {
+          athleteId: attendance.athleteId,
+          athleteName: attendance.athleteName,
+          teamId: training.teamId,
+          teamName: training.teamName,
+          position: attendance.position,
+          callups: 0,
+          starts: 0,
+          minutes: 0,
+          goals: 0,
+          assists: 0,
+          shots: 0,
+          saves: 0,
+          yellowCards: 0,
+          redCards: 0,
+          foulsCommitted: 0,
+          foulsReceived: 0,
+          trainingSessions: 0,
+          trainingAttended: 0,
+          trainingLate: 0,
+          trainingJustifiedAbsences: 0,
+          trainingUnjustifiedAbsences: 0,
+          trainingAttendanceRate: 0,
+          matchRows: [],
+        }
+
+        current.trainingSessions += 1
+        if (attendance.status === 'attended') current.trainingAttended += 1
+        if (attendance.status === 'late') current.trainingLate += 1
+        if (attendance.status === 'justified_absence') current.trainingJustifiedAbsences += 1
+        if (attendance.status === 'unjustified_absence') current.trainingUnjustifiedAbsences += 1
+        byPlayer.set(attendance.athleteId, current)
+      }
+    }
+
+    for (const player of byPlayer.values()) {
+      player.trainingAttendanceRate = player.trainingSessions > 0
+        ? Math.round(((player.trainingAttended + player.trainingLate) / player.trainingSessions) * 100)
+        : 0
+    }
+
     return Array.from(byPlayer.values()).sort((a, b) => {
       if (b[playerMetric] !== a[playerMetric]) return b[playerMetric] - a[playerMetric]
       return a.athleteName.localeCompare(b.athleteName, 'es')
     })
-  }, [filteredMatches, playerMetric])
+  }, [filteredMatches, filteredTrainings, playerMetric])
 
   const selectedMatch = filteredMatches.find((match) => match.id === selectedMatchId) ?? filteredMatches[0] ?? null
   const selectedMatchPlayed = selectedMatch?.status === 'played' && getClubScore(selectedMatch) !== null && getOpponentScore(selectedMatch) !== null
@@ -496,7 +569,6 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
         return diff || a.athleteName.localeCompare(b.athleteName, 'es')
       })
   }, [matchPlayerPosition, matchPlayerSort, matchPlayerStarter, selectedMatch])
-
   const selectedPlayer = playerSummaries.find((player) => player.athleteId === selectedPlayerId) ?? playerSummaries[0] ?? null
   const selectedPlayerRows =
     selectedPlayer?.matchRows.filter(({ match }) => selectedPlayerMatchId === 'all' || match.id === selectedPlayerMatchId) ?? []
@@ -538,7 +610,9 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
   const playerOptions = [...playerSummaries].sort((a, b) => a.athleteName.localeCompare(b.athleteName, 'es'))
   const comparePlayerLeft = playerOptions.find((player) => player.athleteId === comparePlayerA) ?? playerOptions[0] ?? null
   const comparePlayerRight = playerOptions.find((player) => player.athleteId === comparePlayerB) ?? playerOptions[1] ?? playerOptions[0] ?? null
-  const topMetricValue = Math.max(0, ...playerSummaries.map((player) => player[playerMetric]))
+  const topMetricValue = playerMetric === 'trainingAttendanceRate'
+    ? 100
+    : Math.max(0, ...playerSummaries.map((player) => player[playerMetric]))
   const statGroups = Array.from(new Set(TEAM_STATS.map((stat) => stat.group)))
   const teamSummaries = useMemo(() => {
     const byTeam = new Map<string, {
@@ -647,6 +721,32 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
         .sort((a, b) => b.goals + b.assists - (a.goals + a.assists) || b.minutes - a.minutes)
         .slice(0, 8)
     : []
+  const selectedTeamTrainings = selectedTeamAnalysis
+    ? filteredTrainings.filter((training) => training.teamId === selectedTeamAnalysis.id)
+    : []
+  const selectedTeamAttendanceTotal = selectedTeamTrainings.reduce(
+    (total, training) => total + training.attendance.filter((row) => Boolean(row.status)).length,
+    0,
+  )
+  const selectedTeamAttendanceCounts = selectedTeamTrainings.reduce(
+    (totals, training) => {
+      for (const row of training.attendance) {
+        if (!row.status) continue
+        totals[row.status] += 1
+      }
+      return totals
+    },
+    {
+      attended: 0,
+      justified_absence: 0,
+      unjustified_absence: 0,
+      late: 0,
+    } as Record<TrainingAttendanceStatus, number>,
+  )
+  const selectedTeamAttendanceRate = formatPercent(
+    selectedTeamAttendanceCounts.attended + selectedTeamAttendanceCounts.late,
+    selectedTeamAttendanceTotal,
+  )
 
   const compareTeams = useMemo(() => {
     return [compareA, compareB].map((id) => {
@@ -719,8 +819,8 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
         : 'Equipo asignado'
       : teams.find((team) => team.id === teamId)?.nombre ?? 'Equipo seleccionado'
 
-  if (matches.length === 0) {
-    return <EmptyState text="No hay partidos para calcular estadísticas." />
+  if (matches.length === 0 && trainings.length === 0) {
+    return <EmptyState text="No hay datos para calcular estadísticas." />
   }
 
   return (
@@ -1011,7 +1111,7 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
       ) : null}
 
       {tab === 'teams' && filteredMatches.length > 0 ? (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.58fr)]">
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_minmax(340px,0.62fr)]">
           <div className="rounded-lg bg-white/85 p-4 ring-1 ring-foreground/10">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
@@ -1139,41 +1239,79 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
           </div>
 
           <div className="rounded-lg bg-white/85 p-4 ring-1 ring-foreground/10">
-            <h2 className="text-sm font-black uppercase tracking-[0.12em] text-foreground">Ranking de equipos</h2>
-            <div className="mt-4 space-y-2">
-              {teamAnalysisRows.map((team, index) => (
-                <button
-                  key={team.id}
-                  type="button"
-                  onClick={() => setTeamFocusId(team.id)}
-                  className={cn(
-                    'grid w-full grid-cols-[32px_1fr_auto] items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    selectedTeamAnalysis?.id === team.id
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-white hover:bg-muted/40',
-                  )}
-                >
-                  <span className="text-xs font-black text-muted-foreground">{index + 1}</span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-black text-foreground">{team.name}</span>
-                    <span className="block truncate text-[11px] font-semibold text-muted-foreground">
-                      {team.wins}V · {team.draws}E · {team.losses}D · DG {team.goalDifference >= 0 ? '+' : ''}{team.goalDifference}
-                    </span>
-                  </span>
-                  <span className="rounded-lg bg-muted px-2 py-1 text-sm font-black text-foreground">{team.points}</span>
-                </button>
-              ))}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Entrenamientos</p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">Asistencia</h2>
+              </div>
+              <span className="rounded-lg bg-primary/10 px-2 py-1 text-sm font-black text-primary">
+                {selectedTeamTrainings.length}
+              </span>
             </div>
+
+            {selectedTeamAnalysis && selectedTeamTrainings.length > 0 ? (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-xl border border-primary/15 bg-primary p-4 text-primary-foreground">
+                  <p className="text-xs font-black uppercase text-white/70">Ratio asistencia</p>
+                  <p className="mt-1 text-3xl font-black">{selectedTeamAttendanceRate}</p>
+                  <p className="mt-1 text-xs font-semibold text-white/75">
+                    Incluye asistidos y llegadas tarde
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(ATTENDANCE_LABELS).map(([status, label]) => (
+                    <div key={status} className="rounded-lg bg-white px-3 py-2 ring-1 ring-foreground/10">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground">{label}</p>
+                      <p className="mt-1 text-xl font-black text-foreground">
+                        {selectedTeamAttendanceCounts[status as TrainingAttendanceStatus]}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-[0.12em] text-foreground">Últimas sesiones</h3>
+                  <div className="mt-2 space-y-2">
+                    {selectedTeamTrainings.slice(0, 5).map((training) => {
+                      const total = training.attendance.filter((row) => Boolean(row.status)).length
+                      const positive = training.attendance.filter((row) => row.status === 'attended' || row.status === 'late').length
+
+                      return (
+                        <div key={training.id} className="rounded-lg border border-border bg-white px-3 py-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-black text-foreground">{training.dateLabel}</p>
+                              <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">
+                                {training.timeLabel} · {training.location}
+                              </p>
+                            </div>
+                            <span className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-black text-primary">
+                              {formatPercent(positive, total)}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-lg border border-dashed border-border px-3 py-8 text-center text-sm font-semibold text-muted-foreground">
+                Sin entrenamientos con asistencia en este filtro.
+              </div>
+            )}
           </div>
+
         </section>
       ) : null}
 
       {tab === 'players' && filteredMatches.length > 0 ? (
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-lg bg-white/85 p-4 ring-1 ring-foreground/10">
+          <div className="space-y-4">
             {selectedPlayer ? (
               <>
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg bg-white/85 p-4 ring-1 ring-foreground/10">
                   <FilterSelect
                     label="Jugador"
                     value={selectedPlayer.athleteId}
@@ -1186,65 +1324,97 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
                       <option key={player.athleteId} value={player.athleteId}>{player.athleteName}</option>
                     ))}
                   </FilterSelect>
-                  <FilterSelect label="Partido" value={selectedPlayerMatchId} onChange={setSelectedPlayerMatchId}>
-                    <option value="all">Todos los partidos</option>
-                    {selectedPlayer.matchRows.map(({ match }) => (
-                      <option key={match.id} value={match.id}>
-                        {getMatchDisplayLabel(match)}
-                      </option>
-                    ))}
-                  </FilterSelect>
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold uppercase text-muted-foreground">{selectedPlayer.teamName}</p>
-                    <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">{selectedPlayer.athleteName}</h2>
-                    <p className="text-sm text-muted-foreground">{getPlayerPositionLabel(selectedPlayer.position)}</p>
+                <div className="rounded-xl border border-primary/15 bg-white/90 p-4 ring-1 ring-foreground/5">
+                  <div className="grid gap-3 md:grid-cols-[1fr_360px]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Por partido</p>
+                        <h2 className="mt-1 text-2xl font-black tracking-tight text-foreground">{selectedPlayer.athleteName}</h2>
+                        <p className="text-sm font-semibold text-muted-foreground">
+                          {selectedPlayer.teamName} · {getPlayerPositionLabel(selectedPlayer.position)}
+                        </p>
+                      </div>
+                      <span className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary">
+                        {selectedPlayerMatchId === 'all' ? 'Temporada filtrada' : 'Partido'}
+                      </span>
+                    </div>
+                    <FilterSelect label="Partido" value={selectedPlayerMatchId} onChange={setSelectedPlayerMatchId}>
+                      <option value="all">Todos los partidos</option>
+                      {selectedPlayer.matchRows.map(({ match }) => (
+                        <option key={match.id} value={match.id}>
+                          {getMatchDisplayLabel(match)}
+                        </option>
+                      ))}
+                    </FilterSelect>
                   </div>
-                  <span className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-black uppercase text-primary">
-                    {selectedPlayerMatchId === 'all' ? 'Temporada filtrada' : 'Partido'}
-                  </span>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <StatPill label="Minutos" value={`${selectedPlayerStats.minutes}'`} detail={`${selectedPlayerStats.callups} convocatorias`} tone="blue" />
+                    <StatPill label="Goles" value={selectedPlayerStats.goals} detail={`${formatDecimal(selectedPlayerAdvanced.goalsPer100)} cada 100 min`} tone="green" />
+                    <StatPill label="Asistencias" value={selectedPlayerStats.assists} detail={`${formatDecimal(selectedPlayerAdvanced.assistsPer100)} cada 100 min`} tone="green" />
+                    <StatPill label="Aportación directa" value={selectedPlayerAdvanced.goalContributions} detail="Goles + asistencias" tone="amber" />
+                    <StatPill label="Titularidades" value={selectedPlayerStats.starts} detail={`${selectedPlayerAdvanced.starterRate} de convocatorias`} />
+                    <StatPill label="Tiros" value={selectedPlayerStats.shots} detail={`${selectedPlayerAdvanced.shotEfficiency} de eficacia`} />
+                    <StatPill label="Amarillas" value={selectedPlayerStats.yellowCards} />
+                    <StatPill label="Rojas" value={selectedPlayerStats.redCards} tone={selectedPlayerStats.redCards > 0 ? 'red' : 'default'} />
+                  </div>
+
+                  <div className="mt-4 grid gap-2 md:grid-cols-2">
+                    <StatPill label="Paradas" value={selectedPlayerStats.saves} />
+                    <StatPill label="Faltas cometidas" value={selectedPlayerStats.foulsCommitted} />
+                    <StatPill label="Faltas recibidas" value={selectedPlayerStats.foulsReceived} />
+                    <StatPill label="Partidos en el filtro" value={selectedPlayerRows.length} />
+                  </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-                  <StatPill label="Minutos" value={`${selectedPlayerStats.minutes}'`} detail={`${selectedPlayerStats.callups} convocatorias`} tone="blue" />
-                  <StatPill label="Goles" value={selectedPlayerStats.goals} detail={`${formatDecimal(selectedPlayerAdvanced.goalsPer100)} cada 100 min`} tone="green" />
-                  <StatPill label="Asistencias" value={selectedPlayerStats.assists} detail={`${formatDecimal(selectedPlayerAdvanced.assistsPer100)} cada 100 min`} tone="green" />
-                  <StatPill label="Aportación directa" value={selectedPlayerAdvanced.goalContributions} detail="Goles + asistencias" tone="amber" />
-                  <StatPill label="Titularidades" value={selectedPlayerStats.starts} detail={`${selectedPlayerAdvanced.starterRate} de convocatorias`} />
-                  <StatPill label="Tiros" value={selectedPlayerStats.shots} detail={`${selectedPlayerAdvanced.shotEfficiency} de eficacia`} />
-                  <StatPill label="Amarillas" value={selectedPlayerStats.yellowCards} />
-                  <StatPill label="Rojas" value={selectedPlayerStats.redCards} tone={selectedPlayerStats.redCards > 0 ? 'red' : 'default'} />
+                <div className="rounded-xl border border-primary/15 bg-white/90 p-4 ring-1 ring-foreground/5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Entrenamientos</p>
+                      <h3 className="mt-1 text-xl font-black tracking-tight text-foreground">Asistencia del jugador</h3>
+                    </div>
+                    <span className="rounded-lg bg-primary/10 px-3 py-1 text-sm font-black text-primary">
+                      {selectedPlayer.trainingAttendanceRate}%
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+                    <StatPill label="Sesiones" value={selectedPlayer.trainingSessions} />
+                    <StatPill label="Asistido" value={selectedPlayer.trainingAttended} tone="green" />
+                    <StatPill label="Tarde" value={selectedPlayer.trainingLate} tone="blue" />
+                    <StatPill label="Justificadas" value={selectedPlayer.trainingJustifiedAbsences} tone="amber" />
+                    <StatPill label="Injustificadas" value={selectedPlayer.trainingUnjustifiedAbsences} tone="red" />
+                  </div>
                 </div>
 
-                <div className="mt-4 grid gap-2 md:grid-cols-2">
-                  <StatPill label="Paradas" value={selectedPlayerStats.saves} />
-                  <StatPill label="Faltas cometidas" value={selectedPlayerStats.foulsCommitted} />
-                  <StatPill label="Faltas recibidas" value={selectedPlayerStats.foulsReceived} />
-                  <StatPill label="Partidos en el filtro" value={selectedPlayerRows.length} />
-                </div>
-
-                <div className="mt-4 space-y-2">
+                <div className="rounded-xl border border-primary/15 bg-white/90 p-4 ring-1 ring-foreground/5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-black uppercase tracking-[0.12em] text-foreground">Evolución por partido</h3>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-primary">Evolución</p>
+                      <h3 className="mt-1 text-xl font-black tracking-tight text-foreground">Evolución por partido</h3>
+                    </div>
                     <span className="text-xs font-semibold text-muted-foreground">Últimos 8 registros</span>
                   </div>
-                  {selectedPlayerRows.slice(0, 8).map(({ match, stat }) => (
-                    <div key={match.id} className="rounded-lg border border-border px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-bold text-foreground">{match.dateLabel} · {match.opponentName}</p>
-                        <span className="text-xs font-black text-muted-foreground">{stat.minutes}&apos;</span>
+                  <div className="mt-4 space-y-2">
+                    {selectedPlayerRows.slice(0, 8).map(({ match, stat }) => (
+                      <div key={match.id} className="rounded-lg border border-border bg-white px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-bold text-foreground">{match.dateLabel} · {match.opponentName}</p>
+                          <span className="text-xs font-black text-muted-foreground">{stat.minutes}&apos;</span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {stat.goals} goles · {stat.assists} asist. · {stat.shots} tiros · {stat.yellowCards} amarillas · {stat.redCards} rojas
+                        </p>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {stat.goals} goles · {stat.assists} asist. · {stat.shots} tiros · {stat.yellowCards} amarillas · {stat.redCards} rojas
-                      </p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </>
             ) : (
-              <EmptyState text="No hay estadísticas individuales con estos filtros." />
+              <div className="rounded-lg bg-white/85 p-4 ring-1 ring-foreground/10">
+                <EmptyState text="No hay estadísticas individuales con estos filtros." />
+              </div>
             )}
           </div>
 
@@ -1279,7 +1449,7 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
                     <span className="block truncate text-[11px] font-semibold text-muted-foreground">{player.teamName}</span>
                   </span>
                   <span className="rounded-lg bg-muted px-2 py-1 text-sm font-black text-foreground">
-                    {player[playerMetric]}
+                    {playerMetric === 'trainingAttendanceRate' ? `${player[playerMetric]}%` : player[playerMetric]}
                   </span>
                 </button>
               ))}
@@ -1678,7 +1848,9 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
                 <div key={player.athleteId}>
                   <div className="mb-1 flex items-center justify-between gap-2 text-sm">
                     <span className="min-w-0 truncate font-bold text-foreground">{index + 1}. {player.athleteName}</span>
-                    <span className="font-black text-foreground">{player[playerMetric]}</span>
+                    <span className="font-black text-foreground">
+                      {playerMetric === 'trainingAttendanceRate' ? `${player[playerMetric]}%` : player[playerMetric]}
+                    </span>
                   </div>
                   <p className="mb-1 truncate text-[11px] font-semibold text-muted-foreground">{player.teamName}</p>
                   <div className="h-2 overflow-hidden rounded-full bg-muted">

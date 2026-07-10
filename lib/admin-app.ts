@@ -202,6 +202,16 @@ export type AdminMatchPlayerStat = {
   notes: string
 }
 
+export type TrainingAttendanceStatus = 'attended' | 'justified_absence' | 'unjustified_absence' | 'late'
+
+export type AdminTrainingAttendanceRow = {
+  athleteId: string
+  athleteName: string
+  position: PlayerPosition | null
+  shirtNumber: number | null
+  status: TrainingAttendanceStatus | null
+}
+
 export type AdminMatchRow = {
   id: string
   teamId: string
@@ -277,6 +287,7 @@ export type AdminTrainingSessionRow = {
   location: TrainingLocation
   notes: string
   seriesId?: string
+  attendance: AdminTrainingAttendanceRow[]
 }
 
 export type AdminTeamColorMap = Record<string, string>
@@ -1374,17 +1385,55 @@ function formatDuration(minutes: number) {
 
 export async function getAdminTrainingSessions(): Promise<AdminTrainingSessionRow[]> {
   const supabase = createAdminClient()
-  const [trainings, { data: teams }, { data: categories }, { data: seasons }] =
+  const trainings = await listTrainingSessions(supabase)
+  const trainingIds = trainings.map((training) => training.id)
+  const [checkData, { data: teams }, { data: categories }, { data: seasons }, { data: athletes }, attendanceResult] =
     await Promise.all([
-      listTrainingSessions(supabase),
+      Promise.resolve(null),
       supabase.from('teams').select('id, name, category_id, season_id'),
       supabase.from('categories').select('id, name'),
       supabase.from('seasons').select('id, name'),
+      supabase.from('athletes').select('id, first_name, last_name, assigned_team_id, position'),
+      trainingIds.length > 0
+        ? supabase
+            .from('training_attendance')
+            .select('training_session_id, athlete_id, status')
+            .in('training_session_id', trainingIds)
+        : Promise.resolve({ data: [], error: null }),
     ])
+  void checkData
 
   const teamById = new Map((teams ?? []).map((team) => [team.id, team]))
   const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const shirtNumbers = await getTeamShirtNumbers()
+  type TrainingAthleteRow = {
+    id: string
+    first_name: string
+    last_name: string
+    assigned_team_id: string | null
+    position: string | null
+  }
+  type SavedTrainingAttendanceRow = {
+    training_session_id: string
+    athlete_id: string
+    status: TrainingAttendanceStatus
+  }
+  const athletesByTeamId = new Map<string, TrainingAthleteRow[]>()
+  const attendanceByTrainingAndAthlete = new Map<string, TrainingAttendanceStatus>()
+
+  for (const athlete of ((athletes ?? []) as TrainingAthleteRow[])) {
+    if (!athlete.assigned_team_id) continue
+    const current = athletesByTeamId.get(athlete.assigned_team_id) ?? []
+    current.push(athlete)
+    athletesByTeamId.set(athlete.assigned_team_id, current)
+  }
+
+  if (!attendanceResult.error) {
+    for (const row of ((attendanceResult.data ?? []) as SavedTrainingAttendanceRow[])) {
+      attendanceByTrainingAndAthlete.set(`${row.training_session_id}:${row.athlete_id}`, row.status)
+    }
+  }
 
   return trainings
     .sort((a, b) => b.trainingDate.localeCompare(a.trainingDate) || b.startTime.localeCompare(a.startTime))
@@ -1394,6 +1443,15 @@ export async function getAdminTrainingSessions(): Promise<AdminTrainingSessionRo
     const sortInfo = getTeamCategorySortInfo(team?.name ?? '', categoryName)
     const weekInfo = getMatchWeekInfo(training.trainingDate)
     const durationMinutes = training.durationMinutes ?? 0
+    const attendance: AdminTrainingAttendanceRow[] = (athletesByTeamId.get(training.teamId) ?? [])
+      .map((athlete) => ({
+        athleteId: athlete.id,
+        athleteName: `${athlete.first_name} ${athlete.last_name}`.trim(),
+        position: (athlete.position ?? null) as PlayerPosition | null,
+        shirtNumber: shirtNumbers[athlete.id] ?? null,
+        status: attendanceByTrainingAndAthlete.get(`${training.id}:${athlete.id}`) ?? null,
+      }))
+      .sort((a, b) => (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999) || a.athleteName.localeCompare(b.athleteName, 'es'))
 
     return {
       id: training.id,
@@ -1413,6 +1471,7 @@ export async function getAdminTrainingSessions(): Promise<AdminTrainingSessionRo
       location: training.location as TrainingLocation,
       notes: training.notes ?? '',
       seriesId: training.seriesId,
+      attendance,
     }
   })
 }
