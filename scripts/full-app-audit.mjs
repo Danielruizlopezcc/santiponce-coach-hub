@@ -13,7 +13,8 @@ const requiredEnv = [
 ]
 
 const baseUrl = getBaseUrl()
-const prefix = `codex_audit_${Date.now()}`
+const QA_PREFIX = 'QA_TEST_NO_BORRAR_TEMP_'
+const prefix = `${QA_PREFIX}${Date.now()}`
 const warnings = []
 const cleanup = {
   authUserIds: [],
@@ -22,6 +23,7 @@ const cleanup = {
   consentIds: [],
   consentDocumentIds: [],
   paymentIds: [],
+  trainingSessionIds: [],
   matchStatIds: [],
   matchIds: [],
   coachAssignmentIds: [],
@@ -54,8 +56,8 @@ function loadEnvFile(filePath) {
 function getBaseUrl() {
   if (process.env.TEST_BASE_URL) return process.env.TEST_BASE_URL.replace(/\/$/, '')
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-  if (siteUrl && !siteUrl.includes('localhost')) return siteUrl.replace(/\/$/, '')
-  return 'https://santiponce-coach-hub.vercel.app'
+  if (siteUrl) return siteUrl.replace(/\/$/, '')
+  return 'http://localhost:3000'
 }
 
 function assert(condition, message) {
@@ -69,6 +71,30 @@ function warn(message) {
 
 function noError(error, context) {
   if (error) throw new Error(`${context}: ${error.message}`)
+}
+
+function assertSafeAuditEnvironment() {
+  assert(
+    process.env.QA_AUDIT_ALLOW_WRITES === 'true',
+    'QA audit writes are disabled. Set QA_AUDIT_ALLOW_WRITES=true only in a safe test/staging environment.',
+  )
+
+  assert(
+    ['local', 'test', 'staging'].includes(process.env.QA_AUDIT_ENVIRONMENT ?? ''),
+    'Set QA_AUDIT_ENVIRONMENT to local, test, or staging before running write audit checks.',
+  )
+
+  assert(
+    process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'production',
+    'Refusing to run write audit checks in a production environment.',
+  )
+
+  const target = new URL(baseUrl)
+  const isLocalTarget = ['localhost', '127.0.0.1', '::1'].includes(target.hostname)
+  assert(
+    isLocalTarget || process.env.QA_AUDIT_ALLOW_REMOTE === 'true',
+    `Refusing remote audit target ${target.origin}. Set QA_AUDIT_ALLOW_REMOTE=true only for staging/test.`,
+  )
 }
 
 async function check(name, fn) {
@@ -180,7 +206,7 @@ async function expectRedirect(route, session, expectedLocationPart) {
 }
 
 async function createUser(admin, roleLabel, roles = []) {
-  const email = `${prefix}_${roleLabel}@example.invalid`
+  const email = `${prefix}_${roleLabel}@example.com`
   const password = `Codex-${roleLabel}-${Date.now()}!`
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -196,7 +222,7 @@ async function createUser(admin, roleLabel, roles = []) {
   assert(userId, `missing ${roleLabel} user id`)
   cleanup.authUserIds.push(userId)
 
-  for (const role of roles) {
+  for (const role of Array.from(new Set(['user', ...roles]))) {
     const { error: roleError } = await admin
       .from('user_roles')
       .upsert({ user_id: userId, role }, { onConflict: 'user_id,role' })
@@ -224,6 +250,7 @@ async function cleanupAll(admin) {
   }
 
   await deleteIn('match_player_stats', 'id', cleanup.matchStatIds)
+  await deleteIn('training_sessions', 'id', cleanup.trainingSessionIds)
   await deleteIn('matches', 'id', cleanup.matchIds)
   await deleteIn('coach_team_assignments', 'id', cleanup.coachAssignmentIds)
   await deleteIn('tutor_fee_charges', 'id', cleanup.tutorFeeChargeIds)
@@ -248,6 +275,81 @@ async function cleanupAll(admin) {
   }
 }
 
+async function verifyNoCreatedRows(admin) {
+  const countByIds = async (table, column, values) => {
+    if (!values.length) return 0
+    const { count, error } = await admin
+      .from(table)
+      .select(column, { count: 'exact', head: true })
+      .in(column, values)
+    noError(error, `verify cleanup ${table}`)
+    return count ?? 0
+  }
+
+  const createdRowChecks = [
+    ['match_player_stats', 'id', cleanup.matchStatIds],
+    ['training_sessions', 'id', cleanup.trainingSessionIds],
+    ['matches', 'id', cleanup.matchIds],
+    ['coach_team_assignments', 'id', cleanup.coachAssignmentIds],
+    ['tutor_fee_charges', 'id', cleanup.tutorFeeChargeIds],
+    ['tutor_fee_assignments', 'id', cleanup.tutorFeeAssignmentIds],
+    ['payments', 'id', cleanup.paymentIds],
+    ['consents', 'id', cleanup.consentIds],
+    ['athletes', 'id', cleanup.athleteIds],
+    ['guardians', 'id', cleanup.guardianIds],
+    ['admin_finance_movements', 'id', cleanup.financeMovementIds],
+    ['admin_fee_templates', 'id', cleanup.feeTemplateIds],
+    ['news', 'id', cleanup.newsIds],
+    ['news_sections', 'id', cleanup.newsSectionIds],
+    ['sponsors', 'id', cleanup.sponsorIds],
+    ['teams', 'id', cleanup.teamIds],
+    ['categories', 'id', cleanup.categoryIds],
+    ['seasons', 'id', cleanup.seasonIds],
+    ['consent_documents', 'id', cleanup.consentDocumentIds],
+  ]
+
+  for (const [table, column, values] of createdRowChecks) {
+    const remaining = await countByIds(table, column, values)
+    assert(remaining === 0, `${table} still contains ${remaining} created audit rows`)
+  }
+
+  for (const userId of cleanup.authUserIds) {
+    const { data, error } = await admin.auth.admin.getUserById(userId)
+    assert(error || !data?.user, `auth user ${userId} still exists after cleanup`)
+  }
+}
+
+async function verifyNoPrefixResidues(admin) {
+  const countByPrefix = async (table, filter) => {
+    const { count, error } = await admin
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .or(filter)
+    noError(error, `verify prefix cleanup ${table}`)
+    return count ?? 0
+  }
+
+  const prefixChecks = [
+    ['categories', `name.ilike.%${prefix}%`],
+    ['seasons', `name.ilike.%${prefix}%`],
+    ['teams', `name.ilike.%${prefix}%,notes.ilike.%${prefix}%`],
+    ['training_sessions', `notes.ilike.%${prefix}%`],
+    ['matches', `opponent_name.ilike.%${prefix}%,round_label.ilike.%${prefix}%`],
+    ['payments', `description.ilike.%${prefix}%`],
+    ['consent_documents', `code.ilike.%${prefix}%,title.ilike.%${prefix}%`],
+    ['admin_finance_movements', `concept.ilike.%${prefix}%`],
+    ['admin_fee_templates', `name.ilike.%${prefix}%,fee_type.ilike.%${prefix}%`],
+    ['news', `title.ilike.%${prefix}%`],
+    ['news_sections', `name.ilike.%${prefix}%`],
+    ['sponsors', `title.ilike.%${prefix}%`],
+  ]
+
+  for (const [table, filter] of prefixChecks) {
+    const remaining = await countByPrefix(table, filter)
+    assert(remaining === 0, `${table} still contains ${remaining} rows with audit prefix`)
+  }
+}
+
 async function insertOne(admin, table, payload, select = 'id') {
   const { data, error } = await admin.from(table).insert(payload).select(select).single()
   noError(error, `insert ${table}`)
@@ -268,6 +370,9 @@ async function deleteOne(admin, table, id) {
 }
 
 async function main() {
+  assertSafeAuditEnvironment()
+  console.log(`Full app audit prefix: ${prefix}`)
+
   for (const envName of requiredEnv) {
     assert(process.env[envName], `${envName} is missing`)
   }
@@ -278,14 +383,23 @@ async function main() {
   const familyUser = await createUser(admin, 'family', ['member'])
   const memberUser = await createUser(admin, 'member', ['member'])
   const adminUser = await createUser(admin, 'admin', ['admin'])
+  const coordinatorUser = await createUser(admin, 'coordinator', ['sports_coordinator'])
   const coachUser = await createUser(admin, 'coach', ['coach'])
 
   const familySession = await createAuthSession(familyUser.email, familyUser.password)
   const memberSession = await createAuthSession(memberUser.email, memberUser.password)
   const adminSession = await createAuthSession(adminUser.email, adminUser.password)
+  const coordinatorSession = await createAuthSession(coordinatorUser.email, coordinatorUser.password)
   const coachSession = await createAuthSession(coachUser.email, coachUser.password)
 
+  assert(familySession.cookieHeader, 'family session cookies were not created')
+  assert(memberSession.cookieHeader, 'member session cookies were not created')
+  assert(adminSession.cookieHeader, 'admin session cookies were not created')
+  assert(coordinatorSession.cookieHeader, 'coordinator session cookies were not created')
+  assert(coachSession.cookieHeader, 'coach session cookies were not created')
+
   const familyClient = bearerClient(familySession.accessToken)
+  const coordinatorClient = bearerClient(coordinatorSession.accessToken)
   const coachClient = bearerClient(coachSession.accessToken)
 
   let testCategoryId
@@ -295,11 +409,11 @@ async function main() {
   let testAthleteId
   let testMatchId
 
-  await check('Login and role rows exist for user/admin/member/coach', async () => {
+  await check('Login and role rows exist for user/admin/member/coordinator/coach', async () => {
     const { data, error } = await admin
       .from('user_roles')
       .select('user_id,role')
-      .in('user_id', [familyUser.id, memberUser.id, adminUser.id, coachUser.id])
+      .in('user_id', [familyUser.id, memberUser.id, adminUser.id, coordinatorUser.id, coachUser.id])
     noError(error, 'role lookup')
     const roleKey = new Set((data ?? []).map((role) => `${role.user_id}:${role.role}`))
     assert(roleKey.has(`${familyUser.id}:user`), 'family user role missing')
@@ -307,6 +421,7 @@ async function main() {
     assert(roleKey.has(`${memberUser.id}:user`), 'member user role missing')
     assert(roleKey.has(`${memberUser.id}:member`), 'member role missing')
     assert(roleKey.has(`${adminUser.id}:admin`), 'admin role missing')
+    assert(roleKey.has(`${coordinatorUser.id}:sports_coordinator`), 'sports coordinator role missing')
     assert(roleKey.has(`${coachUser.id}:coach`), 'coach role missing')
   })
 
@@ -320,6 +435,7 @@ async function main() {
     await expectRedirect('/admin', familySession, '/app')
     await expectRedirect('/entrenador', familySession, '/app')
     await expectRedirect('/admin', coachSession, '/app')
+    await expectRedirect('/entrenador', coordinatorSession, '/app')
   })
 
   await check('Admin pages render with admin session', async () => {
@@ -344,10 +460,38 @@ async function main() {
     }
   })
 
+  await check('Sports coordinator can access only configured sports admin sections', async () => {
+    await expectAllowedOrRedirect('/admin', coordinatorSession, '/admin/entrenadores')
+
+    for (const route of [
+      '/admin/entrenadores',
+      '/admin/deportistas',
+      '/admin/equipos',
+      '/admin/calendario',
+      '/admin/estadisticas',
+      '/admin/temporadas',
+    ]) {
+      await expectAllowed(route, coordinatorSession)
+    }
+
+    for (const route of [
+      '/admin/tutores',
+      '/admin/matriculas',
+      '/admin/noticias',
+      '/admin/patrocinadores',
+      '/admin/pagos',
+      '/admin/consentimientos',
+      '/admin/configuracion',
+      '/admin/administradores',
+      '/admin/auditoria',
+    ]) {
+      await expectRedirect(route, coordinatorSession, '/admin/entrenadores')
+    }
+  })
+
   await check('Public and auth pages render without session', async () => {
     for (const route of [
       '/',
-      '/club',
       '/calendario',
       '/noticias',
       '/patrocinadores',
@@ -363,10 +507,11 @@ async function main() {
       await expectAllowed(route, null)
     }
 
+    await expectAllowedOrRedirect('/club', null, '/club/organizacion')
     await expectAllowedOrRedirect('/equipos', null, '/equipos/')
   })
 
-  await check('Admin CRUD: category, season, team, coach assignment and match', async () => {
+  await check('Admin CRUD: category, season, team, coach assignment, training and match', async () => {
     const category = await insertOne(admin, 'categories', {
       name: `${prefix} Category`,
       sort_order: 9999,
@@ -405,6 +550,22 @@ async function main() {
       team_id: team.id,
     })
     cleanup.coachAssignmentIds.push(coachAssignment.id)
+
+    const training = await insertOne(admin, 'training_sessions', {
+      team_id: team.id,
+      season_id: season.id,
+      training_date: '2031-01-08',
+      start_time: '18:00',
+      duration_minutes: 90,
+      location: 'Campo completo',
+      notes: `${prefix} Training`,
+    }, 'id,notes')
+    cleanup.trainingSessionIds.push(training.id)
+
+    const updatedTraining = await updateOne(admin, 'training_sessions', training.id, {
+      notes: `${prefix} Training Updated`,
+    }, 'id,notes')
+    assert(updatedTraining.notes.endsWith('Updated'), 'training update did not persist')
 
     const match = await insertOne(admin, 'matches', {
       team_id: team.id,
@@ -745,6 +906,15 @@ async function main() {
         amount_cents: 100,
         payment_method: 'cash',
       }],
+      ['training_sessions', {
+        team_id: testTeamId,
+        season_id: testSeasonId,
+        training_date: '2031-01-09',
+        start_time: '18:00',
+        duration_minutes: 90,
+        location: 'Campo completo',
+        notes: `${prefix} blocked training`,
+      }],
     ]
 
     for (const [table, payload] of blockedTables) {
@@ -753,29 +923,70 @@ async function main() {
     }
   })
 
+  await check('Sports coordinator direct RLS cannot write admin-only restricted tables', async () => {
+    const blockedTables = [
+      ['payments', {
+        user_id: familyUser.id,
+        guardian_id: testGuardianId,
+        athlete_id: testAthleteId,
+        season_id: testSeasonId,
+        payment_type: 'enrollment',
+        provider: 'manual',
+        status: 'pending',
+        amount_cents: 100,
+        description: `${prefix} blocked coordinator payment`,
+      }],
+      ['admin_finance_movements', {
+        movement_type: 'income',
+        concept: `${prefix} blocked coordinator movement`,
+        amount_cents: 100,
+        payment_method: 'cash',
+      }],
+      ['news', {
+        title: `${prefix} blocked coordinator news`,
+        body: '<p>Blocked</p>',
+      }],
+      ['sponsors', {
+        title: `${prefix} blocked coordinator sponsor`,
+        image_url: 'https://example.com/blocked.jpg',
+      }],
+    ]
+
+    for (const [table, payload] of blockedTables) {
+      const { error } = await coordinatorClient.from(table).insert(payload)
+      assert(error, `sports coordinator inserted into restricted table ${table}`)
+    }
+  })
+
   await check('Delete flow works for created CRUD rows', async () => {
-    await deleteOne(admin, 'sponsors', cleanup.sponsorIds.pop())
-    await deleteOne(admin, 'news', cleanup.newsIds.pop())
-    await deleteOne(admin, 'news_sections', cleanup.newsSectionIds.pop())
-    await deleteOne(admin, 'tutor_fee_charges', cleanup.tutorFeeChargeIds.pop())
-    await deleteOne(admin, 'tutor_fee_assignments', cleanup.tutorFeeAssignmentIds.pop())
-    await deleteOne(admin, 'admin_fee_templates', cleanup.feeTemplateIds.pop())
-    await deleteOne(admin, 'admin_finance_movements', cleanup.financeMovementIds.pop())
-    await deleteOne(admin, 'payments', cleanup.paymentIds.pop())
-    await deleteOne(admin, 'consents', cleanup.consentIds.pop())
-    await deleteOne(admin, 'consent_documents', cleanup.consentDocumentIds.pop())
-    await deleteOne(admin, 'match_player_stats', cleanup.matchStatIds.pop())
-    await deleteOne(admin, 'matches', cleanup.matchIds.pop())
-    await deleteOne(admin, 'coach_team_assignments', cleanup.coachAssignmentIds.pop())
+    await deleteOne(admin, 'sponsors', cleanup.sponsorIds.at(-1))
+    await deleteOne(admin, 'news', cleanup.newsIds.at(-1))
+    await deleteOne(admin, 'news_sections', cleanup.newsSectionIds.at(-1))
+    await deleteOne(admin, 'tutor_fee_charges', cleanup.tutorFeeChargeIds.at(-1))
+    await deleteOne(admin, 'tutor_fee_assignments', cleanup.tutorFeeAssignmentIds.at(-1))
+    await deleteOne(admin, 'admin_fee_templates', cleanup.feeTemplateIds.at(-1))
+    await deleteOne(admin, 'admin_finance_movements', cleanup.financeMovementIds.at(-1))
+    await deleteOne(admin, 'payments', cleanup.paymentIds.at(-1))
+    await deleteOne(admin, 'consents', cleanup.consentIds.at(-1))
+    await deleteOne(admin, 'consent_documents', cleanup.consentDocumentIds.at(-1))
+    await deleteOne(admin, 'match_player_stats', cleanup.matchStatIds.at(-1))
+    await deleteOne(admin, 'training_sessions', cleanup.trainingSessionIds.at(-1))
+    await deleteOne(admin, 'matches', cleanup.matchIds.at(-1))
+    await deleteOne(admin, 'coach_team_assignments', cleanup.coachAssignmentIds.at(-1))
     await admin.from('athletes').update({ assigned_team_id: null }).eq('id', testAthleteId)
-    await deleteOne(admin, 'teams', cleanup.teamIds.pop())
-    await deleteOne(admin, 'athletes', cleanup.athleteIds.pop())
-    await deleteOne(admin, 'guardians', cleanup.guardianIds.pop())
-    await deleteOne(admin, 'seasons', cleanup.seasonIds.pop())
-    await deleteOne(admin, 'categories', cleanup.categoryIds.pop())
+    await deleteOne(admin, 'teams', cleanup.teamIds.at(-1))
+    await deleteOne(admin, 'athletes', cleanup.athleteIds.at(-1))
+    await deleteOne(admin, 'guardians', cleanup.guardianIds.at(-1))
+    await deleteOne(admin, 'seasons', cleanup.seasonIds.at(-1))
+    await deleteOne(admin, 'categories', cleanup.categoryIds.at(-1))
   })
 
   await cleanupAll(admin)
+
+  await check('Final cleanup removed every created row and auth user', async () => {
+    await verifyNoCreatedRows(admin)
+    await verifyNoPrefixResidues(admin)
+  })
 }
 
 try {

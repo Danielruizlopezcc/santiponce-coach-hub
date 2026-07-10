@@ -264,7 +264,7 @@ function StatPill({
   return (
     <div
       className={cn(
-        'rounded-lg px-3 py-2 ring-1 ring-foreground/10',
+        'min-w-0 rounded-lg px-3 py-2 ring-1 ring-foreground/10',
         tone === 'default' && 'bg-white',
         tone === 'green' && 'bg-emerald-50 ring-emerald-200',
         tone === 'amber' && 'bg-amber-50 ring-amber-200',
@@ -273,8 +273,8 @@ function StatPill({
       )}
     >
       <p className="text-[11px] font-bold uppercase text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-black text-foreground">{value}</p>
-      {detail ? <p className="mt-1 text-[11px] font-semibold leading-4 text-muted-foreground">{detail}</p> : null}
+      <p className="mt-1 break-words text-xl font-black text-foreground">{value}</p>
+      {detail ? <p className="mt-1 break-words text-[11px] font-semibold leading-4 text-muted-foreground">{detail}</p> : null}
     </div>
   )
 }
@@ -724,7 +724,7 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <section className="overflow-hidden rounded-xl border border-primary/15 bg-white shadow-sm">
         <div className="grid gap-0 xl:grid-cols-[0.5fr_1.5fr]">
           <div className="bg-primary p-4 text-primary-foreground">
@@ -905,16 +905,16 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
             </div>
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.75fr)]">
-            <div className="rounded-lg bg-white/85 p-4 ring-1 ring-foreground/10">
+          <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.75fr)]">
+            <div className="min-w-0 rounded-lg bg-white/85 p-4 ring-1 ring-foreground/10">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-sm font-black uppercase tracking-[0.12em] text-foreground">Clasificación interna</h2>
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">
                   {teamSummaries.length} equipos
                 </span>
               </div>
-              <div className="mt-3 overflow-hidden rounded-lg border border-border bg-white">
-                <div className="grid grid-cols-[32px_1fr_repeat(5,54px)] gap-2 bg-muted/50 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground">
+              <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-white">
+                <div className="grid min-w-[414px] grid-cols-[32px_1fr_repeat(5,54px)] gap-2 bg-muted/50 px-3 py-2 text-[10px] font-black uppercase text-muted-foreground">
                   <span>#</span>
                   <span>Equipo</span>
                   <span className="text-center">PJ</span>
@@ -925,7 +925,7 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
                 </div>
                 {teamSummaries.length > 0 ? (
                   teamSummaries.map((team, index) => (
-                    <div key={team.id} className="grid grid-cols-[32px_1fr_repeat(5,54px)] gap-2 border-t border-border px-3 py-2 text-sm">
+                    <div key={team.id} className="grid min-w-[414px] grid-cols-[32px_1fr_repeat(5,54px)] gap-2 border-t border-border px-3 py-2 text-sm">
                       <span className="font-black text-muted-foreground">{index + 1}</span>
                       <span className="truncate font-black text-foreground">{team.name}</span>
                       <span className="text-center font-semibold text-muted-foreground">{team.played}</span>
@@ -943,7 +943,7 @@ export function StatsDashboard({ matches, teams, scope }: StatsDashboardProps) {
               </div>
             </div>
 
-            <div className="grid gap-3">
+            <div className="grid min-w-0 gap-3">
               <StatPill
                 label="Mejor ataque"
                 value={bestAttack?.name ?? '-'}
@@ -1708,12 +1708,12 @@ function FilterSelect({
   compact?: boolean
 }) {
   return (
-    <label className={cn('grid gap-1', compact ? 'min-w-56' : '')}>
+    <label className={cn('grid min-w-0 gap-1', compact ? 'sm:min-w-56' : '')}>
       <span className="text-[11px] font-bold uppercase text-muted-foreground">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 rounded-lg border border-input bg-white px-3 text-sm font-semibold text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="h-9 w-full min-w-0 rounded-lg border border-input bg-white px-3 text-sm font-semibold text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         {children}
       </select>

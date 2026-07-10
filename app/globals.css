@@ -124,7 +124,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply overflow-x-hidden bg-background text-foreground;
     /* Usa la imagen de fondo desde public/images. */
     background-image: url('/images/Fondo1.png');
     background-position: center center;
@@ -134,7 +134,7 @@
     background-color: var(--background);
   }
   html {
-    @apply font-sans;
+    @apply overflow-x-hidden font-sans;
     min-height: 100%;
   }
 }

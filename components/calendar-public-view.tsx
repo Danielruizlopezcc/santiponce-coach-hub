@@ -310,9 +310,9 @@ export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
 
           <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">
             <form className="grid gap-3 md:grid-cols-4" action="/calendario#partidos">
-              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-black text-foreground">
                 Temporada
-                <select name="season" defaultValue={selectedSeason} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                <select name="season" defaultValue={selectedSeason} className="h-10 w-full min-w-0 rounded-lg border border-input bg-white px-3 text-sm font-medium">
                   {data.seasons.map((season) => (
                     <option key={season.id} value={season.id}>
                       {season.name}
@@ -321,9 +321,9 @@ export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
                 </select>
               </label>
 
-              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-black text-foreground">
                 Equipo
-                <select name="team" defaultValue={normalizeFilter(filters.team) || 'all'} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                <select name="team" defaultValue={normalizeFilter(filters.team) || 'all'} className="h-10 w-full min-w-0 rounded-lg border border-input bg-white px-3 text-sm font-medium">
                   <option value="all">Todos</option>
                   {visibleTeams.map((team) => (
                     <option key={team.id} value={team.id}>
@@ -333,18 +333,18 @@ export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
                 </select>
               </label>
 
-              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-black text-foreground">
                 Competición
-                <select name="competition" defaultValue={normalizeFilter(filters.competition) || 'all'} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                <select name="competition" defaultValue={normalizeFilter(filters.competition) || 'all'} className="h-10 w-full min-w-0 rounded-lg border border-input bg-white px-3 text-sm font-medium">
                   <option value="all">Todas</option>
                   <option value="league">Liga</option>
                   <option value="friendly">Amistosos</option>
                 </select>
               </label>
 
-              <label className="flex flex-col gap-1.5 text-sm font-black text-foreground">
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm font-black text-foreground">
                 Estado
-                <select name="status" defaultValue={selectedStatus} className="h-10 rounded-lg border border-input bg-white px-3 text-sm font-medium">
+                <select name="status" defaultValue={selectedStatus} className="h-10 w-full min-w-0 rounded-lg border border-input bg-white px-3 text-sm font-medium">
                   <option value="all">Todos</option>
                   <option value="upcoming">Próximos</option>
                   <option value="played">Jugados</option>

@@ -25,7 +25,7 @@ function getCountdownLabel(matchDate: string, matchTime: string) {
 }
 
 export function MatchCountdown({ matchDate, matchTime }: MatchCountdownProps) {
-  const [label, setLabel] = useState(() => getCountdownLabel(matchDate, matchTime))
+  const [label, setLabel] = useState(matchTime ? 'Calculando...' : 'Hora por confirmar')
 
   useEffect(() => {
     const update = () => setLabel(getCountdownLabel(matchDate, matchTime))

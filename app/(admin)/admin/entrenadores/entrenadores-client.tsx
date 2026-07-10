@@ -388,6 +388,7 @@ export function CoachesClient({ coaches, teams = [] }: Props) {
           <div className="relative min-w-72 flex-1 md:max-w-md">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              aria-label="Buscar entrenadores"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por entrenador, email o estado"

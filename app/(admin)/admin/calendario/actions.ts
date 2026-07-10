@@ -4,6 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireSportsAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  createTrainingSession,
+  createTrainingSessions,
+  deleteTrainingSeries,
+  deleteTrainingSession,
+  listTrainingSessions,
+  updateTrainingSession,
+} from '@/lib/training-sessions'
 
 const matchStatusSchema = z.enum(['scheduled', 'played', 'postponed', 'cancelled'])
 const matchTypeSchema = z.enum(['league', 'friendly'])
@@ -272,23 +280,11 @@ const updateTrainingSchema = trainingBaseSchema.required({ id: true }).refine((v
 })
 
 type TrainingInput = z.infer<typeof trainingBaseSchema>
-type StoredTrainingSession = {
-  id: string
-  teamId: string
-  seasonId: string
-  trainingDate: string
-  startTime: string
-  durationMinutes: number
-  location: z.infer<typeof trainingLocationSchema>
-  notes: string
-  seriesId?: string
-}
 type StoredMatchScheduleMeta = {
   matchId: string
   durationMinutes: number
 }
 
-const TRAINING_SETTINGS_KEY = 'coordinator_training_sessions'
 const MATCH_SCHEDULE_META_SETTINGS_KEY = 'coordinator_match_schedule_meta'
 const TEAM_COLORS_SETTINGS_KEY = 'coordinator_team_colors'
 const DEFAULT_MATCH_DURATION_MINUTES = 120
@@ -317,38 +313,6 @@ function toTrainingPayload(parsed: TrainingInput, seasonId: string) {
     location: parsed.location,
     notes: parsed.notes?.trim() || '',
   }
-}
-
-async function readStoredTrainings(): Promise<StoredTrainingSession[]> {
-  const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', TRAINING_SETTINGS_KEY)
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-
-  try {
-    return JSON.parse(data?.value ?? '[]') as StoredTrainingSession[]
-  } catch {
-    return []
-  }
-}
-
-async function writeStoredTrainings(trainings: StoredTrainingSession[]) {
-  const supabase = createAdminClient()
-  const { error } = await supabase
-    .from('app_settings')
-    .upsert(
-      {
-        key: TRAINING_SETTINGS_KEY,
-        value: JSON.stringify(trainings),
-      },
-      { onConflict: 'key' },
-    )
-
-  if (error) throw new Error(error.message)
 }
 
 async function readStoredMatchScheduleMeta(): Promise<StoredMatchScheduleMeta[]> {
@@ -553,7 +517,7 @@ async function assertFieldIsAvailable(input: {
       .eq('match_date', input.date),
     supabase.from('teams').select('id, category_id'),
     supabase.from('categories').select('id, name'),
-    readStoredTrainings(),
+    listTrainingSessions(supabase),
     readStoredMatchScheduleMeta(),
   ])
 
@@ -748,8 +712,8 @@ export async function createTrainingAction(input: TrainingInput): Promise<void> 
   await requireSportsAdminAction()
   const parsed = createTrainingSchema.parse(input)
   const teamInfo = await getTeamScheduleInfo(parsed.teamId)
-  const trainings = await readStoredTrainings()
   const durationMinutes = parsed.durationHours * 60 + parsed.durationMinutes
+  const supabase = createAdminClient()
 
   await assertFieldIsAvailable({
     kind: 'training',
@@ -760,11 +724,9 @@ export async function createTrainingAction(input: TrainingInput): Promise<void> 
     location: parsed.location,
   })
 
-  trainings.push({
-    id: crypto.randomUUID(),
+  await createTrainingSession(supabase, {
     ...toTrainingPayload(parsed, teamInfo.seasonId),
   })
-  await writeStoredTrainings(trainings)
   revalidateCalendarPaths()
 }
 
@@ -772,10 +734,10 @@ export async function createRecurringTrainingAction(input: TrainingInput & { rep
   await requireSportsAdminAction()
   const parsed = createRecurringTrainingSchema.parse(input)
   const teamInfo = await getTeamScheduleInfo(parsed.teamId)
-  const trainings = await readStoredTrainings()
   const durationMinutes = parsed.durationHours * 60 + parsed.durationMinutes
   const dates = getWeeklyTrainingDates(parsed.trainingDate, parsed.repeatMonths)
   const seriesId = crypto.randomUUID()
+  const supabase = createAdminClient()
 
   for (const date of dates) {
     await assertFieldIsAvailable({
@@ -788,14 +750,13 @@ export async function createRecurringTrainingAction(input: TrainingInput & { rep
     })
   }
 
-  await writeStoredTrainings([
-    ...trainings,
-    ...dates.map((trainingDate) => ({
-      id: crypto.randomUUID(),
+  await createTrainingSessions(
+    supabase,
+    dates.map((trainingDate) => ({
       seriesId,
       ...toTrainingPayload({ ...parsed, trainingDate }, teamInfo.seasonId),
     })),
-  ])
+  )
   revalidateCalendarPaths()
 }
 
@@ -803,8 +764,10 @@ export async function updateTrainingAction(input: TrainingInput & { id: string }
   await requireSportsAdminAction()
   const parsed = updateTrainingSchema.parse(input)
   const teamInfo = await getTeamScheduleInfo(parsed.teamId)
-  const trainings = await readStoredTrainings()
   const durationMinutes = parsed.durationHours * 60 + parsed.durationMinutes
+  const supabase = createAdminClient()
+  const trainings = await listTrainingSessions(supabase)
+  const currentTraining = trainings.find((training) => training.id === parsed.id)
 
   await assertFieldIsAvailable({
     kind: 'training',
@@ -816,35 +779,27 @@ export async function updateTrainingAction(input: TrainingInput & { id: string }
     location: parsed.location,
   })
 
-  const nextTrainings = trainings.map((training) =>
-    training.id === parsed.id
-      ? {
-          id: parsed.id,
-          seriesId: training.seriesId,
-          ...toTrainingPayload(parsed, teamInfo.seasonId),
-        }
-      : training,
-  )
-
-  await writeStoredTrainings(nextTrainings)
+  await updateTrainingSession(supabase, {
+    id: parsed.id,
+    seriesId: currentTraining?.seriesId,
+    ...toTrainingPayload(parsed, teamInfo.seasonId),
+  })
   revalidateCalendarPaths()
 }
 
 export async function deleteTrainingAction(id: string): Promise<void> {
   await requireSportsAdminAction()
   const parsedId = z.string().uuid().parse(id)
-  const trainings = await readStoredTrainings()
 
-  await writeStoredTrainings(trainings.filter((training) => training.id !== parsedId))
+  await deleteTrainingSession(createAdminClient(), parsedId)
   revalidateCalendarPaths()
 }
 
 export async function deleteTrainingSeriesAction(seriesId: string): Promise<void> {
   await requireSportsAdminAction()
   const parsedSeriesId = z.string().uuid().parse(seriesId)
-  const trainings = await readStoredTrainings()
 
-  await writeStoredTrainings(trainings.filter((training) => training.seriesId !== parsedSeriesId))
+  await deleteTrainingSeries(createAdminClient(), parsedSeriesId)
   revalidateCalendarPaths()
 }
 

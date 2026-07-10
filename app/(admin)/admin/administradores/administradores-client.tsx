@@ -381,6 +381,7 @@ export function AdministradoresClient({ admins }: { admins: AdminManagerRow[] })
           <div className="relative min-w-72 flex-1 md:max-w-md">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              aria-label="Buscar usuarios con permisos"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por nombre, email o estado"

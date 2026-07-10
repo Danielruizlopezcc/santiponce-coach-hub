@@ -2,5 +2,8 @@ allowBuilds:
   msw: true
   sharp: true
   unrs-resolver: true
+overrides:
+  hono: 4.12.25
+  postcss: 8.5.16
 minimumReleaseAgeExclude:
   - stripe@22.2.1

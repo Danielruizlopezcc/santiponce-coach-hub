@@ -1,3 +1,23 @@
+import sanitizeHtml from 'sanitize-html'
+
+const ALLOWED_NEWS_TAGS = [
+  'p',
+  'br',
+  'strong',
+  'b',
+  'em',
+  'i',
+  'u',
+  's',
+  'a',
+  'ul',
+  'ol',
+  'li',
+  'blockquote',
+  'h2',
+  'h3',
+] as const
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -36,11 +56,17 @@ export function sanitizeNewsHtml(value: string | null) {
 
   const html = /<\/?[a-z][\s\S]*>/i.test(raw) ? raw : plainTextToHtml(raw)
 
-  return html
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '')
-    .replace(/<\/?(object|embed|meta|link|form|input|button|textarea|select)[^>]*>/gi, '')
-    .replace(/\s+on\w+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/\s+href=(?:"javascript:[^"]*"|'javascript:[^']*'|javascript:[^\s>]+)/gi, '')
+  return sanitizeHtml(html, {
+    allowedTags: [...ALLOWED_NEWS_TAGS],
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
+    },
+    allowedSchemes: ['http', 'https', 'mailto', 'tel'],
+    allowedSchemesAppliedToAttributes: ['href'],
+    transformTags: {
+      a: sanitizeHtml.simpleTransform('a', {
+        rel: 'noopener noreferrer',
+      }),
+    },
+  })
 }

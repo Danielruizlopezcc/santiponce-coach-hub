@@ -9,6 +9,7 @@ import { getSponsorTierFromSortOrder, type SponsorTier } from '@/lib/sponsors'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getTeamShirtNumbers } from '@/lib/team-shirt-numbers'
+import { listTrainingSessions } from '@/lib/training-sessions'
 import { getTeamCategorySortInfo, getTeamSuffixOrder } from '@/lib/team-order'
 
 export type AdminViewer = PrivateViewer & {
@@ -279,18 +280,6 @@ export type AdminTrainingSessionRow = {
 }
 
 export type AdminTeamColorMap = Record<string, string>
-
-type StoredTrainingSession = {
-  id: string
-  teamId: string
-  seasonId: string
-  trainingDate: string
-  startTime: string
-  durationMinutes: number
-  location: TrainingLocation
-  notes: string
-  seriesId?: string
-}
 
 type StoredMatchScheduleMeta = {
   matchId: string
@@ -1385,24 +1374,13 @@ function formatDuration(minutes: number) {
 
 export async function getAdminTrainingSessions(): Promise<AdminTrainingSessionRow[]> {
   const supabase = createAdminClient()
-  const [{ data: setting }, { data: teams }, { data: categories }, { data: seasons }] =
+  const [trainings, { data: teams }, { data: categories }, { data: seasons }] =
     await Promise.all([
-      supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'coordinator_training_sessions')
-        .maybeSingle(),
+      listTrainingSessions(supabase),
       supabase.from('teams').select('id, name, category_id, season_id'),
       supabase.from('categories').select('id, name'),
       supabase.from('seasons').select('id, name'),
     ])
-
-  let trainings: StoredTrainingSession[] = []
-  try {
-    trainings = JSON.parse(setting?.value ?? '[]') as StoredTrainingSession[]
-  } catch {
-    trainings = []
-  }
 
   const teamById = new Map((teams ?? []).map((team) => [team.id, team]))
   const categoryById = new Map((categories ?? []).map((category) => [category.id, category.name]))
