@@ -20,6 +20,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { SignOutButton } from '@/components/sign-out-button'
+import { useShopAccessModal } from '@/components/shop-access-modal'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -70,7 +71,8 @@ const PRIVATE_ICONS: Partial<Record<PrivateNavItem['icon'], DrawerItem['icon']>>
 }
 
 const AUTH_HREFS = new Set(['/registro', '/iniciar-sesion'])
-const NON_NAVIGABLE_HREFS = new Set(['/club', '/tienda'])
+const NON_NAVIGABLE_HREFS = new Set(['/club'])
+const SHOP_HREF = '/tienda'
 const PRIVATE_MENU_HREFS = new Set(['/app/perfil', '/app/portal-socio', '/app/deportistas', '/app/matriculacion'])
 
 function getDropdownItems(href: string, navData: PublicNavData): DropdownItem[] {
@@ -154,6 +156,8 @@ function NavLinks({
   openVerticalHref?: string | null
   setOpenVerticalHref?: Dispatch<SetStateAction<string | null>>
 }) {
+  const { openShopModal } = useShopAccessModal()
+
   return (
     <ul className={cn('flex gap-1', orientation === 'vertical' ? 'flex-col' : 'flex-row items-center')}>
       {items.map((item) => {
@@ -162,6 +166,7 @@ function NavLinks({
         const active = isActivePath(pathname, item.href)
         const expanded = openVerticalHref === item.href
         const Icon = item.icon
+        const isShopItem = item.href === SHOP_HREF
         const isNonNavigable = NON_NAVIGABLE_HREFS.has(item.href)
         const itemContent = (
           <span className="flex min-w-0 items-center gap-3">
@@ -185,7 +190,19 @@ function NavLinks({
         return (
           <li key={item.href}>
             <div className={cn('flex items-center', orientation === 'vertical' && 'border-b border-border')}>
-              {isNonNavigable ? (
+              {isShopItem ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavigate?.()
+                    openShopModal()
+                  }}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(itemClassName, orientation === 'vertical' && 'text-left')}
+                >
+                  {itemContent}
+                </button>
+              ) : isNonNavigable ? (
                 dropdownItems.length > 0 ? (
                   <button
                     type="button"

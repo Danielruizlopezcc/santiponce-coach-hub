@@ -1,9 +1,13 @@
+'use client'
+
 import Image from 'next/image'
-import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { CLUB } from '@/lib/club'
+import { useShopAccessModal } from '@/components/shop-access-modal'
 
 export function ClubShopBanner() {
+  const { openShopModal } = useShopAccessModal()
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600">
       {/* Background pattern */}
@@ -59,13 +63,14 @@ export function ClubShopBanner() {
             </div>
 
             {/* CTA Button */}
-            <Link
-              href="/tienda"
+            <button
+              type="button"
+              onClick={openShopModal}
               className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-black uppercase text-blue-700 transition-transform hover:scale-105 hover:text-blue-800"
             >
               Accede a nuestra tienda
               <ArrowRight className="size-5" aria-hidden="true" />
-            </Link>
+            </button>
           </div>
 
           {/* Right side - Product showcase */}

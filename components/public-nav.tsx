@@ -28,6 +28,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { CLUB, CLUBER_JOIN_URL, PUBLIC_NAV } from '@/lib/club'
+import { useShopAccessModal } from '@/components/shop-access-modal'
 import type { PublicNavData } from '@/lib/public-app'
 import { cn } from '@/lib/utils'
 
@@ -48,7 +49,8 @@ const NAV_ICONS: Partial<Record<string, LucideIcon>> = {
 }
 
 const AUTH_HREFS = new Set(['/registro', '/iniciar-sesion'])
-const NON_NAVIGABLE_HREFS = new Set(['/club', '/tienda'])
+const NON_NAVIGABLE_HREFS = new Set(['/club'])
+const SHOP_HREF = '/tienda'
 
 type DropdownItem = {
   href: string
@@ -117,6 +119,8 @@ function NavLinks({
   openVerticalHref?: string | null
   setOpenVerticalHref?: Dispatch<SetStateAction<string | null>>
 }) {
+  const { openShopModal } = useShopAccessModal()
+
   return (
     <ul
       className={cn(
@@ -132,6 +136,7 @@ function NavLinks({
         const active = isActivePath(pathname, item.href)
         const Icon = ACTION_ICONS[item.href] ?? NAV_ICONS[item.href]
         const expanded = openVerticalHref === item.href
+        const isShopItem = item.href === SHOP_HREF
         const isNonNavigable = NON_NAVIGABLE_HREFS.has(item.href)
         const itemContent = (
           <span className="flex min-w-0 items-center gap-3">
@@ -162,7 +167,19 @@ function NavLinks({
                 orientation === 'vertical' && 'border-b border-border',
               )}
             >
-              {isNonNavigable ? (
+              {isShopItem ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavigate?.()
+                    openShopModal()
+                  }}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(itemClassName, orientation === 'vertical' && 'text-left')}
+                >
+                  {itemContent}
+                </button>
+              ) : isNonNavigable ? (
                 dropdownItems.length > 0 ? (
                   <button
                     type="button"

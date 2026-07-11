@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ATHLOS ITK · Propuesta comercial para clubes</title>
+    <style>
+      :root {
+        --navy: #0f3054;
+        --navy-2: #194a79;
+        --gold: #d9a42d;
+        --gold-soft: #fff4d8;
+        --paper: #f4f8fb;
+        --line: #d7e1eb;
+        --ink: #18324a;
+        --muted: #617b93;
+        --white: #ffffff;
+      }
+
+      * { box-sizing: border-box; }
+      html { background: #dce5ed; }
+      body {
+        margin: 0;
+        font-family: "Aptos", "Segoe UI", sans-serif;
+        background: #dce5ed;
+        color: var(--ink);
+      }
+
+      .document {
+        width: 210mm;
+        margin: 18px auto;
+      }
+
+      .page {
+        position: relative;
+        height: 297mm;
+        padding: 15mm 16mm 12mm;
+        background: var(--white);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        overflow: hidden;
+      }
+
+      .page + .page { margin-top: 18px; }
+
+      .page::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 12mm;
+        background:
+          radial-gradient(circle at left, rgba(255,255,255,0.12), transparent 28%),
+          linear-gradient(90deg, var(--navy), var(--navy-2));
+      }
+
+      h1, h2, h3, p { margin: 0; }
+      h1 {
+        font-size: 34px;
+        line-height: 1.05;
+        color: var(--navy);
+      }
+      h2 {
+        font-size: 24px;
+        line-height: 1.12;
+        color: var(--navy);
+      }
+      h3 {
+        font-size: 15px;
+        line-height: 1.15;
+        color: var(--navy);
+      }
+      p {
+        font-size: 13.5px;
+        line-height: 1.48;
+      }
+
+      .lead {
+        font-size: 15px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        margin-bottom: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--gold-soft);
+        color: #896114;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .brand-mark {
+        display: inline-block;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        color: var(--navy);
+        margin-top: 10mm;
+      }
+      .brand-mark span { color: var(--gold); }
+
+      .hero {
+        padding-top: 6mm;
+        display: grid;
+        grid-template-columns: 1.18fr 0.82fr;
+        gap: 14mm;
+        align-items: end;
+      }
+
+      .hero-card,
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--white);
+      }
+
+      .hero-card {
+        padding: 16px;
+        background:
+          radial-gradient(circle at top left, rgba(217,164,45,0.18), transparent 32%),
+          linear-gradient(160deg, #f8fbff, #ffffff);
+      }
+
+      .hero-stat {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 29px;
+        font-weight: 900;
+        color: var(--navy);
+      }
+
+      .section { margin-top: 8mm; }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+      .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+
+      .card { padding: 11px 12px; }
+      .soft { background: var(--paper); }
+      .core {
+        background: linear-gradient(180deg, #f8fbff, #ffffff);
+        border-color: #bfd3e7;
+      }
+      .module { border-left: 5px solid var(--gold); }
+      .custom {
+        background: linear-gradient(180deg, #eefaf7, #ffffff);
+        border-color: #bfe8db;
+      }
+
+      .label {
+        display: inline-block;
+        margin-bottom: 5px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      ul {
+        margin: 6px 0 0;
+        padding-left: 16px;
+      }
+
+      li {
+        margin-bottom: 4px;
+        font-size: 12.5px;
+        line-height: 1.34;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .pill {
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: #eef5fb;
+        color: var(--navy);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .banner {
+        margin-top: 8mm;
+        padding: 12px 16px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, var(--navy), var(--navy-2));
+      }
+
+      .banner h2,
+      .banner p { color: white; }
+
+      .kpi {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fbfdff;
+      }
+
+      .kpi strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 24px;
+        color: var(--navy);
+      }
+
+      .quote {
+        margin-top: 9px;
+        padding: 10px 14px;
+        border-left: 5px solid var(--gold);
+        border-radius: 0 14px 14px 0;
+        background: #fff8e7;
+      }
+
+      .footer {
+        position: absolute;
+        right: 16mm;
+        bottom: 10mm;
+        left: 16mm;
+        display: flex;
+        justify-content: space-between;
+        color: #7891a8;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .module-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .module-table th,
+      .module-table td {
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+        text-align: left;
+        font-size: 12.3px;
+        line-height: 1.32;
+      }
+
+      .module-table th {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--navy);
+      }
+
+      .two-column-list {
+        columns: 2;
+        column-gap: 18px;
+      }
+
+      .small {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .accent {
+        color: var(--navy);
+        font-weight: 800;
+      }
+
+      .custom-grid {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 12px;
+      }
+
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
+      @media print {
+        html, body { background: white; }
+        .document { width: auto; margin: 0; }
+        .page,
+        .page + .page {
+          margin: 0;
+          box-shadow: none;
+          page-break-after: always;
+        }
+        .page:last-child { page-break-after: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="document">
+      <section class="page">
+        <div class="brand-mark">ATHLOS <span>ITK</span></div>
+        <div class="hero">
+          <div>
+            <span class="eyebrow">Propuesta comercial</span>
+            <h1>Deja de gestionar tu club a golpe de Excel y grupos de WhatsApp</h1>
+            <p class="lead" style="margin-top: 12px;">
+              ATHLOS ITK junta la web, las matrículas, los pagos, la contabilidad, los
+              equipos y la comunicación en un solo sitio.
+              <span class="accent">Entras y ya está todo funcionando</span>, con la imagen
+              de tu club, no la de una plantilla genérica.
+            </p>
+            <div class="pill-row">
+              <span class="pill">Listo para usar ya</span>
+              <span class="pill">Con tu imagen, no una plantilla</span>
+              <span class="pill">Módulos a la carta</span>
+              <span class="pill">Pagos y contabilidad sin líos</span>
+            </div>
+          </div>
+
+          <div class="hero-card">
+            <span class="hero-stat">Un club, una plataforma</span>
+            <p>
+              Adiós a las hojas de cálculo perdidas, al grupo de WhatsApp con cien
+              mensajes sin leer y a las matrículas en papel. <strong>ATHLOS ITK</strong>
+              pone orden desde el primer minuto.
+            </p>
+            <p style="margin-top: 10px;">
+              Y si más adelante necesitas más, la plataforma lo asume: activas un módulo
+              nuevo y sigues, sin romper nada de lo que ya tenías montado.
+            </p>
+            <p class="small" style="margin-top: 12px;">Documento comercial · Julio 2026</p>
+          </div>
+        </div>
+
+        <div class="section grid-3">
+          <div class="kpi">
+            <strong>Rápido</strong>
+            En marcha en días, no en meses: nada de proyectos eternos.
+          </div>
+          <div class="kpi">
+            <strong>Solo lo que necesitas</strong>
+            Activas cada módulo cuando te hace falta, ni un euro antes.
+          </div>
+          <div class="kpi">
+            <strong>Crece contigo</strong>
+            De un club de barrio a una entidad con varias secciones, sin cambiar de herramienta.
+          </div>
+        </div>
+
+        <div class="banner">
+          <h2>Una plataforma para clubes, no una web con plantilla</h2>
+          <p style="margin-top: 8px;">
+            Tu escudo, tus colores, tus equipos, tu forma de trabajar. ATHLOS ITK se
+            construye alrededor de tu club, no al contrario.
+          </p>
+        </div>
+
+        <div class="footer">
+          <span>ATHLOS ITK · Plataforma digital para clubes deportivos</span>
+          <span>Página 1</span>
+        </div>
+      </section>
+
+      <section class="page">
+        <div class="section" style="margin-top: 10mm;">
+          <span class="eyebrow">Incluido de serie</span>
+          <h2>Lo que tu club tiene el día uno, sin letra pequeña</h2>
+          <p class="lead" style="margin-top: 10px;">
+            Nada de ir desbloqueando lo básico poco a poco. Esto entra en el pack desde que
+            arrancas, ya funcionando.
+          </p>
+        </div>
+
+        <div class="grid-2 section">
+          <div class="card core">
+            <span class="label">Incluido</span>
+            <h3>Web oficial de tu club</h3>
+            <ul>
+              <li>Tu escudo y tus colores, no la plantilla de nadie más.</li>
+              <li>Noticias, patrocinadores y vida institucional, siempre visibles.</li>
+              <li>Equipos, calendario y secciones públicas ordenadas para socios y aficionados.</li>
+            </ul>
+          </div>
+
+          <div class="card core">
+            <span class="label">Incluido</span>
+            <h3>Área privada para familias</h3>
+            <ul>
+              <li>Alta, acceso y recuperación de contraseña en dos clics.</li>
+              <li>Cada familia con su propio rincón: todo sobre su deportista, a mano.</li>
+              <li>Consultan y gestionan sin llamar al club ni perseguir papeles.</li>
+            </ul>
+          </div>
+
+          <div class="card core">
+            <span class="label">Incluido</span>
+            <h3>Matrículas sin papeles de por medio</h3>
+            <ul>
+              <li>Ficha del deportista siempre al día, sin carpetas ni Excel.</li>
+              <li>Matrícula online con el estado a la vista en todo momento.</li>
+              <li>Deportista, tutor, categoría, equipo y temporada, enlazados solos.</li>
+            </ul>
+          </div>
+
+          <div class="card core">
+            <span class="label">Incluido</span>
+            <h3>Finanzas del club bajo control</h3>
+            <ul>
+              <li>Cobro de cuotas y procesos clave integrado en la propia plataforma.</li>
+              <li>Cobros recurrentes automatizados: se acabó perseguir pagos.</li>
+              <li>Contabilidad y seguimiento económico centralizados, con las cuentas claras.</li>
+            </ul>
+          </div>
+
+          <div class="card core">
+            <span class="label">Incluido</span>
+            <h3>Cumplimiento sin dolores de cabeza</h3>
+            <ul>
+              <li>Consentimientos y documentación del club, siempre localizables.</li>
+              <li>Cada persona con el acceso que le corresponde, ni más ni menos.</li>
+              <li>Trazabilidad de lo importante, para dormir tranquilo.</li>
+            </ul>
+          </div>
+
+          <div class="card core">
+            <span class="label">Incluido</span>
+            <h3>Panel de gestión, todo en un sitio</h3>
+            <ul>
+              <li>Categorías, equipos, temporadas y usuarios clave desde un mismo panel.</li>
+              <li>La operativa completa del club, sin saltar entre programas.</li>
+              <li>Configurado a la medida de cómo trabaja tu club, no al revés.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="quote">
+          <p>
+            <strong>Esto no es la versión de entrada, es tu club funcionando de verdad.</strong>
+            Lo que viene ahora son extras para cuando quieras ir más lejos.
+          </p>
+        </div>
+
+        <div class="footer">
+          <span>Lo que incluye ATHLOS ITK</span>
+          <span>Página 2</span>
+        </div>
+      </section>
+
+      <section class="page">
+        <div class="section" style="margin-top: 10mm;">
+          <span class="eyebrow">Cuando quieras ir más allá</span>
+          <h2>Módulos que sumas cuando te hacen falta</h2>
+          <p class="lead" style="margin-top: 10px;">
+            La base ya resuelve el día a día del club. Estos módulos añaden una marcha más
+            para cuando quieras dar un paso adelante.
+          </p>
+        </div>
+
+        <table class="module-table">
+          <thead>
+            <tr>
+              <th>Módulo</th>
+              <th>Qué gana tu club</th>
+              <th>Para qué club es ideal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Socios</strong></td>
+              <td>Vida de socio de verdad: membresías, relación directa y ventajas exclusivas.</td>
+              <td>Clubes con una masa social activa que merece algo más que un carnet de papel.</td>
+            </tr>
+            <tr>
+              <td><strong>Entrenadores</strong></td>
+              <td>Un espacio propio para el cuerpo técnico, con las riendas de sus equipos.</td>
+              <td>Clubes que quieren que su cuerpo técnico trabaje como profesionales.</td>
+            </tr>
+            <tr>
+              <td><strong>Calendario técnico</strong></td>
+              <td>Entrenamientos, partidos e instalaciones organizados sin un solo wasap de última hora.</td>
+              <td>Clubes con varios equipos que hoy cuadran horarios a ojo.</td>
+            </tr>
+            <tr>
+              <td><strong>Estadísticas deportivas</strong></td>
+              <td>Datos por jugador, equipo, partido y temporada, con comparativas de verdad.</td>
+              <td>Clubes que quieren decidir con datos, no solo con intuición.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="section grid-2">
+          <div class="card module">
+            <span class="label">Por qué te conviene</span>
+            <h3>Pagas por lo que enciendes</h3>
+            <ul>
+              <li>Arrancas con lo justo y necesario, sin pagar por lo que no usas.</li>
+              <li>Cada módulo entra en juego cuando de verdad aporta algo.</li>
+              <li>Cero licencias infladas ni funciones de relleno.</li>
+            </ul>
+          </div>
+
+          <div class="card custom">
+            <span class="label">A medida</span>
+            <h3>¿Te falta algo muy tuyo?</h3>
+            <ul>
+              <li>Si tu club tiene una necesidad concreta, te lo construimos.</li>
+              <li>Se conecta con el resto de la plataforma sin romper nada.</li>
+              <li>La herramienta se adapta a ti, no al revés.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="banner">
+          <h2>Empieza con lo esencial, sin límite de crecimiento</h2>
+          <p style="margin-top: 8px;">
+            Arranca con la base, súmale los módulos que de verdad te den un retorno, y si te
+            falta algo que no existe todavía, lo creamos para ti.
+          </p>
+        </div>
+
+        <div class="footer">
+          <span>Módulos y ampliaciones</span>
+          <span>Página 3</span>
+        </div>
+      </section>
+
+      <section class="page">
+        <div class="section" style="margin-top: 10mm;">
+          <span class="eyebrow">Por qué ATHLOS ITK</span>
+          <h2>Un club bien llevado se nota, y se ve</h2>
+          <p class="lead" style="margin-top: 10px;">
+            ATHLOS ITK no es una web con un par de extras. Es el sistema nervioso digital de
+            tu club: orden, gestión y comunicación en un mismo sitio.
+          </p>
+        </div>
+
+        <div class="custom-grid section">
+          <div class="card soft">
+            <span class="label">Lo que ganas</span>
+            <h3>Una imagen que respalda al club</h3>
+            <ul class="two-column-list">
+              <li>Imagen a la altura del proyecto.</li>
+              <li>Orden real, no aparente.</li>
+              <li>Digitalización de verdad.</li>
+              <li>Todo centralizado.</li>
+              <li>Escalabilidad sin sustos.</li>
+              <li>Flexibilidad total.</li>
+              <li>Preparado para lo que venga.</li>
+              <li>Nada de techo de cristal.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <span class="label">En una frase</span>
+            <h3>Qué es ATHLOS ITK</h3>
+            <p>
+              La plataforma que hace que gestionar un club deje de ser una carrera de
+              obstáculos. Arrancas con una base sólida y completa, y sumas módulos o
+              desarrollos a medida según lo que tu club vaya pidiendo.
+            </p>
+            <p style="margin-top: 10px;">
+              Nada de complejidad de más al principio, ni de techo cuando quieras crecer.
+              La herramienta avanza contigo, al ritmo que marques tú.
+            </p>
+          </div>
+        </div>
+
+        <div class="section grid-2">
+          <div class="card core">
+            <span class="label">Qué te llevas</span>
+            <h3>Resumiendo</h3>
+            <ul>
+              <li>Una plataforma lista para usar desde ya.</li>
+              <li>Módulos que sumas solo cuando te compensan.</li>
+              <li>Desarrollos a medida si tu club lo pide.</li>
+            </ul>
+          </div>
+
+          <div class="card module">
+            <span class="label">Siguiente paso</span>
+            <h3>Hablemos de tu club</h3>
+            <ul>
+              <li>Cada club es un mundo: adaptamos la propuesta a tu realidad.</li>
+              <li>Te montamos una demo con la cara de tu propio club.</li>
+              <li>Sin ataduras ni permanencia para empezar a probarlo.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="quote">
+          <p>
+            <strong>ATHLOS ITK:</strong> la base que necesita tu club hoy, con margen de sobra
+            para lo que venga mañana.
+          </p>
+        </div>
+
+        <div class="footer">
+          <span>ATHLOS ITK</span>
+          <span>Página 4</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

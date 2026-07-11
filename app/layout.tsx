@@ -1,5 +1,6 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
+import { ShopAccessModalProvider } from '@/components/shop-access-modal'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="bg-background" suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
-        {children}
+        <ShopAccessModalProvider>{children}</ShopAccessModalProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
