@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { ReactNode } from 'react'
 import {
+  AlertTriangle,
   Camera,
   Eye,
   Loader2,
@@ -143,11 +144,17 @@ function AthleteProfileBlock({
   )
 }
 
-function AthleteProfileItem({ label, value }: { label: string; value: string }) {
+function AthleteProfileItem({ label, value, warning }: { label: string; value: string; warning?: string }) {
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+      {warning ? (
+        <p className="mt-1 flex items-center gap-1 text-xs font-bold text-amber-700">
+          <AlertTriangle className="size-3 shrink-0" aria-hidden="true" />
+          {warning}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -544,8 +551,12 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
             <div className="grid gap-4 lg:grid-cols-2">
               <AthleteProfileBlock title="Deportivo" icon={Trophy}>
                 <div className="grid gap-3">
-                  <AthleteProfileItem label="Categoría" value={viewingAthlete.categoriaSolicitada} />
-                  <AthleteProfileItem label="Equipo" value={viewingAthlete.equipoAsignado} />
+                  <AthleteProfileItem label="Categoría solicitada" value={viewingAthlete.categoriaSolicitada} />
+                  <AthleteProfileItem
+                    label="Equipo asignado"
+                    value={viewingAthlete.equipoAsignado}
+                    warning={viewingAthlete.categoriaEquipoMismatch ? 'No coincide con la categoría solicitada' : undefined}
+                  />
                   <AthleteProfileItem label="Temporada" value={viewingAthlete.temporada} />
                 </div>
               </AthleteProfileBlock>
@@ -837,6 +848,9 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
                 <div className="bg-primary p-4 text-white">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
+                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-white/55">
+                        Categoría solicitada
+                      </p>
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
                         {athlete.categoriaSolicitada}
                       </p>
@@ -851,9 +865,22 @@ export function DeportistasClient({ athletes, categories, teams, seasons, tutors
 
                 <div className="p-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
-                      <p className="text-xs font-black uppercase text-muted-foreground">Equipo</p>
+                    <div
+                      className={cn(
+                        'rounded-lg p-3 ring-1',
+                        athlete.categoriaEquipoMismatch
+                          ? 'bg-amber-50 ring-amber-200'
+                          : 'bg-blue-50/70 ring-blue-100',
+                      )}
+                    >
+                      <p className="text-xs font-black uppercase text-muted-foreground">Equipo asignado</p>
                       <p className="mt-2 text-sm font-black text-foreground">{athlete.equipoAsignado}</p>
+                      {athlete.categoriaEquipoMismatch ? (
+                        <p className="mt-1 flex items-center gap-1 text-[0.7rem] font-bold text-amber-700">
+                          <AlertTriangle className="size-3 shrink-0" aria-hidden="true" />
+                          No coincide con la categoría solicitada
+                        </p>
+                      ) : null}
                     </div>
                     <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
                       <p className="text-xs font-black uppercase text-muted-foreground">Temporada</p>

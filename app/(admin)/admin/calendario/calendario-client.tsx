@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Loader2, Palette, Pencil, Pipette, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Loader2, Palette, Pencil, Pipette, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { AdminFormDialog } from '@/components/admin-form-dialog'
 import { Button } from '@/components/ui/button'
@@ -854,7 +854,10 @@ export function CalendarioClient({
   )
   const scheduleDateKeys = useMemo(() => scheduleDays.map(getDateKey), [scheduleDays])
   const scheduleGridColumns = useMemo(
-    () => `${SCHEDULE_TIME_COLUMN_WIDTH}px repeat(${visibleScheduleDays.length}, minmax(0, 1fr))`,
+    () =>
+      `${SCHEDULE_TIME_COLUMN_WIDTH}px repeat(${visibleScheduleDays.length}, minmax(${
+        visibleScheduleDays.length > 1 ? '132px' : '0px'
+      }, 1fr))`,
     [visibleScheduleDays.length],
   )
   const scheduleSlots = useMemo(
@@ -2123,8 +2126,15 @@ export function CalendarioClient({
             </div>
           </div>
 
-          <div className="overflow-visible rounded-xl bg-white/82 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
-            <div className="min-w-0">
+          {scheduleViewMode === 'week' ? (
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground lg:hidden">
+              <ArrowLeftRight className="size-3.5 shrink-0" aria-hidden="true" />
+              Desliza hacia los lados para ver toda la semana
+            </p>
+          ) : null}
+
+          <div className="overflow-x-auto rounded-xl bg-white/82 shadow-sm ring-1 ring-foreground/10 backdrop-blur">
+            <div className="min-w-fit">
               <div
                 className="sticky top-12 z-20 grid border-b border-border bg-white/95 shadow-sm backdrop-blur"
                 style={{ gridTemplateColumns: scheduleGridColumns }}
@@ -2241,9 +2251,11 @@ export function CalendarioClient({
                             <p className={cn('mt-0.5 font-bold leading-tight opacity-95', isDayView ? 'text-xs' : 'text-[10px]')}>
                               {minutesToTime(event.startMinute)}-{addMinutesToTime(event.startTime, event.durationMinutes)}
                             </p>
-                            <p className={cn('mt-0.5 font-semibold leading-tight opacity-95', isDayView ? 'text-xs' : 'text-[10px]')}>
-                              {event.subtitle}
-                            </p>
+                            {isDayView ? (
+                              <p className="mt-0.5 text-xs font-semibold leading-tight opacity-95">
+                                {event.subtitle}
+                              </p>
+                            ) : null}
                             {isDayView ? (
                               <p className="mt-1 text-xs font-semibold leading-tight opacity-90">
                                 {event.kind === 'match' ? 'Partido' : 'Entrenamiento'} · {event.location}

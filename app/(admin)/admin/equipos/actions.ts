@@ -178,3 +178,41 @@ export async function updateAthleteShirtNumberAction(
   await saveTeamShirtNumbers(shirtNumbers)
   teamPaths(teamId)
 }
+
+export async function swapAthleteShirtNumbersAction(
+  teamId: string,
+  athleteId: string,
+  otherAthleteId: string,
+): Promise<void> {
+  const supabase = await getAdminSupabase()
+  const { data: teamAthletes, error } = await supabase
+    .from('athletes')
+    .select('id, first_name, last_name')
+    .eq('assigned_team_id', teamId)
+
+  if (error) throw new Error(error.message)
+
+  const athleteIds = new Set((teamAthletes ?? []).map((athlete) => athlete.id))
+  if (!athleteIds.has(athleteId) || !athleteIds.has(otherAthleteId)) {
+    throw new Error('No se ha encontrado a los jugadores en este equipo.')
+  }
+
+  const shirtNumbers = await getTeamShirtNumbers()
+  const athleteNumber = shirtNumbers[athleteId] ?? null
+  const otherNumber = shirtNumbers[otherAthleteId] ?? null
+
+  if (otherNumber !== null) {
+    shirtNumbers[athleteId] = otherNumber
+  } else {
+    delete shirtNumbers[athleteId]
+  }
+
+  if (athleteNumber !== null) {
+    shirtNumbers[otherAthleteId] = athleteNumber
+  } else {
+    delete shirtNumbers[otherAthleteId]
+  }
+
+  await saveTeamShirtNumbers(shirtNumbers)
+  teamPaths(teamId)
+}

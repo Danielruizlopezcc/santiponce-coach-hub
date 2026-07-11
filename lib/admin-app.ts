@@ -131,6 +131,7 @@ export type AdminAthleteRow = {
   categoriaSolicitada: string
   assignedTeamId: string | null
   equipoAsignado: string
+  categoriaEquipoMismatch: boolean
   seasonId: string
   temporada: string
   rawStatus: 'pendiente' | 'matriculado' | 'en_revision'
@@ -1029,6 +1030,7 @@ export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
   const guardianById = createGuardianNameLookup(guardians)
   const categoryById = new Map(categories.map((category) => [category.id, category.name]))
   const teamById = new Map(teams.map((team) => [team.id, team.name]))
+  const teamCategoryIdById = new Map(teams.map((team) => [team.id, team.category_id]))
   const seasonById = new Map(seasons.map((season) => [season.id, season.name]))
   const latestEnrollmentPaymentByAthlete = createLatestEnrollmentPaymentByAthlete(payments)
   const imageRightsDocument = consentDocuments.find((document) => document.code === 'image_rights')
@@ -1063,6 +1065,11 @@ export async function getAdminAthletes(): Promise<AdminAthleteRow[]> {
       equipoAsignado: athlete.assigned_team_id
         ? teamById.get(athlete.assigned_team_id) ?? 'Equipo pendiente'
         : 'Sin equipo asignado',
+      categoriaEquipoMismatch: Boolean(
+        athlete.assigned_team_id &&
+        teamCategoryIdById.has(athlete.assigned_team_id) &&
+        teamCategoryIdById.get(athlete.assigned_team_id) !== athlete.requested_category_id,
+      ),
       seasonId: athlete.season_id,
       temporada: seasonById.get(athlete.season_id) ?? CLUB.season,
       rawStatus: athlete.status,

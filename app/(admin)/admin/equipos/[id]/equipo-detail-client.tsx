@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
+import { ShirtNumberPicker } from '@/components/admin-shirt-number-picker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,6 +28,7 @@ import type { PlayerPosition } from '@/lib/private-app-shared'
 import {
   assignAthleteAction,
   removeAthleteAction,
+  swapAthleteShirtNumbersAction,
   updateAthletePositionAction,
   updateAthleteShirtNumberAction,
   updateTeamAction,
@@ -106,6 +108,14 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
   const [editActive, setEditActive] = useState(team.isActive)
   const [editNotes, setEditNotes]   = useState(team.notes ?? '')
   const [editError, setEditError]   = useState<string | null>(null)
+
+  const shirtNumberOwners = useMemo(() => {
+    const owners = new Map<number, { athleteId: string; name: string }>()
+    for (const member of team.members) {
+      if (member.shirtNumber) owners.set(member.shirtNumber, { athleteId: member.id, name: member.nombre })
+    }
+    return owners
+  }, [team.members])
 
   const matriculatedMembers = team.members.filter((m) => m.estadoMatricula === 'Matriculado').length
   const positionedMembers = team.members.filter((m) => m.position).length
@@ -195,6 +205,20 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
         )
       } catch (e) {
         setActionError(e instanceof Error ? e.message : 'Error al actualizar el dorsal.')
+      } finally {
+        setUpdatingShirtNumberId(null)
+      }
+    })
+  }
+
+  function handleShirtNumberSwap(athleteId: string, otherAthleteId: string) {
+    setActionError(null)
+    setUpdatingShirtNumberId(athleteId)
+    startTransition(async () => {
+      try {
+        await swapAthleteShirtNumbersAction(team.id, athleteId, otherAthleteId)
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Error al intercambiar el dorsal.')
       } finally {
         setUpdatingShirtNumberId(null)
       }
@@ -341,20 +365,17 @@ export function EquipoDetailClient({ team, categories, seasons }: Props) {
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-lg bg-blue-50/70 p-3 ring-1 ring-blue-100">
                       <Label className="text-xs font-black uppercase text-primary">Dorsal</Label>
-                      <select
-                        value={member.shirtNumber ?? ''}
+                      <ShirtNumberPicker
+                        athleteId={member.id}
+                        value={member.shirtNumber}
                         disabled={isPending && updatingShirtNumberId === member.id}
-                        onChange={(event) => handleShirtNumberChange(member.id, event.target.value)}
-                        aria-label={`Dorsal de ${member.nombre}`}
-                        className="mt-2 h-9 w-full rounded-md border border-input bg-white px-3 text-sm font-medium text-foreground shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
-                      >
-                        <option value="">Sin dorsal</option>
-                        {Array.from({ length: 99 }, (_, index) => index + 1).map((number) => (
-                          <option key={number} value={number}>
-                            {number}
-                          </option>
-                        ))}
-                      </select>
+                        occupantByNumber={shirtNumberOwners}
+                        onAssign={(shirtNumber) =>
+                          handleShirtNumberChange(member.id, shirtNumber === null ? '' : String(shirtNumber))
+                        }
+                        onSwap={(otherAthleteId) => handleShirtNumberSwap(member.id, otherAthleteId)}
+                        ariaLabel={`Dorsal de ${member.nombre}`}
+                      />
                     </div>
 
                     <div className="rounded-lg bg-muted/35 p-3 ring-1 ring-foreground/10">
