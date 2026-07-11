@@ -418,11 +418,11 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
 
       <div className="relative bg-[#0f3f86]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/14" aria-hidden="true" />
-        <div className="absolute left-1/2 top-0 hidden h-full w-30 -translate-x-1/2 bg-[#2367bd] [clip-path:polygon(20%_0,80%_0,100%_100%,0_100%)] md:block" />
+        <div className="absolute left-1/2 top-0 h-full w-30 -translate-x-1/2 bg-[#2367bd] [clip-path:polygon(20%_0,80%_0,100%_100%,0_100%)]" />
         <Link
           href="/"
           aria-label={`${CLUB.shortName} - Inicio`}
-          className="absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:block"
+          className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         >
           <Image
             src={CLUB.crest}
@@ -430,11 +430,11 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
             width={74}
             height={74}
             priority
-            className="size-16 rounded-md object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.28)]"
+            className="size-14 rounded-md object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.28)] md:size-16"
           />
         </Link>
 
-        <div className="absolute left-3 top-1/2 z-20 -translate-y-1/2 md:left-5">
+        <div className="absolute left-3 top-1/2 z-20 -translate-y-1/2 md:left-5 lg:hidden">
           <MenuDrawer open={open} setOpen={setOpen} pathname={pathname} navData={navData} items={drawerItems} />
         </div>
 
@@ -443,24 +443,7 @@ export function PrivateHeader({ navItems, navData }: PrivateHeaderProps) {
             <NavLinks pathname={pathname} navData={navData} onMegaOpen={setActiveMegaHref} items={leftNav} />
           </nav>
 
-          <Link
-            href="/"
-            aria-label={`${CLUB.shortName} - Inicio`}
-            className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 lg:pointer-events-none lg:invisible"
-          >
-            <Image
-              src={CLUB.crest}
-              alt={`Escudo del ${CLUB.legalName}`}
-              width={58}
-              height={58}
-              priority
-              className="size-14 rounded-md object-contain"
-            />
-            <span className="min-w-0">
-              <span className="block truncate text-lg font-black text-white">{CLUB.shortName}</span>
-              <span className="block text-xs font-black uppercase text-white/72">Temporada {CLUB.season}</span>
-            </span>
-          </Link>
+          <div aria-hidden="true" />
 
           <nav aria-label="Navegación principal derecha" className="hidden justify-self-start lg:block">
             <NavLinks pathname={pathname} navData={navData} onMegaOpen={setActiveMegaHref} items={rightNav} />

@@ -129,7 +129,7 @@ function NavLinks({
       )}
     >
       {items.map((item) => {
-        if (orientation === 'horizontal' && AUTH_HREFS.has(item.href)) return null
+        if (AUTH_HREFS.has(item.href)) return null
 
         const dropdownItems = getDropdownItems(item.href, navData)
         const href = getPrimaryHref(item.href, dropdownItems)
@@ -389,29 +389,33 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
       onMouseLeave={() => setActiveMegaHref(null)}
     >
       <div className="border-b border-white/12 bg-[#061a3d]">
-        <div className="flex h-10 w-full items-center justify-between gap-4 px-4 text-[0.86rem] font-extrabold uppercase tracking-[0.025em] text-white md:px-8 lg:px-10">
-          <div className="flex min-w-0 items-center gap-8">
-            <Link href="/" className="truncate outline-none hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/80">
+        <div className="flex h-10 w-full items-center justify-between gap-3 px-4 text-[0.78rem] font-extrabold uppercase tracking-[0.025em] text-white sm:gap-4 sm:text-[0.86rem] md:px-8 lg:px-10">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-8">
+            <Link
+              href="/"
+              className="shrink-0 outline-none hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/80"
+            >
               CDSANTIPONCE.COM
             </Link>
             <span className="hidden text-white/75 sm:inline">Temporada {CLUB.season}</span>
           </div>
           <Link
             href="/iniciar-sesion"
-            className="shrink-0 outline-none hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/80"
+            className="shrink-0 whitespace-nowrap outline-none hover:text-white/80 focus-visible:ring-2 focus-visible:ring-white/80"
           >
-            Iniciar sesión / Registrarse
+            <span className="sm:hidden">Acceder</span>
+            <span className="hidden sm:inline">Iniciar sesión / Registrarse</span>
           </Link>
         </div>
       </div>
 
       <div className="relative bg-[#0f3f86]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/14" aria-hidden="true" />
-        <div className="absolute left-1/2 top-0 hidden h-full w-30 -translate-x-1/2 bg-[#2367bd] [clip-path:polygon(20%_0,80%_0,100%_100%,0_100%)] md:block" />
+        <div className="absolute left-1/2 top-0 h-full w-30 -translate-x-1/2 bg-[#2367bd] [clip-path:polygon(20%_0,80%_0,100%_100%,0_100%)]" />
         <Link
           href="/"
           aria-label={`${CLUB.shortName} - Inicio`}
-          className="absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:block"
+          className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         >
           <Image
             src={CLUB.crest}
@@ -419,11 +423,11 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
             width={74}
             height={74}
             priority
-            className="size-16 rounded-md object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.28)]"
+            className="size-14 rounded-md object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.28)] md:size-16"
           />
         </Link>
 
-        <div className="absolute left-3 top-1/2 z-20 -translate-y-1/2 md:left-5">
+        <div className="absolute left-3 top-1/2 z-20 -translate-y-1/2 md:left-5 lg:hidden">
           <MenuDrawer open={open} setOpen={setOpen} pathname={pathname} navData={navData} />
         </div>
 
@@ -437,26 +441,7 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
             />
           </nav>
 
-          <Link
-            href="/"
-            aria-label={`${CLUB.shortName} - Inicio`}
-            className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/80 lg:pointer-events-none lg:invisible"
-          >
-            <Image
-              src={CLUB.crest}
-              alt={`Escudo del ${CLUB.legalName}`}
-              width={58}
-              height={58}
-              priority
-              className="size-14 rounded-md object-contain"
-            />
-            <span className="min-w-0">
-              <span className="block truncate text-lg font-black text-white">{CLUB.shortName}</span>
-              <span className="block text-xs font-black uppercase text-white/72">
-                Temporada {CLUB.season}
-              </span>
-            </span>
-          </Link>
+          <div aria-hidden="true" />
 
           <nav aria-label="Navegación principal derecha" className="hidden justify-self-start lg:block">
             <NavLinks
