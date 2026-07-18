@@ -17,6 +17,8 @@ import { createSponsor, deleteSponsor, updateSponsor } from './actions'
 
 type SheetMode = 'create' | 'edit'
 
+const DEFAULT_SPONSOR_URL = 'https://santiponce-coach-hub.vercel.app/'
+
 function SponsorFormSection({
   title,
   description,
@@ -50,6 +52,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [title, setTitle] = useState('')
+  const [url, setUrl] = useState(DEFAULT_SPONSOR_URL)
   const [tier, setTier] = useState<SponsorTier>('partner')
   const [isActive, setIsActive] = useState(true)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -62,6 +65,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
     setMode('create')
     setEditing(null)
     setTitle('')
+    setUrl(DEFAULT_SPONSOR_URL)
     setTier('partner')
     setIsActive(true)
     setImageFile(null)
@@ -74,6 +78,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
     setMode('edit')
     setEditing(sponsor)
     setTitle(sponsor.title)
+    setUrl(sponsor.url || DEFAULT_SPONSOR_URL)
     setTier(sponsor.tier)
     setIsActive(sponsor.isActive)
     setImageFile(null)
@@ -89,9 +94,22 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
 
   function handleSubmit() {
     const trimmedTitle = title.trim()
+    const trimmedUrl = url.trim()
 
     if (!trimmedTitle) {
       setFormError('El título es obligatorio.')
+      return
+    }
+
+    if (!trimmedUrl) {
+      setFormError('La URL es obligatoria.')
+      return
+    }
+
+    try {
+      new URL(trimmedUrl)
+    } catch {
+      setFormError('La URL no es válida. Debe incluir https://')
       return
     }
 
@@ -106,6 +124,7 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
       try {
         const formData = new FormData()
         formData.set('title', trimmedTitle)
+        formData.set('url', trimmedUrl)
         formData.set('tier', tier)
         formData.set('isActive', String(isActive))
 
@@ -316,6 +335,20 @@ export function PatrocinadoresClient({ sponsors }: { sponsors: AdminSponsorRow[]
                       placeholder="Ej. Clínica Santiponce"
                       autoFocus
                     />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="sponsor-url">URL de destino</Label>
+                    <Input
+                      id="sponsor-url"
+                      type="url"
+                      value={url}
+                      onChange={(event) => setUrl(event.target.value)}
+                      placeholder="https://ejemplo.com"
+                    />
+                    <p className="text-xs font-semibold leading-5 text-muted-foreground">
+                      Al pulsar sobre el patrocinador en la web, se abrirá esta dirección.
+                    </p>
                   </div>
 
                   <div className="flex flex-col gap-1.5">

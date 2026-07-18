@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { CalendarDays, Clock3, Dumbbell, Filter, MapPin, Trophy } from 'lucide-react'
+import Image from 'next/image'
+import { ChevronLeft, ChevronRight, Filter, MapPin, Trophy } from 'lucide-react'
 import { BrandedPageHero } from '@/components/branded-page-hero'
 import { MatchCountdown } from '@/components/match-countdown'
 import { CLUB } from '@/lib/club'
@@ -20,6 +21,7 @@ type CalendarPublicViewProps = {
     team?: string
     competition?: string
     status?: string
+    month?: string
   }
 }
 
@@ -89,9 +91,12 @@ function getFeaturedMatch(matches: PublicCalendarMatch[], status: string | undef
       .sort((a, b) => b.matchDate.localeCompare(a.matchDate) || b.matchTime.localeCompare(a.matchTime))[0] ?? null
   }
 
-  return [...matches]
+  const nextMatch = [...matches]
     .filter((match) => isUpcomingMatch(match, today))
     .sort((a, b) => a.matchDate.localeCompare(b.matchDate) || a.matchTime.localeCompare(b.matchTime))[0] ?? null
+
+  return nextMatch ?? [...matches]
+    .sort((a, b) => b.matchDate.localeCompare(a.matchDate) || b.matchTime.localeCompare(a.matchTime))[0] ?? null
 }
 
 function groupByMonth(matches: PublicCalendarMatch[]) {
@@ -110,6 +115,39 @@ function groupByMonth(matches: PublicCalendarMatch[]) {
   return Array.from(groups.entries())
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([key, group]) => ({ key, ...group }))
+}
+
+function getSelectedMonthGroup(
+  groups: ReturnType<typeof groupByMonth>,
+  requestedMonth?: string,
+) {
+  if (requestedMonth) {
+    const requested = groups.find((group) => group.key === requestedMonth)
+    if (requested) return requested
+  }
+
+  return groups[0] ?? null
+}
+
+function getCalendarHref(
+  filters: CalendarPublicViewProps['filters'],
+  selectedSeason: string,
+  month?: string,
+) {
+  const params = new URLSearchParams()
+  params.set('season', selectedSeason)
+
+  const team = normalizeFilter(filters.team)
+  const competition = normalizeFilter(filters.competition)
+  const status = filters.status || 'all'
+
+  if (team) params.set('team', team)
+  if (competition) params.set('competition', competition)
+  if (status !== 'all') params.set('status', status)
+  if (month) params.set('month', month)
+
+  const query = params.toString()
+  return `/calendario${query ? `?${query}` : ''}#partidos`
 }
 
 function ResultBadge({ match }: { match: PublicCalendarMatch }) {
@@ -135,67 +173,74 @@ function FeaturedMatch({ match, isPlayedMode }: { match: PublicCalendarMatch; is
   const competitionLabel = getCompetitionLabel(match)
 
   return (
-    <section className="relative overflow-hidden bg-[#f4f6f8] text-white shadow-[0_18px_50px_rgba(6,23,47,0.18)]">
-      <div className="absolute inset-0 opacity-20" aria-hidden="true">
-        <div
-          className="size-full"
-          style={{
-            backgroundImage:
-              'linear-gradient(135deg, rgba(255,255,255,0.14) 0 1px, transparent 1px 52px)',
-            backgroundSize: '52px 52px',
-          }}
-        />
-      </div>
-      <div className="absolute inset-y-0 left-0 hidden w-[34%] bg-primary lg:block" aria-hidden="true" />
-      <div className="absolute inset-y-0 left-[27%] hidden w-72 bg-gradient-to-r from-primary to-transparent lg:block" aria-hidden="true" />
-
-      <div className="relative mx-auto grid max-w-7xl lg:grid-cols-[0.68fr_1.62fr]">
-          <div className="relative bg-primary px-4 py-8 md:px-8 md:py-10 lg:bg-transparent">
-            <p className="text-xs font-black uppercase tracking-[0.34em] text-white/72">
-              {isPlayedMode ? 'Resultado destacado' : 'Próximo partido'}
+    <section
+      className="relative overflow-hidden rounded-lg bg-[#06172f] text-white shadow-[0_18px_50px_rgba(6,23,47,0.18)]"
+      style={{
+        backgroundImage:
+          'linear-gradient(rgba(6, 12, 24, 0.78), rgba(6, 12, 24, 0.82)), url(/images/Campo_Futbol.jpg)',
+        backgroundPosition: 'center',
+        backgroundSize: 'cover',
+      }}
+    >
+      <div className="relative grid min-h-[320px] lg:grid-cols-[25%_75%]">
+        <aside className="flex flex-col items-center justify-center gap-5 border-b border-white/20 bg-primary/70 px-6 py-8 text-center backdrop-blur-[1px] lg:border-b-0 lg:border-r">
+          <Image
+            src={CLUB.crest}
+            alt={`Escudo del ${CLUB.legalName}`}
+            width={118}
+            height={118}
+            className="h-28 w-auto drop-shadow-xl"
+          />
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-white/70">
+              {isPlayedMode ? 'Resultado' : 'Próximo partido'}
             </p>
-            <h2 className="mt-4 text-5xl font-black leading-none tracking-tight md:text-6xl">
+            <h2 className="mt-2 text-3xl font-black leading-tight tracking-tight md:text-4xl">
               {match.teamName}
             </h2>
-            <div className="mt-6 inline-flex rounded-full bg-white/12 px-4 py-2 text-sm font-black ring-1 ring-white/18">
-              {getCompetitionLabel(match)} · {match.seasonName}
-            </div>
           </div>
+        </aside>
 
-          <div className="relative flex flex-col justify-center overflow-hidden bg-[#102846] px-4 py-10 text-center md:px-8 md:py-12 lg:px-20">
-            <div
-              className="absolute inset-0 opacity-70"
-              aria-hidden="true"
-              style={{
-                background:
-                  'radial-gradient(circle at 50% 12%, rgba(47,123,205,0.35), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,0.06), transparent 45%), linear-gradient(180deg, transparent, rgba(6,23,47,0.4))',
-              }}
-            />
-            <div className="relative mx-auto flex size-11 items-center justify-center rounded-full border border-white/20 bg-white/12">
-              <Trophy className="size-6 text-white/90" aria-hidden="true" />
-            </div>
-            <p className="relative mt-4 text-sm font-black uppercase tracking-[0.18em] text-white">
+        <div className="flex min-w-0 flex-col">
+          <MatchCountdown
+            matchDate={match.matchDate}
+            matchTime={match.matchTime}
+            className="!m-0 border-b border-t-0 border-white/12 bg-black/45 px-4 py-3"
+          />
+
+          <div className="flex flex-1 flex-col items-center justify-center px-5 py-10 text-center md:px-10">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-white">
               {match.matchType === 'friendly' ? 'Amistosos' : competitionLabel}
             </p>
-            <p className="relative mt-2 text-sm font-bold text-white/86">
-              {competitionLabel} | {match.location || 'Lugar por confirmar'}
+            <p className="mt-2 max-w-3xl text-sm font-bold text-white/90 md:text-base">
+              {match.seasonName} | {match.location || 'Lugar por confirmar'}
             </p>
 
-            <div className="relative mt-7 grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-              <p className="text-3xl font-black leading-tight tracking-tight md:text-4xl">{CLUB.shortName}</p>
-              <div className="grid gap-1">
+            <div className="mt-8 grid w-full items-center gap-5 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+              <p className="text-3xl font-black leading-tight tracking-tight md:text-4xl">
+                {match.isHome ? CLUB.shortName : match.opponentName}
+              </p>
+              <div className="grid justify-items-center gap-2">
+                <Image
+                  src={CLUB.crest}
+                  alt=""
+                  width={72}
+                  height={72}
+                  className="h-16 w-auto drop-shadow-lg"
+                />
                 {score ? (
-                  <p className="text-4xl font-black leading-none text-white md:text-5xl">{score}</p>
+                  <p className="text-4xl font-black leading-none md:text-5xl">{score}</p>
                 ) : (
-                  <p className="text-4xl font-black leading-none text-white md:text-5xl">{match.timeLabel}</p>
+                  <p className="text-4xl font-black leading-none md:text-5xl">{match.timeLabel}</p>
                 )}
-                <p className="text-sm font-black text-white/90">{match.dateLabel}</p>
+                <p className="text-sm font-black text-white/92">{match.dateLabel}</p>
               </div>
-              <p className="text-3xl font-black leading-tight tracking-tight md:text-4xl">{match.opponentName}</p>
+              <p className="text-3xl font-black leading-tight tracking-tight md:text-4xl">
+                {match.isHome ? match.opponentName : CLUB.shortName}
+              </p>
             </div>
-
-            <MatchCountdown matchDate={match.matchDate} matchTime={match.matchTime} />
           </div>
+        </div>
       </div>
     </section>
   )
@@ -233,30 +278,6 @@ function MatchRow({ match }: { match: PublicCalendarMatch }) {
   )
 }
 
-function EmptyCalendarSection({
-  id,
-  title,
-  icon: Icon,
-}: {
-  id: string
-  title: string
-  icon: typeof Clock3
-}) {
-  return (
-    <section id={id} className="scroll-mt-24">
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-white">
-          <Icon className="size-5" aria-hidden="true" />
-        </span>
-        <h2 className="text-3xl font-black tracking-tight text-foreground">{title}</h2>
-      </div>
-      <div className="rounded-lg bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
-        <p className="text-base font-black text-foreground">Pendiente de configurar</p>
-      </div>
-    </section>
-  )
-}
-
 export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
   const selectedSeason = getSelectedSeason(data, filters.season)
   const selectedStatus = filters.status || 'all'
@@ -266,6 +287,12 @@ export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
   const filteredMatches = filterMatches(data.matches, filters, selectedSeason)
   const featuredMatch = getFeaturedMatch(filteredMatches, selectedStatus)
   const monthGroups = groupByMonth(filteredMatches)
+  const selectedMonthGroup = getSelectedMonthGroup(monthGroups, filters.month)
+  const selectedMonthIndex = selectedMonthGroup
+    ? monthGroups.findIndex((group) => group.key === selectedMonthGroup.key)
+    : -1
+  const olderMonth = selectedMonthIndex >= 0 ? monthGroups[selectedMonthIndex + 1] : null
+  const newerMonth = selectedMonthIndex > 0 ? monthGroups[selectedMonthIndex - 1] : null
 
   return (
     <section className="bg-[#f4f6f8]">
@@ -274,40 +301,8 @@ export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
         title="Calendario"
       />
 
-      <div className="border-b border-border bg-white/95 shadow-sm">
-        <nav className="mx-auto flex max-w-7xl flex-wrap gap-2 px-4 py-4 md:px-8" aria-label="Secciones del calendario">
-          {[
-            { href: '#horario', label: 'Horario', icon: Clock3 },
-            { href: '#entrenamientos', label: 'Entrenamientos', icon: Dumbbell },
-            { href: '#partidos', label: 'Partidos', icon: Trophy },
-          ].map((item) => {
-            const Icon = item.icon
-            return (
-              <a
-                key={item.href}
-                href={item.href}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-4 text-sm font-black text-foreground shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Icon className="size-4 text-primary" aria-hidden="true" />
-                {item.label}
-              </a>
-            )
-          })}
-        </nav>
-      </div>
-
       <div className="mx-auto max-w-7xl space-y-10 px-4 py-8 md:px-8 md:py-12">
-        <EmptyCalendarSection id="horario" title="Horario" icon={Clock3} />
-        <EmptyCalendarSection id="entrenamientos" title="Entrenamientos" icon={Dumbbell} />
-
         <section id="partidos" className="scroll-mt-24 space-y-6">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-white">
-              <Trophy className="size-5" aria-hidden="true" />
-            </span>
-            <h2 className="text-3xl font-black tracking-tight text-foreground">Partidos</h2>
-          </div>
-
           <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5">
             <form className="grid gap-3 md:grid-cols-4" action="/calendario#partidos">
               <label className="flex min-w-0 flex-col gap-1.5 text-sm font-black text-foreground">
@@ -377,21 +372,48 @@ export function CalendarPublicView({ data, filters }: CalendarPublicViewProps) {
                 <FeaturedMatch match={featuredMatch} isPlayedMode={selectedStatus === 'played'} />
               ) : null}
 
-              {monthGroups.map((group) => (
-                <section key={group.key}>
-                  <div className="mb-4 flex items-center gap-3">
-                    <CalendarDays className="size-5 text-primary" aria-hidden="true" />
-                    <h2 className="text-3xl font-black capitalize tracking-tight text-foreground">
-                      {group.label}
-                    </h2>
+              {selectedMonthGroup ? (
+                <section key={selectedMonthGroup.key}>
+                  <div className="mb-4 flex items-center justify-center gap-3">
+                      {olderMonth ? (
+                        <Link
+                          href={getCalendarHref(filters, selectedSeason, olderMonth.key)}
+                          scroll={false}
+                          className="inline-flex size-8 items-center justify-center text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label={`Ver ${olderMonth.label}`}
+                        >
+                          <ChevronLeft className="size-5" aria-hidden="true" />
+                        </Link>
+                      ) : (
+                        <span className="inline-flex size-8 items-center justify-center text-muted-foreground/40">
+                          <ChevronLeft className="size-5" aria-hidden="true" />
+                        </span>
+                      )}
+                      <h2 className="text-center text-3xl font-black capitalize tracking-tight text-foreground">
+                        {selectedMonthGroup.label}
+                      </h2>
+                      {newerMonth ? (
+                        <Link
+                          href={getCalendarHref(filters, selectedSeason, newerMonth.key)}
+                          scroll={false}
+                          className="inline-flex size-8 items-center justify-center text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label={`Ver ${newerMonth.label}`}
+                        >
+                          <ChevronRight className="size-5" aria-hidden="true" />
+                        </Link>
+                      ) : (
+                        <span className="inline-flex size-8 items-center justify-center text-muted-foreground/40">
+                          <ChevronRight className="size-5" aria-hidden="true" />
+                        </span>
+                      )}
                   </div>
                   <div className="space-y-3">
-                    {group.matches.map((match) => (
+                    {selectedMonthGroup.matches.map((match) => (
                       <MatchRow key={match.id} match={match} />
                     ))}
                   </div>
                 </section>
-              ))}
+              ) : null}
             </div>
           )}
         </section>

@@ -306,7 +306,7 @@ export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('sponsors')
-    .select('id, title, image_url, sort_order')
+    .select('id, title, image_url, url, sort_order')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
@@ -315,6 +315,7 @@ export async function getPrivateSponsors(): Promise<PrivateSponsor[]> {
     id: sponsor.id,
     title: sponsor.title,
     imageUrl: sponsor.image_url,
+    url: sponsor.url,
     tier: getSponsorTierFromSortOrder(sponsor.sort_order),
   }))
 }

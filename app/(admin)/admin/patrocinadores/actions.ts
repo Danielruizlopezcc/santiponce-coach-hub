@@ -81,9 +81,25 @@ function getSponsorSortOrder(value: FormDataEntryValue | null) {
   return getSponsorTierOption(isValidTier ? (tier as SponsorTier) : 'partner').sortOrder
 }
 
+function getSponsorUrl(value: FormDataEntryValue | null) {
+  const url = typeof value === 'string' ? value.trim() : ''
+  if (!url) {
+    throw new Error('La URL del patrocinador es obligatoria.')
+  }
+
+  try {
+    new URL(url)
+  } catch {
+    throw new Error('La URL del patrocinador no es válida.')
+  }
+
+  return url
+}
+
 export async function createSponsor(formData: FormData) {
   const title = formData.get('title')
   const sortOrder = getSponsorSortOrder(formData.get('tier'))
+  const url = getSponsorUrl(formData.get('url'))
   const isActive = formData.get('isActive') === 'true'
   const image = formData.get('image') as File | null
 
@@ -101,6 +117,7 @@ export async function createSponsor(formData: FormData) {
   const { error } = await supabase.from('sponsors').insert({
     title: title.trim(),
     image_url: imageUrl,
+    url,
     is_active: isActive,
     sort_order: sortOrder,
   })
@@ -118,6 +135,7 @@ export async function updateSponsor(formData: FormData) {
   const id = formData.get('id')
   const title = formData.get('title')
   const sortOrder = getSponsorSortOrder(formData.get('tier'))
+  const url = getSponsorUrl(formData.get('url'))
   const isActive = formData.get('isActive') === 'true'
   const image = formData.get('image') as File | null
 
@@ -133,6 +151,7 @@ export async function updateSponsor(formData: FormData) {
 
   const updates: Record<string, unknown> = {
     title: title.trim(),
+    url,
     is_active: isActive,
     sort_order: sortOrder,
   }

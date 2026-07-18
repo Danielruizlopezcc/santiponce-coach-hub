@@ -14,6 +14,7 @@ type CalendarioPageProps = {
     team?: string
     competition?: string
     status?: string
+    month?: string
   }>
 }
 

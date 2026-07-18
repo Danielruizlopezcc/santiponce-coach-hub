@@ -402,6 +402,7 @@ export type AdminSponsorRow = {
   id: string
   title: string
   imageUrl: string
+  url: string
   isActive: boolean
   sortOrder: number
   tier: SponsorTier
@@ -1507,13 +1508,14 @@ export async function getAdminSponsors(): Promise<AdminSponsorRow[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('sponsors')
-    .select('id, title, image_url, is_active, sort_order, created_at')
+    .select('id, title, image_url, url, is_active, sort_order, created_at')
     .order('sort_order', { ascending: true })
 
   return (data ?? []).map((sponsor) => ({
     id: sponsor.id,
     title: sponsor.title,
     imageUrl: sponsor.image_url,
+    url: sponsor.url,
     isActive: sponsor.is_active,
     sortOrder: sponsor.sort_order,
     tier: getSponsorTierFromSortOrder(sponsor.sort_order),

@@ -427,7 +427,7 @@ export function PublicNav({ navData }: { navData: PublicNavData }) {
           />
         </Link>
 
-        <div className="absolute left-3 top-1/2 z-20 -translate-y-1/2 md:left-5 lg:hidden">
+        <div className="absolute left-3 top-1/2 z-20 -translate-y-1/2 md:left-5">
           <MenuDrawer open={open} setOpen={setOpen} pathname={pathname} navData={navData} />
         </div>
 

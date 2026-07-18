@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { cn } from '@/lib/utils'
 
 type MatchCountdownProps = {
   matchDate: string
   matchTime: string
+  className?: string
 }
 
 function getCountdownLabel(matchDate: string, matchTime: string) {
@@ -24,7 +26,7 @@ function getCountdownLabel(matchDate: string, matchTime: string) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-export function MatchCountdown({ matchDate, matchTime }: MatchCountdownProps) {
+export function MatchCountdown({ matchDate, matchTime, className }: MatchCountdownProps) {
   const [label, setLabel] = useState(matchTime ? 'Calculando...' : 'Hora por confirmar')
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export function MatchCountdown({ matchDate, matchTime }: MatchCountdownProps) {
   }, [matchDate, matchTime])
 
   return (
-    <div className="relative -mx-4 -mb-10 mt-9 flex items-center justify-center gap-5 border-t border-white/10 bg-white/8 px-4 py-4 text-sm font-black text-white md:-mx-8 md:-mb-12 lg:-mx-20">
+    <div className={cn('relative -mx-4 -mb-10 mt-9 flex items-center justify-center gap-5 border-t border-white/10 bg-white/8 px-4 py-4 text-sm font-black text-white md:-mx-8 md:-mb-12 lg:-mx-20', className)}>
       <span>Comienza en:</span>
       <span className="text-lg">{label}</span>
     </div>

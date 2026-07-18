@@ -54,6 +54,7 @@ export type PrivateSponsor = {
   id: string
   title: string
   imageUrl: string
+  url: string
   tier: SponsorTier
 }
 
