@@ -12,6 +12,70 @@ import {
   type TutorFeeChargeDraft,
 } from '@/lib/tutor-fee-billing'
 
+const RECEIPT_BUCKET_NAME = 'finance-receipts'
+const RECEIPT_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+
+function normalizeFileName(fileName: string) {
+  return fileName
+    .toLowerCase()
+    .replace(/[^a-z0-9.\-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+
+function buildReceiptPath(file: File) {
+  const safeName = normalizeFileName(file.name)
+  return `justificantes/${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeName}`
+}
+
+function getStoragePathFromPublicUrl(url: string | null | undefined) {
+  if (!url) return null
+  const marker = `/storage/v1/object/public/${RECEIPT_BUCKET_NAME}/`
+  const index = url.indexOf(marker)
+  if (index === -1) return null
+  return decodeURIComponent(url.slice(index + marker.length).split('?')[0] ?? '')
+}
+
+async function removeFinanceReceipt(supabase: ReturnType<typeof createAdminClient>, receiptUrl: string | null | undefined) {
+  const path = getStoragePathFromPublicUrl(receiptUrl)
+  if (!path) return
+  await supabase.storage.from(RECEIPT_BUCKET_NAME).remove([path])
+}
+
+async function uploadFinanceReceipt(supabase: ReturnType<typeof createAdminClient>, receipt: File) {
+  if (!RECEIPT_ALLOWED_TYPES.includes(receipt.type)) {
+    throw new Error('El justificante debe ser una imagen (JPG, PNG, WEBP) o un PDF.')
+  }
+
+  const { error: bucketError } = await supabase.storage.createBucket(RECEIPT_BUCKET_NAME, {
+    public: true,
+  })
+
+  if (bucketError && !bucketError.message.includes('already exists')) {
+    throw new Error(bucketError.message)
+  }
+
+  const receiptPath = buildReceiptPath(receipt)
+  const { error: uploadError } = await supabase.storage
+    .from(RECEIPT_BUCKET_NAME)
+    .upload(receiptPath, receipt, {
+      cacheControl: '3600',
+      upsert: false,
+    })
+
+  if (uploadError) throw new Error(uploadError.message)
+
+  const { data: publicUrlData } = supabase.storage
+    .from(RECEIPT_BUCKET_NAME)
+    .getPublicUrl(receiptPath)
+
+  if (!publicUrlData?.publicUrl) {
+    throw new Error('No se pudo obtener la URL del justificante.')
+  }
+
+  return publicUrlData.publicUrl
+}
+
 export type FinanceMovementActionState = {
   ok: boolean
   message: string
@@ -45,11 +109,30 @@ const financeMovementSchema = z.object({
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
     z.string().uuid().optional(),
   ),
-  justificanteUrl: z.string().trim().url('El justificante debe ser una URL válida.').optional().or(z.literal('')),
+  vendorId: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().uuid().optional(),
+  ),
+  removeReceipt: z.coerce.boolean().optional(),
   importe: z.coerce
     .number({ message: 'Introduce un importe válido.' })
     .positive('El importe debe ser mayor que cero.')
     .max(999_999, 'El importe es demasiado alto.'),
+})
+
+const vendorSchema = z.object({
+  id: z.string().uuid().optional(),
+  nombre: z.string().trim().min(2, 'Escribe el nombre del proveedor.').max(140),
+  cif: z.string().trim().max(20, 'El CIF/NIF es demasiado largo.').optional(),
+  contactoNombre: z.string().trim().max(140).optional(),
+  contactoEmail: z
+    .string()
+    .trim()
+    .transform((value) => value || '')
+    .pipe(z.string().email('Correo no válido.').or(z.literal(''))),
+  contactoTelefono: z.string().trim().max(40, 'El teléfono es demasiado largo.').optional(),
+  notas: z.string().trim().max(500, 'Las notas son demasiado largas.').optional(),
+  activo: z.coerce.boolean(),
 })
 
 const feeTemplateSchema = z.object({
@@ -127,7 +210,8 @@ export async function createFinanceMovementAction(
     metodoPago: formData.get('metodoPago'),
     estado: formData.get('estado'),
     seasonId: formData.get('seasonId'),
-    justificanteUrl: formData.get('justificanteUrl'),
+    vendorId: formData.get('vendorId'),
+    removeReceipt: formData.get('removeReceipt') === 'on',
     importe: formData.get('importe'),
   })
 
@@ -139,8 +223,11 @@ export async function createFinanceMovementAction(
   }
 
   const supabase = createAdminClient()
-  const { id, tipo, concepto, detalle, categoria, metodoPago, estado, seasonId, justificanteUrl, importe } = parsed.data
-  const payload = {
+  const { id, tipo, concepto, detalle, categoria, metodoPago, estado, seasonId, vendorId, removeReceipt, importe } = parsed.data
+  const receipt = formData.get('receipt')
+  const receiptFile = receipt instanceof File && receipt.size > 0 ? receipt : null
+
+  const payload: Record<string, unknown> = {
     movement_type: tipo === 'ingreso' ? 'income' : 'expense',
     concept: concepto,
     detail: detalle || null,
@@ -148,10 +235,34 @@ export async function createFinanceMovementAction(
     payment_method: metodoPago,
     status: estado,
     season_id: seasonId ?? null,
-    receipt_url: justificanteUrl || null,
+    vendor_id: tipo === 'gasto' ? vendorId ?? null : null,
     amount_cents: Math.round(importe * 100),
     currency: 'eur',
   }
+
+  let previousReceiptUrl: string | null | undefined
+  if (id && (receiptFile || removeReceipt)) {
+    const { data: current } = await supabase
+      .from('admin_finance_movements')
+      .select('receipt_url')
+      .eq('id', id)
+      .maybeSingle()
+    previousReceiptUrl = current?.receipt_url
+  }
+
+  if (receiptFile) {
+    try {
+      payload.receipt_url = await uploadFinanceReceipt(supabase, receiptFile)
+    } catch (uploadError) {
+      return {
+        ok: false,
+        message: uploadError instanceof Error ? uploadError.message : 'No se ha podido subir el justificante.',
+      }
+    }
+  } else if (removeReceipt) {
+    payload.receipt_url = null
+  }
+
   const { error } = id
     ? await supabase.from('admin_finance_movements').update(payload).eq('id', id)
     : await supabase.from('admin_finance_movements').insert({
@@ -164,6 +275,10 @@ export async function createFinanceMovementAction(
       ok: false,
       message: error.message,
     }
+  }
+
+  if (receiptFile || removeReceipt) {
+    await removeFinanceReceipt(supabase, previousReceiptUrl)
   }
 
   await createAdminAuditLog({
@@ -201,6 +316,12 @@ export async function deleteFinanceMovementAction(id: string): Promise<FinanceMo
   }
 
   const supabase = createAdminClient()
+  const { data: current } = await supabase
+    .from('admin_finance_movements')
+    .select('receipt_url')
+    .eq('id', parsed.data)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('admin_finance_movements')
     .delete()
@@ -212,6 +333,8 @@ export async function deleteFinanceMovementAction(id: string): Promise<FinanceMo
       message: error.message,
     }
   }
+
+  await removeFinanceReceipt(supabase, current?.receipt_url)
 
   await createAdminAuditLog({
     actor: admin,
@@ -590,4 +713,357 @@ export async function refundStripePaymentAction(id: string): Promise<FinanceMove
       message: error instanceof Error ? error.message : 'No se ha podido crear el reembolso en Stripe.',
     }
   }
+}
+
+export type VendorActionState = {
+  ok: boolean
+  message: string
+}
+
+export async function createVendorAction(
+  _prevState: VendorActionState,
+  formData: FormData,
+): Promise<VendorActionState> {
+  const admin = await requireAdminAction()
+  const parsed = vendorSchema.safeParse({
+    id: formData.get('id') || undefined,
+    nombre: formData.get('nombre'),
+    cif: formData.get('cif'),
+    contactoNombre: formData.get('contactoNombre'),
+    contactoEmail: formData.get('contactoEmail'),
+    contactoTelefono: formData.get('contactoTelefono'),
+    notas: formData.get('notas'),
+    activo: formData.get('activo') === 'on',
+  })
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Revisa los datos del proveedor.' }
+  }
+
+  const { id, nombre, cif, contactoNombre, contactoEmail, contactoTelefono, notas, activo } = parsed.data
+  const payload = {
+    name: nombre,
+    tax_id: cif || null,
+    contact_name: contactoNombre || null,
+    contact_email: contactoEmail || null,
+    contact_phone: contactoTelefono || null,
+    notes: notas || null,
+    is_active: activo,
+  }
+
+  const supabase = createAdminClient()
+  const { error } = id
+    ? await supabase.from('finance_vendors').update(payload).eq('id', id)
+    : await supabase.from('finance_vendors').insert({ ...payload, created_by: admin.id })
+
+  if (error) {
+    return { ok: false, message: error.message }
+  }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'vendor.upsert',
+    entityType: 'finance_vendor',
+    entityId: id ?? null,
+    summary: id ? 'Actualizó un proveedor.' : 'Creó un proveedor.',
+    metadata: { nombre, cif },
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: id ? 'Proveedor actualizado correctamente.' : 'Proveedor creado correctamente.' }
+}
+
+export async function deleteVendorAction(id: string): Promise<VendorActionState> {
+  const admin = await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) {
+    return { ok: false, message: 'No se ha podido identificar el proveedor.' }
+  }
+
+  const supabase = createAdminClient()
+  const { count } = await supabase
+    .from('admin_finance_movements')
+    .select('id', { count: 'exact', head: true })
+    .eq('vendor_id', parsed.data)
+
+  if (count && count > 0) {
+    return {
+      ok: false,
+      message: `No se puede eliminar: hay ${count} gasto(s) asociados a este proveedor. Desactívalo en su lugar.`,
+    }
+  }
+
+  const { error } = await supabase.from('finance_vendors').delete().eq('id', parsed.data)
+  if (error) {
+    return { ok: false, message: error.message }
+  }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'vendor.delete',
+    entityType: 'finance_vendor',
+    entityId: parsed.data,
+    summary: 'Eliminó un proveedor.',
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Proveedor eliminado correctamente.' }
+}
+
+// --- Conciliación bancaria ---
+
+export type BankTransactionActionState = {
+  ok: boolean
+  message: string
+}
+
+function parseBankTransactionsCsv(csvText: string) {
+  const lines = csvText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const rows: Array<{ transaction_date: string; description: string; amount_cents: number }> = []
+
+  for (const line of lines) {
+    const [dateRaw, descriptionRaw, amountRaw] = line.split(',').map((cell) => cell.trim())
+    if (!dateRaw || !descriptionRaw || !amountRaw) continue
+    if (dateRaw.toLowerCase() === 'fecha') continue // skip header row if present
+
+    const date = new Date(dateRaw)
+    const amount = Number(amountRaw.replace(',', '.'))
+    if (Number.isNaN(date.getTime()) || !Number.isFinite(amount) || amount === 0) continue
+
+    rows.push({
+      transaction_date: date.toISOString().slice(0, 10),
+      description: descriptionRaw,
+      amount_cents: Math.round(amount * 100),
+    })
+  }
+
+  return rows
+}
+
+export async function importBankTransactionsAction(
+  _prevState: BankTransactionActionState,
+  formData: FormData,
+): Promise<BankTransactionActionState> {
+  const admin = await requireAdminAction()
+  const csvText = String(formData.get('csvText') ?? '')
+  const rows = parseBankTransactionsCsv(csvText)
+
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      message: 'No se ha reconocido ningún movimiento. Usa el formato fecha,descripción,importe (uno por línea).',
+    }
+  }
+
+  const supabase = createAdminClient()
+  const batchId = new Date().toISOString()
+  const { error } = await supabase.from('bank_transactions').insert(
+    rows.map((row) => ({ ...row, created_by: admin.id, import_batch: batchId })),
+  )
+
+  if (error) {
+    return { ok: false, message: error.message }
+  }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'bank_transactions.import',
+    entityType: 'bank_transaction',
+    summary: `Importó ${rows.length} movimiento(s) bancario(s) para conciliar.`,
+    metadata: { count: rows.length },
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: `${rows.length} movimiento(s) importado(s) correctamente.` }
+}
+
+export async function matchBankTransactionAction(
+  bankTransactionId: string,
+  target: { type: 'movement' | 'payment'; id: string },
+): Promise<BankTransactionActionState> {
+  const admin = await requireAdminAction()
+  const parsedId = z.string().uuid().safeParse(bankTransactionId)
+  const parsedTargetId = z.string().uuid().safeParse(target.id)
+  if (!parsedId.success || !parsedTargetId.success) {
+    return { ok: false, message: 'No se ha podido identificar el movimiento.' }
+  }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('bank_transactions')
+    .update({
+      status: 'matched',
+      matched_movement_id: target.type === 'movement' ? parsedTargetId.data : null,
+      matched_payment_id: target.type === 'payment' ? parsedTargetId.data : null,
+    })
+    .eq('id', parsedId.data)
+
+  if (error) return { ok: false, message: error.message }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'bank_transactions.match',
+    entityType: 'bank_transaction',
+    entityId: parsedId.data,
+    summary: 'Conciliar movimiento bancario con un registro contable.',
+    metadata: { targetType: target.type, targetId: target.id },
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Movimiento conciliado correctamente.' }
+}
+
+export async function unmatchBankTransactionAction(id: string): Promise<BankTransactionActionState> {
+  const admin = await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el movimiento.' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('bank_transactions')
+    .update({ status: 'unmatched', matched_movement_id: null, matched_payment_id: null })
+    .eq('id', parsed.data)
+
+  if (error) return { ok: false, message: error.message }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'bank_transactions.unmatch',
+    entityType: 'bank_transaction',
+    entityId: parsed.data,
+    summary: 'Deshizo la conciliación de un movimiento bancario.',
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Conciliación deshecha.' }
+}
+
+export async function ignoreBankTransactionAction(id: string): Promise<BankTransactionActionState> {
+  await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el movimiento.' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('bank_transactions')
+    .update({ status: 'ignored', matched_movement_id: null, matched_payment_id: null })
+    .eq('id', parsed.data)
+
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Movimiento marcado como ignorado.' }
+}
+
+export async function deleteBankTransactionAction(id: string): Promise<BankTransactionActionState> {
+  const admin = await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el movimiento.' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('bank_transactions').delete().eq('id', parsed.data)
+  if (error) return { ok: false, message: error.message }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'bank_transactions.delete',
+    entityType: 'bank_transaction',
+    entityId: parsed.data,
+    summary: 'Eliminó un movimiento bancario importado.',
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Movimiento eliminado.' }
+}
+
+// --- Presupuesto vs. real ---
+
+export type BudgetActionState = {
+  ok: boolean
+  message: string
+}
+
+const budgetSchema = z.object({
+  id: z.string().uuid().optional(),
+  seasonId: z.string().uuid('Selecciona una temporada.'),
+  tipo: z.enum(['ingreso', 'gasto'], { message: 'Selecciona si es ingreso o gasto.' }),
+  categoria: z.string().trim().min(2, 'Selecciona una categoría.').max(80),
+  importe: z.coerce
+    .number({ message: 'Introduce un importe válido.' })
+    .positive('El presupuesto debe ser mayor que cero.')
+    .max(999_999, 'El importe es demasiado alto.'),
+})
+
+export async function upsertBudgetAction(
+  _prevState: BudgetActionState,
+  formData: FormData,
+): Promise<BudgetActionState> {
+  const admin = await requireAdminAction()
+  const parsed = budgetSchema.safeParse({
+    id: formData.get('id') || undefined,
+    seasonId: formData.get('seasonId'),
+    tipo: formData.get('tipo'),
+    categoria: formData.get('categoria'),
+    importe: formData.get('importe'),
+  })
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Revisa los datos del presupuesto.' }
+  }
+
+  const { id, seasonId, tipo, categoria, importe } = parsed.data
+  const payload = {
+    season_id: seasonId,
+    movement_type: tipo === 'ingreso' ? 'income' : 'expense',
+    category: categoria,
+    budgeted_amount_cents: Math.round(importe * 100),
+  }
+
+  const supabase = createAdminClient()
+  const { error } = id
+    ? await supabase.from('finance_budgets').update(payload).eq('id', id)
+    : await supabase
+        .from('finance_budgets')
+        .upsert({ ...payload, created_by: admin.id }, { onConflict: 'season_id,movement_type,category' })
+
+  if (error) {
+    return { ok: false, message: error.message }
+  }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'budget.upsert',
+    entityType: 'finance_budget',
+    entityId: id ?? null,
+    summary: id ? 'Actualizó un presupuesto.' : 'Creó un presupuesto.',
+    metadata: { seasonId, tipo, categoria, importe },
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Presupuesto guardado correctamente.' }
+}
+
+export async function deleteBudgetAction(id: string): Promise<BudgetActionState> {
+  const admin = await requireAdminAction()
+  const parsed = z.string().uuid().safeParse(id)
+  if (!parsed.success) return { ok: false, message: 'No se ha podido identificar el presupuesto.' }
+
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('finance_budgets').delete().eq('id', parsed.data)
+  if (error) return { ok: false, message: error.message }
+
+  await createAdminAuditLog({
+    actor: admin,
+    action: 'budget.delete',
+    entityType: 'finance_budget',
+    entityId: parsed.data,
+    summary: 'Eliminó un presupuesto.',
+  })
+
+  revalidatePath('/admin/pagos')
+  return { ok: true, message: 'Presupuesto eliminado correctamente.' }
 }

@@ -2,27 +2,39 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowRight, BarChart3, CreditCard, Download, FileText, Landmark, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
+import { ArrowRight, BarChart3, CreditCard, Download, FileText, Landmark, Link2, Link2Off, Loader2, Pencil, Plus, ReceiptText, Search, ShieldAlert, Tags, Trash2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react'
 import { AdminErrorDialog } from '@/components/admin-error-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatEuro } from '@/lib/format'
-import type { AdminAthleteRow, AdminEnrollmentRow, AdminFeeTemplateRow, AdminFinanceMovementRow, AdminPaymentRow, AdminSeasonRow, AdminTutorFeeAssignmentRow } from '@/lib/admin-app'
+import type { AdminAthleteRow, AdminBankTransactionRow, AdminBudgetRow, AdminEnrollmentRow, AdminFeeTemplateRow, AdminFinanceMovementRow, AdminPaymentRow, AdminSeasonRow, AdminTutorFeeAssignmentRow, AdminVendorRow } from '@/lib/admin-app'
 import { cn } from '@/lib/utils'
 import { MatriculasClient } from '../matriculas/matriculas-client'
 import {
   assignAthleteFeeAction,
   createFinanceMovementAction,
   createFeeTemplateAction,
+  createVendorAction,
   cancelPaymentAction,
+  deleteBankTransactionAction,
+  deleteBudgetAction,
   deleteFeeTemplateAction,
   deleteFinanceMovementAction,
+  deleteVendorAction,
+  ignoreBankTransactionAction,
+  importBankTransactionsAction,
   markPaymentPendingAction,
+  matchBankTransactionAction,
   refundStripePaymentAction,
+  unmatchBankTransactionAction,
+  upsertBudgetAction,
   type AthleteFeeAssignmentState,
+  type BankTransactionActionState,
+  type BudgetActionState,
   type FeeTemplateActionState,
   type FinanceMovementActionState,
+  type VendorActionState,
 } from './actions'
 
 type AdminPaymentsClientProps = {
@@ -33,9 +45,12 @@ type AdminPaymentsClientProps = {
   seasons: AdminSeasonRow[]
   feeAssignments: AdminTutorFeeAssignmentRow[]
   athletes: AdminAthleteRow[]
+  vendors: AdminVendorRow[]
+  bankTransactions: AdminBankTransactionRow[]
+  budgets: AdminBudgetRow[]
 }
 
-type PaymentsTab = 'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'programadas' | 'pendientes' | 'ingresos' | 'gastos' | 'informes'
+type PaymentsTab = 'resumen' | 'cobros' | 'matriculas' | 'cuotas' | 'programadas' | 'pendientes' | 'ingresos' | 'gastos' | 'proveedores' | 'conciliacion' | 'presupuesto' | 'informes'
 
 const TAB_GROUPS: Array<{
   title: string
@@ -85,6 +100,9 @@ const TAB_GROUPS: Array<{
     tabs: [
       { id: 'ingresos', label: 'Ingresos manuales' },
       { id: 'gastos', label: 'Gastos manuales' },
+      { id: 'proveedores', label: 'Proveedores' },
+      { id: 'conciliacion', label: 'Conciliación bancaria' },
+      { id: 'presupuesto', label: 'Presupuesto' },
       { id: 'informes', label: 'Informes' },
     ],
   },
@@ -210,6 +228,9 @@ const initialFeeState: FeeTemplateActionState = {
   message: '',
 }
 const initialFeeAssignmentState: AthleteFeeAssignmentState = { ok: false, message: '' }
+const initialVendorState: VendorActionState = { ok: false, message: '' }
+const initialBankTransactionState: BankTransactionActionState = { ok: false, message: '' }
+const initialBudgetState: BudgetActionState = { ok: false, message: '' }
 
 const INCOME_CATEGORIES = ['Socios', 'Matrículas', 'Cuotas deportivas', 'Patrocinadores', 'Lotería / eventos', 'Subvenciones', 'Otros']
 const EXPENSE_CATEGORIES = ['Material deportivo', 'Árbitros', 'Federación', 'Equipaciones', 'Instalaciones', 'Transporte', 'Administración', 'Otros']
@@ -350,6 +371,58 @@ function sumMovements(movements: AdminFinanceMovementRow[]) {
     .reduce((sum, movement) => sum + movement.importe, 0)
 }
 
+type BankMatchCandidate = {
+  type: 'movement' | 'payment'
+  id: string
+  label: string
+  detail: string
+  importe: number
+  closeAmount: boolean
+}
+
+function getBankTransactionCandidates(
+  bankTransaction: AdminBankTransactionRow,
+  financeMovements: AdminFinanceMovementRow[],
+  payments: AdminPaymentRow[],
+  search: string,
+): BankMatchCandidate[] {
+  const amountAbs = Math.abs(bankTransaction.importe)
+  const q = search.trim().toLowerCase()
+
+  const movementCandidates: BankMatchCandidate[] = financeMovements
+    .filter((movement) => movement.estado === 'confirmed')
+    .filter((movement) => (bankTransaction.importe > 0 ? movement.tipo === 'ingreso' : movement.tipo === 'gasto'))
+    .map((movement) => ({
+      type: 'movement' as const,
+      id: movement.id,
+      label: movement.concepto,
+      detail: `${movement.categoria} · ${movement.fecha}`,
+      importe: movement.importe,
+      closeAmount: Math.abs(movement.importe - amountAbs) < 0.01,
+    }))
+
+  const paymentCandidates: BankMatchCandidate[] =
+    bankTransaction.importe > 0
+      ? payments
+          .filter((payment) => payment.estado === 'pagado')
+          .map((payment) => ({
+            type: 'payment' as const,
+            id: payment.id,
+            label: `${payment.operacion} · ${payment.tutor}`,
+            detail: `${payment.deportista} · ${payment.fecha}`,
+            importe: payment.importe,
+            closeAmount: Math.abs(payment.importe - amountAbs) < 0.01,
+          }))
+      : []
+
+  const all = [...movementCandidates, ...paymentCandidates]
+  const filtered = q
+    ? all.filter((candidate) => candidate.label.toLowerCase().includes(q) || candidate.detail.toLowerCase().includes(q))
+    : all.filter((candidate) => candidate.closeAmount)
+
+  return filtered.sort((a, b) => Number(b.closeAmount) - Number(a.closeAmount)).slice(0, 25)
+}
+
 function csvEscape(value: string | number) {
   return `"${String(value).replaceAll('"', '""')}"`
 }
@@ -370,8 +443,28 @@ function downloadCsv(filename: string, headers: string[], rows: Array<Array<stri
   URL.revokeObjectURL(url)
 }
 
-export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments, athletes }: AdminPaymentsClientProps) {
+export function AdminPaymentsClient({ payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments, athletes, vendors, bankTransactions, budgets }: AdminPaymentsClientProps) {
   const [activeTab, setActiveTab] = useState<PaymentsTab>('resumen')
+  const [editingVendor, setEditingVendor] = useState<AdminVendorRow | null>(null)
+  const [vendorSearch, setVendorSearch] = useState('')
+  const [confirmDeleteVendorId, setConfirmDeleteVendorId] = useState<string | null>(null)
+  const [vendorDeleteMessage, setVendorDeleteMessage] = useState<VendorActionState | null>(null)
+  const [vendorState, vendorAction, vendorPending] = useActionState(createVendorAction, initialVendorState)
+  const vendorFormRef = useRef<HTMLFormElement>(null)
+  const [bankImportState, bankImportAction, bankImportPending] = useActionState(
+    importBankTransactionsAction,
+    initialBankTransactionState,
+  )
+  const bankImportFormRef = useRef<HTMLFormElement>(null)
+  const [bankActionId, setBankActionId] = useState<string | null>(null)
+  const [bankActionMessage, setBankActionMessage] = useState<BankTransactionActionState | null>(null)
+  const [bankMatchSearchByRow, setBankMatchSearchByRow] = useState<Record<string, string>>({})
+  const [bankStatusFilter, setBankStatusFilter] = useState<'todos' | AdminBankTransactionRow['estado']>('unmatched')
+  const [editingBudget, setEditingBudget] = useState<AdminBudgetRow | null>(null)
+  const [budgetState, budgetAction, budgetPending] = useActionState(upsertBudgetAction, initialBudgetState)
+  const budgetFormRef = useRef<HTMLFormElement>(null)
+  const [confirmDeleteBudgetId, setConfirmDeleteBudgetId] = useState<string | null>(null)
+  const [budgetDeleteMessage, setBudgetDeleteMessage] = useState<BudgetActionState | null>(null)
   const [editingMovement, setEditingMovement] = useState<AdminFinanceMovementRow | null>(null)
   const [editingFee, setEditingFee] = useState<AdminFeeTemplateRow | null>(null)
   const [movementFormType, setMovementFormType] = useState<'ingreso' | 'gasto'>('ingreso')
@@ -629,6 +722,65 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
       setAssignmentAthleteFilter('')
     }
   }, [feeAssignmentState.ok, feeAssignmentState.message])
+
+  useEffect(() => {
+    if (vendorState.ok) {
+      vendorFormRef.current?.reset()
+      setEditingVendor(null)
+    }
+  }, [vendorState.ok, vendorState.message])
+
+  useEffect(() => {
+    if (bankImportState.ok) {
+      bankImportFormRef.current?.reset()
+    }
+  }, [bankImportState.ok, bankImportState.message])
+
+  useEffect(() => {
+    if (budgetState.ok) {
+      budgetFormRef.current?.reset()
+      setEditingBudget(null)
+    }
+  }, [budgetState.ok, budgetState.message])
+
+  async function handleBankAction(
+    id: string,
+    action: 'match' | 'unmatch' | 'ignore' | 'delete',
+    target?: { type: 'movement' | 'payment'; id: string },
+  ) {
+    setBankActionId(id)
+    setBankActionMessage(null)
+    const result =
+      action === 'match' && target
+        ? await matchBankTransactionAction(id, target)
+        : action === 'unmatch'
+          ? await unmatchBankTransactionAction(id)
+          : action === 'ignore'
+            ? await ignoreBankTransactionAction(id)
+            : await deleteBankTransactionAction(id)
+    setBankActionId(null)
+    setBankActionMessage(result)
+  }
+
+  async function handleDeleteBudget(budget: AdminBudgetRow) {
+    setBudgetDeleteMessage(null)
+    const result = await deleteBudgetAction(budget.id)
+    setConfirmDeleteBudgetId(null)
+    setBudgetDeleteMessage(result)
+    if (editingBudget?.id === budget.id) {
+      setEditingBudget(null)
+    }
+  }
+
+  async function handleDeleteVendor(vendor: AdminVendorRow) {
+    setVendorDeleteMessage(null)
+    const result = await deleteVendorAction(vendor.id)
+    setConfirmDeleteVendorId(null)
+    setVendorDeleteMessage(result)
+    if (editingVendor?.id === vendor.id) {
+      setEditingVendor(null)
+    }
+  }
 
   async function handleDeleteMovement(movement: AdminFinanceMovementRow) {
     setDeletePendingId(movement.id)
@@ -1045,6 +1197,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                 const canRefund = payment.estado === 'pagado' && payment.proveedor === 'Stripe' && Boolean(payment.stripePaymentIntentId)
                 const canRetry = payment.estado === 'fallido'
                 const canCancel = payment.estado === 'pendiente' || payment.estado === 'fallido'
+                const canDownloadReceipt = payment.estado === 'pagado'
 
                 return (
                   <article key={payment.id} className="rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20">
@@ -1099,7 +1252,18 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                             Reembolsar
                           </Button>
                         ) : null}
-                        {!canRetry && !canCancel && !canRefund ? (
+                        {canDownloadReceipt ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            nativeButton={false}
+                            render={<a href={`/api/admin/pagos/${payment.id}/recibo`} target="_blank" rel="noreferrer" />}
+                          >
+                            <FileText className="size-3.5" aria-hidden="true" />
+                            Recibo
+                          </Button>
+                        ) : null}
+                        {!canRetry && !canCancel && !canRefund && !canDownloadReceipt ? (
                           <span className="self-center text-xs font-semibold text-muted-foreground">Sin acciones</span>
                         ) : null}
                       </div>
@@ -2197,14 +2361,53 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                       </select>
                     </MovementField>
 
+                    {(editingMovement?.tipo ?? movementFormType) === 'gasto' ? (
+                      <MovementField label="Proveedor opcional">
+                        <select
+                          id="vendorId"
+                          name="vendorId"
+                          defaultValue={editingMovement?.vendorId ?? ''}
+                          className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        >
+                          <option value="">Sin proveedor</option>
+                          {vendors.map((vendor) => (
+                            <option key={vendor.id} value={vendor.id}>
+                              {vendor.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </MovementField>
+                    ) : null}
+
                     <MovementField label="Justificante opcional">
-                      <Input
-                        id="justificanteUrl"
-                        name="justificanteUrl"
-                        type="url"
-                        placeholder="https://..."
-                        defaultValue={editingMovement?.justificanteUrl ?? ''}
-                      />
+                      <div className="space-y-2">
+                        {editingMovement?.justificanteUrl ? (
+                          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+                            <a
+                              href={editingMovement.justificanteUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-black text-primary"
+                            >
+                              Ver justificante actual
+                            </a>
+                            <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                              <input type="checkbox" name="removeReceipt" className="size-4 accent-primary" />
+                              Quitar
+                            </label>
+                          </div>
+                        ) : null}
+                        <input
+                          id="receipt"
+                          name="receipt"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,application/pdf"
+                          className="w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground outline-none file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
+                        />
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          Imagen (JPG, PNG, WEBP) o PDF.{editingMovement ? ' Sube uno nuevo para sustituir el actual.' : ''}
+                        </p>
+                      </div>
                     </MovementField>
                   </div>
                 </FeeFormSection>
@@ -2349,7 +2552,7 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                           </p>
                         </div>
 
-                        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
                           <div className="rounded-lg bg-slate-50 px-3 py-2">
                             <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Temporada</p>
                             <p className="mt-1 truncate font-semibold text-foreground">{movement.temporada}</p>
@@ -2358,6 +2561,12 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
                             <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Fecha</p>
                             <p className="mt-1 font-semibold text-foreground">{movement.fecha}</p>
                           </div>
+                          {movement.tipo === 'gasto' ? (
+                            <div className="rounded-lg bg-slate-50 px-3 py-2">
+                              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Proveedor</p>
+                              <p className="mt-1 truncate font-semibold text-foreground">{movement.vendorName || 'Sin proveedor'}</p>
+                            </div>
+                          ) : null}
                           <div className="rounded-lg bg-slate-50 px-3 py-2">
                             <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-muted-foreground">Justificante</p>
                             {movement.justificanteUrl ? (
@@ -2437,6 +2646,536 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
         </div>
       </section>
       ) : null}
+
+      {activeTab === 'proveedores' ? (
+        <section aria-labelledby="pagos-proveedores" className="space-y-5" role="tabpanel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">Contabilidad del club</p>
+            <h2 id="pagos-proveedores" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+              Proveedores
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Registra a quién le compra o paga el club para poder relacionarlo con los gastos manuales.
+            </p>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+            <Card className="bg-white/88 shadow-sm backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-lg font-black">
+                  {editingVendor ? 'Editar proveedor' : 'Añadir proveedor'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  key={editingVendor?.id ?? 'new-vendor'}
+                  ref={vendorFormRef}
+                  action={vendorAction}
+                  className="space-y-4"
+                >
+                  <input type="hidden" name="id" value={editingVendor?.id ?? ''} />
+                  <FeeFormSection title="Datos del proveedor" description="Identificación y contacto." icon={Landmark}>
+                    <div className="space-y-4">
+                      <MovementField label="Nombre">
+                        <Input name="nombre" placeholder="Ej. Deportes Sanlúcar S.L." defaultValue={editingVendor?.nombre ?? ''} required />
+                      </MovementField>
+                      <MovementField label="CIF/NIF opcional">
+                        <Input name="cif" placeholder="Ej. B12345678" defaultValue={editingVendor?.cif ?? ''} />
+                      </MovementField>
+                      <MovementField label="Persona de contacto">
+                        <Input name="contactoNombre" defaultValue={editingVendor?.contactoNombre ?? ''} />
+                      </MovementField>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <MovementField label="Email">
+                          <Input name="contactoEmail" type="email" defaultValue={editingVendor?.contactoEmail ?? ''} />
+                        </MovementField>
+                        <MovementField label="Teléfono">
+                          <Input name="contactoTelefono" defaultValue={editingVendor?.contactoTelefono ?? ''} />
+                        </MovementField>
+                      </div>
+                      <MovementField label="Notas opcionales">
+                        <textarea
+                          name="notas"
+                          rows={3}
+                          defaultValue={editingVendor?.notas ?? ''}
+                          className="w-full resize-none rounded-lg border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        />
+                      </MovementField>
+                      <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <input
+                          type="checkbox"
+                          name="activo"
+                          defaultChecked={editingVendor?.activo ?? true}
+                          className="size-4 accent-primary"
+                        />
+                        Proveedor activo
+                      </label>
+                    </div>
+                  </FeeFormSection>
+
+                  {vendorState.message && !vendorState.ok ? (
+                    <p className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700">
+                      {vendorState.message}
+                    </p>
+                  ) : null}
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {editingVendor ? (
+                      <Button type="button" variant="outline" onClick={() => setEditingVendor(null)}>
+                        Cancelar edición
+                      </Button>
+                    ) : null}
+                    <Button type="submit" disabled={vendorPending} className={editingVendor ? '' : 'sm:col-span-2'}>
+                      {vendorPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+                      {editingVendor ? 'Guardar cambios' : 'Añadir proveedor'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  value={vendorSearch}
+                  onChange={(event) => setVendorSearch(event.target.value)}
+                  placeholder="Buscar proveedor por nombre o CIF..."
+                  className="pl-9"
+                />
+              </div>
+
+              {vendorDeleteMessage?.message ? (
+                <p
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm font-semibold',
+                    vendorDeleteMessage.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+                  )}
+                >
+                  {vendorDeleteMessage.message}
+                </p>
+              ) : null}
+
+              <div className="grid gap-3">
+                {vendors
+                  .filter((vendor) => {
+                    const q = vendorSearch.trim().toLowerCase()
+                    if (!q) return true
+                    return vendor.nombre.toLowerCase().includes(q) || vendor.cif.toLowerCase().includes(q)
+                  })
+                  .map((vendor) => (
+                    <article key={vendor.id} className="rounded-xl border border-border bg-white p-4 shadow-sm transition-colors hover:border-primary/25 hover:bg-blue-50/20">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={cn(
+                                'rounded-full px-2.5 py-1 text-xs font-black',
+                                vendor.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground',
+                              )}
+                            >
+                              {vendor.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                            {vendor.cif ? (
+                              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{vendor.cif}</span>
+                            ) : null}
+                          </div>
+                          <p className="mt-3 text-lg font-black leading-tight text-foreground">{vendor.nombre}</p>
+                          {vendor.contactoNombre || vendor.contactoEmail || vendor.contactoTelefono ? (
+                            <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                              {[vendor.contactoNombre, vendor.contactoEmail, vendor.contactoTelefono].filter(Boolean).join(' · ')}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Gastos vinculados</p>
+                          <p className="mt-1 text-2xl font-black text-foreground">{formatEuro(vendor.gastosTotal)}</p>
+                          <p className="mt-1 text-xs font-semibold text-muted-foreground">{vendor.gastosCount} movimiento(s)</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex justify-end gap-1 border-t border-border pt-3">
+                        {confirmDeleteVendorId === vendor.id ? (
+                          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 p-2">
+                            <span className="text-xs font-semibold text-rose-700">¿Eliminar proveedor?</span>
+                            <Button type="button" size="sm" variant="destructive" onClick={() => handleDeleteVendor(vendor)}>
+                              Sí, eliminar
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => setConfirmDeleteVendorId(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setEditingVendor(vendor)}>
+                              <Pencil className="size-3.5" aria-hidden="true" />
+                              Editar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => setConfirmDeleteVendorId(vendor.id)}
+                            >
+                              <Trash2 className="size-3.5" aria-hidden="true" />
+                              Eliminar
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                {vendors.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
+                    Aún no hay proveedores registrados.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === 'conciliacion' ? (
+        <section aria-labelledby="pagos-conciliacion" className="space-y-5" role="tabpanel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">Contabilidad del club</p>
+            <h2 id="pagos-conciliacion" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+              Conciliación bancaria
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Importa el extracto de tu cuenta y vincula cada movimiento con un cobro o un apunte manual ya registrado.
+            </p>
+          </div>
+
+          <Card className="bg-white/88 shadow-sm backdrop-blur">
+            <CardHeader>
+              <CardTitle className="text-lg font-black">Importar extracto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form ref={bankImportFormRef} action={bankImportAction} className="space-y-3">
+                <MovementField label="Movimientos (uno por línea: fecha,descripción,importe)">
+                  <textarea
+                    name="csvText"
+                    rows={5}
+                    placeholder={'2026-07-01,Transferencia cuota socios,120.00\n2026-07-03,Pago material deportivo,-85.50'}
+                    className="w-full resize-none rounded-lg border border-input bg-white px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  />
+                </MovementField>
+                <p className="text-xs font-semibold text-muted-foreground">
+                  Formato: fecha (AAAA-MM-DD), descripción, importe (positivo para ingresos, negativo para gastos). Exporta este formato desde la banca online de tu banco.
+                </p>
+                {bankImportState.message ? (
+                  <p
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-sm font-semibold',
+                      bankImportState.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+                    )}
+                  >
+                    {bankImportState.message}
+                  </p>
+                ) : null}
+                <Button type="submit" disabled={bankImportPending}>
+                  {bankImportPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+                  Importar movimientos
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {(['unmatched', 'matched', 'ignored', 'todos'] as const).map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setBankStatusFilter(status)}
+                className={cn(
+                  'rounded-full px-3 py-1.5 text-xs font-black transition-colors',
+                  bankStatusFilter === status ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                )}
+              >
+                {status === 'unmatched' ? 'Sin conciliar' : status === 'matched' ? 'Conciliados' : status === 'ignored' ? 'Ignorados' : 'Todos'}
+              </button>
+            ))}
+          </div>
+
+          {bankActionMessage?.message && !bankActionMessage.ok ? (
+            <p className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700">{bankActionMessage.message}</p>
+          ) : null}
+
+          <div className="grid gap-3">
+            {bankTransactions
+              .filter((bt) => bankStatusFilter === 'todos' || bt.estado === bankStatusFilter)
+              .map((bt) => {
+                const search = bankMatchSearchByRow[bt.id] ?? ''
+                const candidates = bt.estado === 'unmatched' ? getBankTransactionCandidates(bt, financeMovements, payments, search) : []
+
+                return (
+                  <article key={bt.id} className="rounded-xl border border-border bg-white p-4 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              'rounded-full px-2.5 py-1 text-xs font-black',
+                              bt.estado === 'matched'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : bt.estado === 'ignored'
+                                  ? 'bg-muted text-muted-foreground'
+                                  : 'bg-amber-100 text-amber-700',
+                            )}
+                          >
+                            {bt.estado === 'matched' ? 'Conciliado' : bt.estado === 'ignored' ? 'Ignorado' : 'Sin conciliar'}
+                          </span>
+                          <span className="text-xs font-semibold text-muted-foreground">{bt.fecha}</span>
+                        </div>
+                        <p className="mt-2 text-base font-black text-foreground">{bt.descripcion}</p>
+                        {bt.estado === 'matched' ? (
+                          <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+                            <Link2 className="size-3.5" aria-hidden="true" />
+                            Vinculado a: {bt.matchedMovementConcepto ?? bt.matchedPaymentConcepto ?? 'registro contable'}
+                          </p>
+                        ) : null}
+                      </div>
+                      <p className={cn('text-xl font-black', bt.importe >= 0 ? 'text-emerald-700' : 'text-amber-700')}>
+                        {formatEuro(bt.importe)}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap justify-end gap-1 border-t border-border pt-3">
+                      {bt.estado === 'matched' ? (
+                        <Button type="button" size="sm" variant="outline" disabled={bankActionId === bt.id} onClick={() => handleBankAction(bt.id, 'unmatch')}>
+                          <Link2Off className="size-3.5" aria-hidden="true" />
+                          Deshacer
+                        </Button>
+                      ) : null}
+                      {bt.estado === 'unmatched' ? (
+                        <Button type="button" size="sm" variant="outline" disabled={bankActionId === bt.id} onClick={() => handleBankAction(bt.id, 'ignore')}>
+                          Ignorar
+                        </Button>
+                      ) : null}
+                      <Button type="button" size="sm" variant="destructive" disabled={bankActionId === bt.id} onClick={() => handleBankAction(bt.id, 'delete')}>
+                        {bankActionId === bt.id ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="size-3.5" aria-hidden="true" />}
+                        Eliminar
+                      </Button>
+                    </div>
+
+                    {bt.estado === 'unmatched' ? (
+                      <div className="mt-3 rounded-lg bg-muted/35 p-3">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                          <Input
+                            value={search}
+                            onChange={(event) => setBankMatchSearchByRow((prev) => ({ ...prev, [bt.id]: event.target.value }))}
+                            placeholder="Buscar un cobro o movimiento para vincular..."
+                            className="h-9 bg-white pl-9 text-sm"
+                          />
+                        </div>
+                        <div className="mt-2 grid gap-1.5">
+                          {candidates.length === 0 ? (
+                            <p className="px-1 py-1 text-xs font-semibold text-muted-foreground">
+                              {search ? 'No hay coincidencias con esa búsqueda.' : 'Sin sugerencias automáticas por importe. Busca manualmente.'}
+                            </p>
+                          ) : (
+                            candidates.map((candidate) => (
+                              <div
+                                key={`${candidate.type}-${candidate.id}`}
+                                className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-border"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate font-black text-foreground">{candidate.label}</p>
+                                  <p className="truncate text-xs font-semibold text-muted-foreground">{candidate.detail}</p>
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <span className={cn('font-black', candidate.closeAmount ? 'text-emerald-700' : 'text-muted-foreground')}>
+                                    {formatEuro(candidate.importe)}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={bankActionId === bt.id}
+                                    onClick={() => handleBankAction(bt.id, 'match', { type: candidate.type, id: candidate.id })}
+                                  >
+                                    Vincular
+                                  </Button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </article>
+                )
+              })}
+            {bankTransactions.filter((bt) => bankStatusFilter === 'todos' || bt.estado === bankStatusFilter).length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
+                No hay movimientos bancarios en este estado.
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === 'presupuesto' ? (
+        <section aria-labelledby="pagos-presupuesto" className="space-y-5" role="tabpanel">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-primary">Contabilidad del club</p>
+            <h2 id="pagos-presupuesto" className="mt-2 text-2xl font-black tracking-tight text-foreground">
+              Presupuesto vs. real
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-muted-foreground">
+              Fija un presupuesto por categoría y temporada, y compáralo con lo realmente ingresado o gastado.
+            </p>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+            <Card className="bg-white/88 shadow-sm backdrop-blur">
+              <CardHeader>
+                <CardTitle className="text-lg font-black">
+                  {editingBudget ? 'Editar presupuesto' : 'Añadir presupuesto'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  key={editingBudget?.id ?? 'new-budget'}
+                  ref={budgetFormRef}
+                  action={budgetAction}
+                  className="space-y-4"
+                >
+                  <input type="hidden" name="id" value={editingBudget?.id ?? ''} />
+                  <MovementField label="Temporada">
+                    <select
+                      name="seasonId"
+                      defaultValue={editingBudget?.seasonId ?? seasons.find((s) => s.isActive)?.id ?? seasons[0]?.id ?? ''}
+                      className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {seasons.map((season) => (
+                        <option key={season.id} value={season.id}>{season.nombre}</option>
+                      ))}
+                    </select>
+                  </MovementField>
+                  <MovementField label="Tipo">
+                    <select
+                      name="tipo"
+                      defaultValue={editingBudget?.tipo ?? 'gasto'}
+                      className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      <option value="ingreso">Ingreso</option>
+                      <option value="gasto">Gasto</option>
+                    </select>
+                  </MovementField>
+                  <MovementField label="Categoría">
+                    <select
+                      name="categoria"
+                      defaultValue={editingBudget?.categoria ?? ''}
+                      className="h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {[...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES]
+                        .filter((category, index, all) => all.indexOf(category) === index)
+                        .map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                    </select>
+                  </MovementField>
+                  <MovementField label="Presupuesto (€)">
+                    <Input name="importe" type="number" min="0.01" step="0.01" defaultValue={editingBudget ? String(editingBudget.presupuesto) : ''} required />
+                  </MovementField>
+
+                  {budgetState.message && !budgetState.ok ? (
+                    <p className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700">{budgetState.message}</p>
+                  ) : null}
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {editingBudget ? (
+                      <Button type="button" variant="outline" onClick={() => setEditingBudget(null)}>
+                        Cancelar edición
+                      </Button>
+                    ) : null}
+                    <Button type="submit" disabled={budgetPending} className={editingBudget ? '' : 'sm:col-span-2'}>
+                      {budgetPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+                      {editingBudget ? 'Guardar cambios' : 'Añadir presupuesto'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-3">
+              {budgetDeleteMessage?.message ? (
+                <p
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm font-semibold',
+                    budgetDeleteMessage.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+                  )}
+                >
+                  {budgetDeleteMessage.message}
+                </p>
+              ) : null}
+
+              {budgets.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-white/70 p-6 text-center text-sm text-muted-foreground">
+                  Aún no hay presupuestos configurados.
+                </div>
+              ) : (
+                budgets.map((budget) => {
+                  const percent = budget.presupuesto > 0 ? Math.round((budget.real / budget.presupuesto) * 100) : 0
+                  const isExpenseOver = budget.tipo === 'gasto' && percent > 100
+                  const isIncomeUnder = budget.tipo === 'ingreso' && percent < 100
+
+                  return (
+                    <article key={budget.id} className="rounded-xl border border-border bg-white p-4 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={cn('rounded-full px-2.5 py-1 text-xs font-black', budget.tipo === 'ingreso' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                              {budget.tipo === 'ingreso' ? 'Ingreso' : 'Gasto'}
+                            </span>
+                            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{budget.temporada}</span>
+                          </div>
+                          <p className="mt-2 text-lg font-black text-foreground">{budget.categoria}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button type="button" size="icon-sm" variant="ghost" aria-label={`Editar ${budget.categoria}`} onClick={() => setEditingBudget(budget)}>
+                            <Pencil className="size-4" aria-hidden="true" />
+                          </Button>
+                          {confirmDeleteBudgetId === budget.id ? (
+                            <div className="flex items-center gap-1">
+                              <Button type="button" size="sm" variant="destructive" onClick={() => handleDeleteBudget(budget)}>Sí</Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => setConfirmDeleteBudgetId(null)}>No</Button>
+                            </div>
+                          ) : (
+                            <Button type="button" size="icon-sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label={`Eliminar ${budget.categoria}`} onClick={() => setConfirmDeleteBudgetId(budget.id)}>
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between text-sm font-semibold text-muted-foreground">
+                        <span>Real: <span className="text-foreground">{formatEuro(budget.real)}</span></span>
+                        <span>Presupuesto: <span className="text-foreground">{formatEuro(budget.presupuesto)}</span></span>
+                      </div>
+                      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn('h-full rounded-full', isExpenseOver ? 'bg-rose-500' : isIncomeUnder ? 'bg-amber-400' : 'bg-emerald-500')}
+                          style={{ width: `${Math.min(100, percent)}%` }}
+                        />
+                      </div>
+                      <p className={cn('mt-1.5 text-xs font-black', isExpenseOver ? 'text-rose-600' : 'text-muted-foreground')}>
+                        {percent}% {budget.tipo === 'gasto' ? 'del presupuesto gastado' : 'del objetivo alcanzado'}
+                        {isExpenseOver ? ' · presupuesto superado' : ''}
+                      </p>
+                    </article>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <AdminErrorDialog
         message={
           (paymentMessage?.message && !paymentMessage.ok ? paymentMessage.message : null) ??
@@ -2444,12 +3183,16 @@ export function AdminPaymentsClient({ payments, financeMovements, enrollments, f
           (feeState.message && !feeState.ok ? feeState.message : null) ??
           (feeDeleteMessage?.message && !feeDeleteMessage.ok ? feeDeleteMessage.message : null) ??
           (movementState.message && !movementState.ok ? movementState.message : null) ??
-          (deleteMessage?.message && !deleteMessage.ok ? deleteMessage.message : null)
+          (deleteMessage?.message && !deleteMessage.ok ? deleteMessage.message : null) ??
+          (vendorDeleteMessage?.message && !vendorDeleteMessage.ok ? vendorDeleteMessage.message : null) ??
+          (budgetDeleteMessage?.message && !budgetDeleteMessage.ok ? budgetDeleteMessage.message : null)
         }
         onClose={() => {
           setPaymentMessage(null)
           setFeeDeleteMessage(null)
           setDeleteMessage(null)
+          setVendorDeleteMessage(null)
+          setBudgetDeleteMessage(null)
         }}
       />
     </div>

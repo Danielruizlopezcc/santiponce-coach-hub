@@ -5,7 +5,7 @@ import { requireUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import {
-  getEnrollmentAmountCents,
+  getEnrollmentAmountCentsForCategory,
   getMembershipAmountCents,
   getSiteUrl,
   getStripeClient,
@@ -232,7 +232,7 @@ export async function createEnrollmentCheckoutAction(athleteId: string): Promise
 
     const { data: athlete } = await supabase
       .from('athletes')
-      .select('id, first_name, last_name, status, season_id')
+      .select('id, first_name, last_name, status, season_id, requested_category_id')
       .eq('id', athleteId)
       .eq('guardian_id', guardian.id)
       .maybeSingle()
@@ -251,7 +251,7 @@ export async function createEnrollmentCheckoutAction(athleteId: string): Promise
     ])
 
     const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim()
-    const enrollmentAmountCents = await getEnrollmentAmountCents()
+    const enrollmentAmountCents = await getEnrollmentAmountCentsForCategory(athlete.requested_category_id)
     const paymentId = await findOrCreatePendingPayment({
       userId: user.id,
       guardianId: guardian.id,

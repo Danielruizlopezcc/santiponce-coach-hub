@@ -19,6 +19,7 @@ export type PrivateAthleteSummary = {
   categoriaSolicitada: string
   equipoAsignado: string | null
   estado: 'pendiente' | 'matriculado' | 'en_revision'
+  importeMatricula: number
 }
 
 export type PrivateAthleteDetail = PrivateAthleteSummary & {

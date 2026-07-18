@@ -1,17 +1,31 @@
 import { PageContainer } from '@/components/page-container'
 import {
   getAdminAthletes,
+  getAdminBankTransactions,
+  getAdminBudgets,
   getAdminEnrollments,
   getAdminFeeTemplates,
   getAdminFinanceMovements,
   getAdminPayments,
   getAdminSeasons,
   getAdminTutorFeeAssignments,
+  getAdminVendors,
 } from '@/lib/admin-app'
 import { AdminPaymentsClient } from './payments-client'
 
 export default async function AdminPagosPage() {
-  const [payments, financeMovements, enrollments, feeTemplates, seasons, feeAssignments, athletes] = await Promise.all([
+  const [
+    payments,
+    financeMovements,
+    enrollments,
+    feeTemplates,
+    seasons,
+    feeAssignments,
+    athletes,
+    vendors,
+    bankTransactions,
+    budgets,
+  ] = await Promise.all([
     getAdminPayments(),
     getAdminFinanceMovements(),
     getAdminEnrollments(),
@@ -19,6 +33,9 @@ export default async function AdminPagosPage() {
     getAdminSeasons(),
     getAdminTutorFeeAssignments(),
     getAdminAthletes(),
+    getAdminVendors(),
+    getAdminBankTransactions(),
+    getAdminBudgets(),
   ])
 
   return (
@@ -35,6 +52,9 @@ export default async function AdminPagosPage() {
         seasons={seasons}
         feeAssignments={feeAssignments}
         athletes={athletes}
+        vendors={vendors}
+        bankTransactions={bankTransactions}
+        budgets={budgets}
       />
     </PageContainer>
   )

@@ -254,7 +254,6 @@ export default async function AdminDashboardPage() {
   const totalDeportistas = Math.max(1, data.summary.deportistas)
   const maxCategoria = Math.max(1, ...data.athletesByCategory.map((item) => item.total))
   const maxEquipo = Math.max(1, ...data.athletesByTeam.map((item) => item.total))
-  const ingresosRecientes = data.recentPayments.reduce((total, payment) => total + payment.importe, 0)
 
   return (
     <PageContainer
@@ -371,13 +370,17 @@ export default async function AdminDashboardPage() {
                 { label: 'Matrículas', href: '/admin/matriculas' },
               ]}
             >
-              <ModuleMetric label="Ingresos" value={moneyFormatter.format(ingresosRecientes)} />
-              <ModuleMetric label="Socios activos" value={data.summary.sociosActivos} />
               <ModuleMetric
-                label="Pagos recientes"
-                value={data.recentPayments.length}
-                detail="Confirmados en el resumen"
+                label="Ingresos totales"
+                value={moneyFormatter.format(data.finance.ingresosTotales)}
+                detail="Pagos cobrados + ingresos manuales confirmados"
               />
+              <ModuleMetric
+                label="Balance"
+                value={moneyFormatter.format(data.finance.balance)}
+                detail={`Gastos: ${moneyFormatter.format(data.finance.gastosTotales)}`}
+              />
+              <ModuleMetric label="Socios activos" value={data.summary.sociosActivos} />
             </ModuleCard>
 
             <ModuleCard

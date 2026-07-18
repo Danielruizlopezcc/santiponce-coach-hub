@@ -100,3 +100,54 @@ export async function confirmStripeCheckoutSessionPayment(session: Stripe.Checko
 
   return { confirmed: true, userId: payment.user_id }
 }
+
+type RefundablePayment = {
+  id: string
+  status: 'pending' | 'paid' | 'canceled' | 'failed' | 'refunded'
+  metadata: Record<string, unknown> | null
+}
+
+// No-ops if already refunded, since this event also fires for refunds the admin panel itself triggered.
+export async function confirmStripeChargeRefunded(charge: Stripe.Charge) {
+  const paymentIntentId =
+    typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id ?? null
+  if (!paymentIntentId) return { confirmed: false }
+
+  const supabase = createAdminClient()
+  const { data: payment, error } = await supabase
+    .from('payments')
+    .select('id, status, metadata')
+    .eq('stripe_payment_intent_id', paymentIntentId)
+    .maybeSingle<RefundablePayment>()
+
+  if (error) throw new Error(error.message)
+  if (!payment || payment.status === 'refunded') return { confirmed: false }
+
+  const latestRefund = charge.refunds?.data?.[0] ?? null
+
+  const { error: updateError } = await supabase
+    .from('payments')
+    .update({
+      status: 'refunded',
+      metadata: {
+        ...(payment.metadata ?? {}),
+        refund_id: latestRefund?.id ?? null,
+        refund_status: latestRefund?.status ?? charge.status,
+        refunded_from_stripe_dashboard: true,
+      },
+    })
+    .eq('id', payment.id)
+
+  if (updateError) throw new Error(updateError.message)
+
+  await supabase.from('admin_audit_logs').insert({
+    actor_user_id: null,
+    action: 'payment.refund_webhook',
+    entity_type: 'payment',
+    entity_id: payment.id,
+    summary: 'Un reembolso de Stripe (originado fuera del panel) se sincronizó automáticamente.',
+    metadata: { stripeChargeId: charge.id, stripePaymentIntentId: paymentIntentId },
+  })
+
+  return { confirmed: true, paymentId: payment.id }
+}

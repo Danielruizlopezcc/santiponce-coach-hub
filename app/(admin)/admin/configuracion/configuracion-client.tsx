@@ -55,9 +55,17 @@ function ConfigSection({
   )
 }
 
-function ConfigField({ label, children }: { label: string; children: ReactNode }) {
+function ConfigField({
+  label,
+  children,
+  className,
+}: {
+  label: string
+  children: ReactNode
+  className?: string
+}) {
   return (
-    <label className="grid gap-2 text-sm font-semibold text-foreground">
+    <label className={cn('grid gap-2 text-sm font-semibold text-foreground', className)}>
       {label}
       {children}
     </label>
@@ -142,6 +150,27 @@ export function ConfiguracionClient({ data }: { data: AdminConfigData }) {
               </ConfigField>
               <ConfigField label="Teléfono de contacto">
                 <Input name="contactPhone" defaultValue={data.settings.contactPhone} />
+              </ConfigField>
+            </div>
+          </ConfigSection>
+
+          <ConfigSection
+            title="Datos fiscales"
+            description="Identificación legal del club para recibos, facturas y trámites administrativos."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <ConfigField label="CIF / NIF">
+                <Input name="clubTaxId" placeholder="Ej. G12345678" defaultValue={data.settings.clubTaxId} />
+              </ConfigField>
+              <ConfigField label="Nº de registro de entidad deportiva">
+                <Input name="clubRegistryNumber" placeholder="Ej. RAD/12345" defaultValue={data.settings.clubRegistryNumber} />
+              </ConfigField>
+              <ConfigField label="Dirección fiscal" className="md:col-span-2">
+                <Input
+                  name="clubFiscalAddress"
+                  placeholder="Calle, número, código postal, ciudad, provincia"
+                  defaultValue={data.settings.clubFiscalAddress}
+                />
               </ConfigField>
             </div>
           </ConfigSection>

@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminAuditLog } from '@/lib/audit'
 import { requireAdminAction } from '@/lib/auth'
-import { getAdminSettings } from '@/lib/admin-app'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getEnrollmentAmountCentsForCategory } from '@/lib/stripe'
 
 async function getAdminSupabase() {
   const admin = await requireAdminAction()
@@ -15,7 +15,7 @@ export async function confirmPaymentAction(athleteId: string): Promise<void> {
   const { admin, supabase } = await getAdminSupabase()
   const { data: athlete, error: athleteError } = await supabase
     .from('athletes')
-    .select('id, guardian_id, season_id')
+    .select('id, guardian_id, season_id, requested_category_id')
     .eq('id', athleteId)
     .maybeSingle()
 
@@ -35,7 +35,7 @@ export async function confirmPaymentAction(athleteId: string): Promise<void> {
     .eq('id', athleteId)
   if (error) throw new Error(error.message)
 
-  const settings = await getAdminSettings()
+  const enrollmentAmountCents = await getEnrollmentAmountCentsForCategory(athlete.requested_category_id)
 
   await supabase.from('payments').insert({
     user_id: guardian.user_id,
@@ -45,7 +45,7 @@ export async function confirmPaymentAction(athleteId: string): Promise<void> {
     payment_type: 'enrollment',
     provider: 'manual',
     status: 'paid',
-    amount_cents: Math.round(settings.enrollmentFeeEuros * 100),
+    amount_cents: enrollmentAmountCents,
     currency: 'eur',
     description: 'Confirmación manual de matrícula',
     metadata: { source: 'admin-manual-confirmation' },

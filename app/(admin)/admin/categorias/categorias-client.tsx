@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageContainer } from '@/components/page-container'
 import { cn } from '@/lib/utils'
+import { formatEuro } from '@/lib/format'
 import type { AdminCategoryRow } from '@/lib/admin-app'
 import { createCategory, deleteCategory, updateCategory } from './actions'
 
@@ -17,9 +18,10 @@ type SheetMode = 'create' | 'edit'
 type CategoriasClientProps = {
   categories: AdminCategoryRow[]
   embedded?: boolean
+  globalEnrollmentFeeEuros?: number
 }
 
-export function CategoriasClient({ categories, embedded = false }: CategoriasClientProps) {
+export function CategoriasClient({ categories, embedded = false, globalEnrollmentFeeEuros }: CategoriasClientProps) {
   const [isPending, startTransition] = useTransition()
   const [sheetOpen, setSheetOpen]       = useState(false)
   const [mode, setMode]                 = useState<SheetMode>('create')
@@ -31,6 +33,7 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
   const [name, setName]           = useState('')
   const [sortOrder, setSortOrder] = useState('')
   const [isActive, setIsActive]   = useState(true)
+  const [enrollmentFee, setEnrollmentFee] = useState('')
 
   function openCreate() {
     setMode('create')
@@ -38,6 +41,7 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
     setName('')
     setSortOrder(String(categories.length + 1))
     setIsActive(true)
+    setEnrollmentFee('')
     setFormError(null)
     setSheetOpen(true)
   }
@@ -48,6 +52,7 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
     setName(cat.nombre)
     setSortOrder(String(cat.orden))
     setIsActive(cat.estado === 'Activa')
+    setEnrollmentFee(cat.importeMatricula != null ? String(cat.importeMatricula) : '')
     setFormError(null)
     setSheetOpen(true)
   }
@@ -57,14 +62,20 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
     const order = parseInt(sortOrder, 10)
     if (!trimmed) { setFormError('El nombre es obligatorio.'); return }
     if (isNaN(order) || order < 1) { setFormError('El orden debe ser un número mayor que 0.'); return }
+    const trimmedFee = enrollmentFee.trim()
+    let fee: number | null = null
+    if (trimmedFee) {
+      fee = Number(trimmedFee)
+      if (!Number.isFinite(fee) || fee <= 0) { setFormError('El precio de matrícula debe ser mayor que 0.'); return }
+    }
     setFormError(null)
 
     startTransition(async () => {
       try {
         if (mode === 'create') {
-          await createCategory(trimmed, order, isActive)
+          await createCategory(trimmed, order, isActive, fee)
         } else if (editing) {
-          await updateCategory(editing.id, trimmed, order, isActive)
+          await updateCategory(editing.id, trimmed, order, isActive, fee)
         }
         setSheetOpen(false)
       } catch (e) {
@@ -144,6 +155,12 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
                       <p className="text-xs font-black uppercase text-muted-foreground">Visibilidad</p>
                       <p className="mt-2 text-lg font-black text-foreground">
                         {cat.estado === 'Activa' ? 'Disponible' : 'Borrador'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50/70 p-3 ring-1 ring-emerald-100 sm:col-span-2">
+                      <p className="text-xs font-black uppercase text-muted-foreground">Precio de matrícula</p>
+                      <p className="mt-2 text-lg font-black text-foreground">
+                        {cat.importeMatricula != null ? formatEuro(cat.importeMatricula) : 'Precio global'}
                       </p>
                     </div>
                   </div>
@@ -259,6 +276,29 @@ export function CategoriasClient({ categories, embedded = false }: CategoriasCli
                     className="size-4 rounded border-border accent-primary"
                   />
                 </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl bg-white p-4 ring-1 ring-foreground/10">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Precio de matrícula</p>
+              <div className="mt-3 flex flex-col gap-1.5">
+                <Label htmlFor="cat-fee">Importe para esta categoría (€, opcional)</Label>
+                <Input
+                  id="cat-fee"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={enrollmentFee}
+                  onChange={(e) => setEnrollmentFee(e.target.value)}
+                  placeholder={
+                    globalEnrollmentFeeEuros != null
+                      ? `Vacío = precio global (${formatEuro(globalEnrollmentFeeEuros)})`
+                      : 'Vacío = usa el precio global'
+                  }
+                />
+                <p className="text-xs font-semibold text-muted-foreground">
+                  Déjalo vacío para que esta categoría use el precio de matrícula general configurado en Ajustes.
+                </p>
               </div>
             </section>
           </div>

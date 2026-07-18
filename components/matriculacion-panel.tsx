@@ -57,8 +57,8 @@ export function MatriculacionPanel({
           <div className="max-w-2xl">
             <h2 className="text-xl font-semibold text-foreground">Matriculación</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              La matrícula cuesta {formatEuro(importe)} por deportista para la
-              temporada {temporada}.
+              La matrícula es individual por deportista para la temporada {temporada}. El precio
+              depende de la categoría solicitada de cada deportista.
             </p>
             <ul className="mt-4 grid gap-2 text-sm text-muted-foreground">
               <li>La matrícula es individual por deportista.</li>
@@ -68,12 +68,12 @@ export function MatriculacionPanel({
           </div>
 
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-            <p className="font-semibold text-foreground">Precio visible</p>
+            <p className="font-semibold text-foreground">Precio orientativo</p>
             <p className="mt-1 text-2xl font-bold text-primary">
               {formatEuro(importe)}
             </p>
             <p className="mt-2 text-muted-foreground">
-              El estado de la matrícula se actualizará automáticamente al completar el pago.
+              El precio exacto de cada deportista aparece junto a su nombre al elegirlo.
             </p>
           </div>
         </div>
@@ -188,7 +188,7 @@ export function MatriculacionPanel({
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-sm">
                           <span className="inline-flex items-center gap-2 text-foreground">
                             <CreditCard className="size-4 text-primary" aria-hidden="true" />
-                            Precio: {formatEuro(importe)}
+                            Precio: {formatEuro(deportista.importeMatricula)}
                           </span>
                           {disabled ? (
                             <span className="inline-flex items-center gap-2 text-emerald-700">

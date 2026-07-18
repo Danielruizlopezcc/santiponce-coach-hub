@@ -245,6 +245,45 @@ export async function cancelTutorFeeStripeSchedule({
   }
 }
 
+// Reconciles subscriptions canceled outside the admin panel (Stripe Dashboard, dunning
+// exhausted, etc). The panel's own cancel action deletes the assignment row directly and
+// never reaches here; this is the safety net for everything that doesn't go through it.
+export async function handleTutorFeeSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const supabase = createAdminClient()
+  const { data: assignment, error } = await supabase
+    .from('tutor_fee_assignments')
+    .select('id, status')
+    .eq('stripe_subscription_id', subscription.id)
+    .maybeSingle<{ id: string; status: string }>()
+
+  if (error) throw new Error(error.message)
+  if (!assignment || assignment.status !== 'active') return
+
+  const { error: updateError } = await supabase
+    .from('tutor_fee_assignments')
+    .update({ status: 'canceled' })
+    .eq('id', assignment.id)
+
+  if (updateError) throw new Error(updateError.message)
+
+  const { error: chargesError } = await supabase
+    .from('tutor_fee_charges')
+    .update({ status: 'canceled' })
+    .eq('assignment_id', assignment.id)
+    .eq('status', 'scheduled')
+
+  if (chargesError) throw new Error(chargesError.message)
+
+  await supabase.from('admin_audit_logs').insert({
+    actor_user_id: null,
+    action: 'tutor_fee.subscription_canceled_webhook',
+    entity_type: 'tutor_fee_assignment',
+    entity_id: assignment.id,
+    summary: 'Una suscripción de Stripe (cancelada fuera del panel) se sincronizó automáticamente.',
+    metadata: { stripeSubscriptionId: subscription.id },
+  })
+}
+
 function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice) {
   const invoiceWithSubscription = invoice as Stripe.Invoice & {
     subscription?: string | Stripe.Subscription | null

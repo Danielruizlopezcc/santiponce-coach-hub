@@ -143,6 +143,7 @@ export type AdminCategoryRow = {
   nombre: string
   orden: number
   estado: 'Activa' | 'Borrador'
+  importeMatricula: number | null
 }
 
 export type AdminTeamRow = {
@@ -344,8 +345,23 @@ export type AdminFinanceMovementRow = {
   seasonId: string | null
   temporada: string
   justificanteUrl: string
+  vendorId: string | null
+  vendorName: string
   importe: number
   fecha: string
+}
+
+export type AdminVendorRow = {
+  id: string
+  nombre: string
+  cif: string
+  contactoNombre: string
+  contactoEmail: string
+  contactoTelefono: string
+  notas: string
+  activo: boolean
+  gastosCount: number
+  gastosTotal: number
 }
 
 export type AdminFeeTemplateRow = {
@@ -455,6 +471,9 @@ export type AdminSettings = {
   registrationOpen: boolean
   contactEmail: string
   contactPhone: string
+  clubTaxId: string
+  clubFiscalAddress: string
+  clubRegistryNumber: string
 }
 
 export type AdminConfigData = {
@@ -464,8 +483,15 @@ export type AdminConfigData = {
   activeSeasonId: string
 }
 
+export type AdminFinanceSummary = {
+  ingresosTotales: number
+  gastosTotales: number
+  balance: number
+}
+
 export type AdminDashboardData = {
   summary: AdminSummary
+  finance: AdminFinanceSummary
   athletesByCategory: AdminCategoryBreakdown[]
   athletesByTeam: AdminTeamBreakdown[]
   recentPayments: AdminRecentPayment[]
@@ -503,9 +529,12 @@ type AdminFinanceMovementRecord = {
   status: 'confirmed' | 'pending' | 'void'
   season_id: string | null
   receipt_url: string | null
+  vendor_id: string | null
   amount_cents: number
   recorded_at: string
 }
+
+type AdminFinanceMovementSummaryRecord = Pick<AdminFinanceMovementRecord, 'id' | 'movement_type' | 'status' | 'amount_cents'>
 
 type AdminFeeTemplateRecord = {
   id: string
@@ -593,6 +622,7 @@ async function getAdminCollections() {
     sponsors,
     news,
     coachTeamAssignments,
+    financeMovements,
   ] = await Promise.all([
     read(
       () => supabase
@@ -611,7 +641,7 @@ async function getAdminCollections() {
         ),
       'athletes',
     ),
-    read(() => supabase.from('categories').select('id, name, sort_order, is_active'), 'categories'),
+    read(() => supabase.from('categories').select('id, name, sort_order, is_active, enrollment_fee_cents'), 'categories'),
     read(() => supabase.from('teams').select('id, name, category_id, season_id, is_active, notes'), 'teams'),
     read(() => supabase.from('seasons').select('id, name, starts_at, ends_at, is_active'), 'seasons'),
     read(
@@ -633,6 +663,10 @@ async function getAdminCollections() {
     read(() => supabase.from('sponsors').select('id, is_active'), 'sponsors'),
     read(() => supabase.from('news').select('id'), 'news'),
     read(() => supabase.from('coach_team_assignments').select('coach_user_id, team_id'), 'coach_team_assignments'),
+    read(
+      () => supabase.from('admin_finance_movements').select('id, movement_type, status, amount_cents'),
+      'admin_finance_movements',
+    ),
   ])
 
   const guardiansWithApproval = await supabase
@@ -663,6 +697,7 @@ async function getAdminCollections() {
     sponsors: sponsors ?? [],
     news: news ?? [],
     coachTeamAssignments: coachTeamAssignments ?? [],
+    financeMovements: (financeMovements ?? []) as AdminFinanceMovementSummaryRecord[],
   }
 }
 
@@ -736,8 +771,20 @@ function getCardStatus(profile?: {
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
-  const { profiles, roles, guardians, athletes, categories, teams, seasons, consents, payments, sponsors, news } =
-    await getAdminCollections()
+  const {
+    profiles,
+    roles,
+    guardians,
+    athletes,
+    categories,
+    teams,
+    seasons,
+    consents,
+    payments,
+    sponsors,
+    news,
+    financeMovements,
+  } = await getAdminCollections()
 
   const guardianById = createGuardianNameLookup(guardians)
   const profileById = new Map(
@@ -854,6 +901,23 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     })
   }
 
+  const paidPaymentsTotalCents = payments
+    .filter((payment) => payment.status === 'paid')
+    .reduce((sum, payment) => sum + payment.amount_cents, 0)
+  const confirmedIncomeMovementsCents = financeMovements
+    .filter((movement) => movement.movement_type === 'income' && movement.status === 'confirmed')
+    .reduce((sum, movement) => sum + movement.amount_cents, 0)
+  const confirmedExpenseMovementsCents = financeMovements
+    .filter((movement) => movement.movement_type === 'expense' && movement.status === 'confirmed')
+    .reduce((sum, movement) => sum + movement.amount_cents, 0)
+  const ingresosTotales = (paidPaymentsTotalCents + confirmedIncomeMovementsCents) / 100
+  const gastosTotales = confirmedExpenseMovementsCents / 100
+  const finance: AdminFinanceSummary = {
+    ingresosTotales,
+    gastosTotales,
+    balance: ingresosTotales - gastosTotales,
+  }
+
   const recentPayments = payments
     .filter((payment) => payment.status === 'paid')
     .slice(0, 5)
@@ -875,6 +939,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   return {
     summary,
+    finance,
     athletesByCategory: Array.from(athletesByCategoryMap.entries())
       .map(([label, total]) => ({ label, total }))
       .sort((a, b) => a.label.localeCompare(b.label, 'es')),
@@ -1092,6 +1157,8 @@ export async function getAdminCategories(): Promise<AdminCategoryRow[]> {
       nombre: category.name,
       orden: category.sort_order,
       estado: (category.is_active ? 'Activa' : 'Borrador') as AdminCategoryRow['estado'],
+      importeMatricula:
+        typeof category.enrollment_fee_cents === 'number' ? category.enrollment_fee_cents / 100 : null,
     }))
     .sort((a, b) => a.orden - b.orden)
 }
@@ -1688,9 +1755,17 @@ export async function getAdminSeasons(): Promise<AdminSeasonRow[]> {
 }
 
 export async function getAdminEnrollments(): Promise<AdminEnrollmentRow[]> {
-  const { payments } = await getAdminCollections()
+  const { payments, categories } = await getAdminCollections()
   const settings = await getAdminSettings()
   const latestEnrollmentPaymentByAthlete = createLatestEnrollmentPaymentByAthlete(payments)
+  const enrollmentFeeByCategoryId = new Map(
+    categories.map((category) => [
+      category.id,
+      typeof category.enrollment_fee_cents === 'number'
+        ? category.enrollment_fee_cents / 100
+        : null,
+    ]),
+  )
 
   const athleteRows = await getAdminAthletes()
   return athleteRows.map((athlete) => ({
@@ -1704,8 +1779,70 @@ export async function getAdminEnrollments(): Promise<AdminEnrollmentRow[]> {
       latestEnrollmentPaymentByAthlete.get(athlete.id)?.status === 'paid'
         ? 'Pagado'
         : 'Pendiente',
-    importe: settings.enrollmentFeeEuros,
+    importe: enrollmentFeeByCategoryId.get(athlete.categoriaSolicitadaId) ?? settings.enrollmentFeeEuros,
   }))
+}
+
+export type AdminPaymentReceiptData = {
+  id: string
+  concepto: string
+  importe: number
+  currency: string
+  estado: AdminPaymentRow['estado']
+  proveedor: AdminPaymentRow['proveedor']
+  fecha: string
+  tutorNombre: string
+  tutorNif: string
+  deportistaNombre: string | null
+  temporadaNombre: string | null
+  settings: AdminSettings
+}
+
+export async function getAdminPaymentReceiptData(paymentId: string): Promise<AdminPaymentReceiptData | null> {
+  const supabase = await createClient()
+  const { data: payment, error } = await supabase
+    .from('payments')
+    .select(
+      'id, user_id, guardian_id, athlete_id, season_id, payment_type, provider, status, amount_cents, currency, description, paid_at, created_at',
+    )
+    .eq('id', paymentId)
+    .maybeSingle()
+
+  if (error || !payment) return null
+
+  const [{ data: guardian }, { data: athlete }, { data: season }, { data: profile }, settings] = await Promise.all([
+    payment.guardian_id
+      ? supabase.from('guardians').select('first_name, last_name, document_id').eq('id', payment.guardian_id).maybeSingle()
+      : Promise.resolve({ data: null as { first_name: string; last_name: string; document_id: string } | null }),
+    payment.athlete_id
+      ? supabase.from('athletes').select('first_name, last_name').eq('id', payment.athlete_id).maybeSingle()
+      : Promise.resolve({ data: null as { first_name: string; last_name: string } | null }),
+    payment.season_id
+      ? supabase.from('seasons').select('name').eq('id', payment.season_id).maybeSingle()
+      : Promise.resolve({ data: null as { name: string } | null }),
+    supabase.from('profiles').select('first_name, last_name, email').eq('id', payment.user_id).maybeSingle(),
+    getAdminSettings(),
+  ])
+
+  const tutorNombre = guardian
+    ? `${guardian.first_name} ${guardian.last_name}`.trim()
+    : `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || profile?.email || 'Usuario no disponible'
+
+  return {
+    id: payment.id,
+    concepto:
+      payment.payment_type === 'membership' ? 'Cuota de socio' : payment.description || 'Matrícula inicial',
+    importe: payment.amount_cents / 100,
+    currency: payment.currency ?? 'eur',
+    estado: mapPaymentStatusLabel(payment.status),
+    proveedor: mapPaymentProviderLabel(payment.provider),
+    fecha: formatSpanishDate(payment.paid_at ?? payment.created_at),
+    tutorNombre,
+    tutorNif: guardian?.document_id ?? '',
+    deportistaNombre: athlete ? `${athlete.first_name} ${athlete.last_name}`.trim() : null,
+    temporadaNombre: season?.name ?? null,
+    settings,
+  }
 }
 
 export async function getAdminPayments(): Promise<AdminPaymentRow[]> {
@@ -1741,16 +1878,18 @@ export async function getAdminPayments(): Promise<AdminPaymentRow[]> {
 
 export async function getAdminFinanceMovements(): Promise<AdminFinanceMovementRow[]> {
   const supabase = await createClient()
-  const [{ data }, { data: seasons }] = await Promise.all([
+  const [{ data }, { data: seasons }, { data: vendors }] = await Promise.all([
     supabase
     .from('admin_finance_movements')
-      .select('id, movement_type, concept, detail, category, payment_method, status, season_id, receipt_url, amount_cents, recorded_at')
+      .select('id, movement_type, concept, detail, category, payment_method, status, season_id, receipt_url, vendor_id, amount_cents, recorded_at')
     .order('recorded_at', { ascending: false })
       .order('created_at', { ascending: false }),
     supabase.from('seasons').select('id, name'),
+    supabase.from('finance_vendors').select('id, name'),
   ])
 
   const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const vendorById = new Map((vendors ?? []).map((vendor) => [vendor.id, vendor.name]))
 
   return ((data ?? []) as AdminFinanceMovementRecord[]).map((movement) => ({
     id: movement.id,
@@ -1763,9 +1902,142 @@ export async function getAdminFinanceMovements(): Promise<AdminFinanceMovementRo
     seasonId: movement.season_id,
     temporada: movement.season_id ? seasonById.get(movement.season_id) ?? 'Temporada no disponible' : 'Sin temporada',
     justificanteUrl: movement.receipt_url ?? '',
+    vendorId: movement.vendor_id,
+    vendorName: movement.vendor_id ? vendorById.get(movement.vendor_id) ?? 'Proveedor no disponible' : '',
     importe: movement.amount_cents / 100,
     fecha: formatSpanishDateTime(movement.recorded_at),
   }))
+}
+
+export async function getAdminVendors(): Promise<AdminVendorRow[]> {
+  const supabase = await createClient()
+  const [{ data: vendors }, { data: movements }] = await Promise.all([
+    supabase
+      .from('finance_vendors')
+      .select('id, name, tax_id, contact_name, contact_email, contact_phone, notes, is_active')
+      .order('name', { ascending: true }),
+    supabase.from('admin_finance_movements').select('vendor_id, amount_cents').not('vendor_id', 'is', null),
+  ])
+
+  const expensesByVendor = new Map<string, { count: number; total: number }>()
+  for (const movement of movements ?? []) {
+    if (!movement.vendor_id) continue
+    const current = expensesByVendor.get(movement.vendor_id) ?? { count: 0, total: 0 }
+    current.count += 1
+    current.total += movement.amount_cents
+    expensesByVendor.set(movement.vendor_id, current)
+  }
+
+  return (vendors ?? []).map((vendor) => ({
+    id: vendor.id,
+    nombre: vendor.name,
+    cif: vendor.tax_id ?? '',
+    contactoNombre: vendor.contact_name ?? '',
+    contactoEmail: vendor.contact_email ?? '',
+    contactoTelefono: vendor.contact_phone ?? '',
+    notas: vendor.notes ?? '',
+    activo: vendor.is_active,
+    gastosCount: expensesByVendor.get(vendor.id)?.count ?? 0,
+    gastosTotal: (expensesByVendor.get(vendor.id)?.total ?? 0) / 100,
+  }))
+}
+
+export type AdminBankTransactionRow = {
+  id: string
+  fecha: string
+  descripcion: string
+  importe: number
+  estado: 'unmatched' | 'matched' | 'ignored'
+  matchedMovementId: string | null
+  matchedMovementConcepto: string | null
+  matchedPaymentId: string | null
+  matchedPaymentConcepto: string | null
+}
+
+export async function getAdminBankTransactions(): Promise<AdminBankTransactionRow[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('bank_transactions')
+    .select(
+      'id, transaction_date, description, amount_cents, status, matched_movement_id, matched_payment_id',
+    )
+    .order('transaction_date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  const rows = data ?? []
+  const movementIds = rows.map((row) => row.matched_movement_id).filter((id): id is string => Boolean(id))
+  const paymentIds = rows.map((row) => row.matched_payment_id).filter((id): id is string => Boolean(id))
+
+  const [{ data: movements }, { data: payments }] = await Promise.all([
+    movementIds.length
+      ? supabase.from('admin_finance_movements').select('id, concept').in('id', movementIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; concept: string }> }),
+    paymentIds.length
+      ? supabase.from('payments').select('id, description').in('id', paymentIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; description: string }> }),
+  ])
+
+  const movementById = new Map((movements ?? []).map((movement) => [movement.id, movement.concept]))
+  const paymentById = new Map((payments ?? []).map((payment) => [payment.id, payment.description]))
+
+  return rows.map((row) => ({
+    id: row.id,
+    fecha: formatSpanishDate(row.transaction_date),
+    descripcion: row.description,
+    importe: row.amount_cents / 100,
+    estado: row.status,
+    matchedMovementId: row.matched_movement_id,
+    matchedMovementConcepto: row.matched_movement_id ? movementById.get(row.matched_movement_id) ?? null : null,
+    matchedPaymentId: row.matched_payment_id,
+    matchedPaymentConcepto: row.matched_payment_id ? paymentById.get(row.matched_payment_id) ?? null : null,
+  }))
+}
+
+export type AdminBudgetRow = {
+  id: string
+  seasonId: string
+  temporada: string
+  tipo: 'ingreso' | 'gasto'
+  categoria: string
+  presupuesto: number
+  real: number
+}
+
+export async function getAdminBudgets(): Promise<AdminBudgetRow[]> {
+  const supabase = await createClient()
+  const [{ data: budgets }, { data: seasons }, { data: movements }] = await Promise.all([
+    supabase
+      .from('finance_budgets')
+      .select('id, season_id, movement_type, category, budgeted_amount_cents'),
+    supabase.from('seasons').select('id, name'),
+    supabase
+      .from('admin_finance_movements')
+      .select('season_id, movement_type, category, amount_cents, status')
+      .eq('status', 'confirmed'),
+  ])
+
+  const seasonById = new Map((seasons ?? []).map((season) => [season.id, season.name]))
+  const actualByKey = new Map<string, number>()
+  for (const movement of movements ?? []) {
+    if (!movement.season_id || !movement.category) continue
+    const key = `${movement.season_id}::${movement.movement_type}::${movement.category}`
+    actualByKey.set(key, (actualByKey.get(key) ?? 0) + movement.amount_cents)
+  }
+
+  return (budgets ?? [])
+    .map((budget) => {
+      const key = `${budget.season_id}::${budget.movement_type}::${budget.category}`
+      return {
+        id: budget.id,
+        seasonId: budget.season_id,
+        temporada: seasonById.get(budget.season_id) ?? 'Temporada no disponible',
+        tipo: (budget.movement_type === 'income' ? 'ingreso' : 'gasto') as AdminBudgetRow['tipo'],
+        categoria: budget.category,
+        presupuesto: budget.budgeted_amount_cents / 100,
+        real: (actualByKey.get(key) ?? 0) / 100,
+      }
+    })
+    .sort((a, b) => a.temporada.localeCompare(b.temporada, 'es') || a.categoria.localeCompare(b.categoria, 'es'))
 }
 
 export async function getAdminFeeTemplates(): Promise<AdminFeeTemplateRow[]> {
@@ -1952,6 +2224,9 @@ export async function getAdminSettings(): Promise<AdminSettings> {
     registrationOpen: true,
     contactEmail: '',
     contactPhone: '',
+    clubTaxId: '',
+    clubFiscalAddress: '',
+    clubRegistryNumber: '',
   }
 
   const supabase = await createClient()
@@ -1974,6 +2249,9 @@ export async function getAdminSettings(): Promise<AdminSettings> {
     registrationOpen: (settings.get('registration_open') ?? String(fallback.registrationOpen)) === 'true',
     contactEmail: settings.get('contact_email') || '',
     contactPhone: settings.get('contact_phone') || '',
+    clubTaxId: settings.get('club_tax_id') || '',
+    clubFiscalAddress: settings.get('club_fiscal_address') || '',
+    clubRegistryNumber: settings.get('club_registry_number') || '',
   }
 }
 

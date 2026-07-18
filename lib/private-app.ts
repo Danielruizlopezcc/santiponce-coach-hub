@@ -30,6 +30,7 @@ type PrivateCollections = {
   guardianApprovalStatus: 'pending' | 'approved' | 'rejected' | null
   activeSeasonLabel: string
   categoriesById: Map<string, string>
+  categoryEnrollmentFeeCentsById: Map<string, number | null>
   teamsById: Map<string, string>
   seasonsById: Map<string, string>
 }
@@ -107,7 +108,7 @@ async function getPrivateCollections(userId: string): Promise<PrivateCollections
     await Promise.all([
       supabase.from('seasons').select('id, name').eq('is_active', true).maybeSingle(),
       supabase.from('guardians').select('id, is_approved, approval_status').eq('user_id', userId).maybeSingle(),
-      supabase.from('categories').select('id, name'),
+      supabase.from('categories').select('id, name, enrollment_fee_cents'),
       supabase.from('teams').select('id, name'),
       supabase.from('seasons').select('id, name'),
     ])
@@ -118,9 +119,21 @@ async function getPrivateCollections(userId: string): Promise<PrivateCollections
     guardianApprovalStatus: (guardian?.approval_status ?? null) as PrivateCollections['guardianApprovalStatus'],
     activeSeasonLabel: activeSeason?.name ?? CLUB.season,
     categoriesById: new Map((categories ?? []).map((category) => [category.id, category.name])),
+    categoryEnrollmentFeeCentsById: new Map(
+      (categories ?? []).map((category) => [category.id, category.enrollment_fee_cents ?? null]),
+    ),
     teamsById: new Map((teams ?? []).map((team) => [team.id, team.name])),
     seasonsById: new Map((seasons ?? []).map((season) => [season.id, season.name])),
   }
+}
+
+function getEnrollmentEurosForCategory(
+  collections: PrivateCollections,
+  categoryId: string,
+  fallbackEuros: number,
+) {
+  const overrideCents = collections.categoryEnrollmentFeeCentsById.get(categoryId)
+  return typeof overrideCents === 'number' ? overrideCents / 100 : fallbackEuros
 }
 
 export async function getPrivateUserStatus(userId: string): Promise<PrivateUserStatus> {
@@ -199,6 +212,7 @@ export async function getPrivateDashboardData(
         ? collections.teamsById.get(athlete.assigned_team_id) ?? 'Equipo pendiente'
         : null,
       estado: getAthleteDisplayStatus(athlete.status, paymentByAthlete.get(athlete.id)),
+      importeMatricula: getEnrollmentEurosForCategory(collections, athlete.requested_category_id, MATRICULA_IMPORTE),
     })),
     hasGuardian: true,
     isGuardianApproved: collections.isGuardianApproved,
@@ -297,6 +311,7 @@ export async function getPrivateAthletes(userId: string): Promise<PrivateAthlete
       athlete.status === 'matriculado' || paymentByAthlete.get(athlete.id) === 'paid'
         ? 'pagado'
         : 'pendiente',
+    importeMatricula: getEnrollmentEurosForCategory(collections, athlete.requested_category_id, MATRICULA_IMPORTE),
   }))
 }
 

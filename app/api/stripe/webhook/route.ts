@@ -1,13 +1,14 @@
 import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { confirmStripeSetupSessionPaymentMethod } from '@/lib/payment-method-confirmation'
-import { confirmStripeCheckoutSessionPayment } from '@/lib/payment-confirmation'
+import { confirmStripeChargeRefunded, confirmStripeCheckoutSessionPayment } from '@/lib/payment-confirmation'
 import { completePendingRegistration } from '@/app/registro/actions'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripeClient, getStripeWebhookSecret } from '@/lib/stripe'
 import {
   confirmTutorFeeInvoiceFailed,
   confirmTutorFeeInvoicePaid,
+  handleTutorFeeSubscriptionDeleted,
   syncTutorFeeSubscription,
 } from '@/lib/tutor-fee-billing'
 
@@ -85,6 +86,17 @@ export async function POST(request: Request) {
   if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
     await syncTutorFeeSubscription(event.data.object)
     revalidatePath('/admin/tutores')
+    revalidatePath('/admin/pagos')
+  }
+
+  if (event.type === 'customer.subscription.deleted') {
+    await handleTutorFeeSubscriptionDeleted(event.data.object)
+    revalidatePath('/admin/tutores')
+    revalidatePath('/admin/pagos')
+  }
+
+  if (event.type === 'charge.refunded') {
+    await confirmStripeChargeRefunded(event.data.object)
     revalidatePath('/admin/pagos')
   }
 

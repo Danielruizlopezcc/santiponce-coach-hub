@@ -29,6 +29,9 @@ const settingsSchema = z.object({
     .transform((value) => value || '')
     .pipe(z.string().email('Correo no válido.').or(z.literal(''))),
   contactPhone: z.string().trim().max(40, 'El teléfono es demasiado largo.'),
+  clubTaxId: z.string().trim().max(20, 'El CIF/NIF es demasiado largo.'),
+  clubFiscalAddress: z.string().trim().max(200, 'La dirección fiscal es demasiado larga.'),
+  clubRegistryNumber: z.string().trim().max(60, 'El número de registro es demasiado largo.'),
 })
 
 const activeSeasonSchema = z.object({
@@ -54,6 +57,9 @@ export async function updateAdminSettingsAction(
     registrationOpen: formData.get('registrationOpen') === 'on',
     contactEmail: formData.get('contactEmail'),
     contactPhone: formData.get('contactPhone'),
+    clubTaxId: formData.get('clubTaxId'),
+    clubFiscalAddress: formData.get('clubFiscalAddress'),
+    clubRegistryNumber: formData.get('clubRegistryNumber'),
   })
 
   if (!parsed.success) {
@@ -70,6 +76,9 @@ export async function updateAdminSettingsAction(
     { key: 'registration_open', value: String(values.registrationOpen) },
     { key: 'contact_email', value: values.contactEmail },
     { key: 'contact_phone', value: values.contactPhone },
+    { key: 'club_tax_id', value: values.clubTaxId },
+    { key: 'club_fiscal_address', value: values.clubFiscalAddress },
+    { key: 'club_registry_number', value: values.clubRegistryNumber },
   ]
 
   const { error } = await createAdminClient()

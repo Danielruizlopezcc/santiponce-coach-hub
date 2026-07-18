@@ -2,6 +2,7 @@ import 'server-only'
 
 import Stripe from 'stripe'
 import { getAdminSettings } from '@/lib/admin-app'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 function readEnv(name: string) {
   const value = process.env[name]
@@ -31,4 +32,19 @@ export async function getMembershipAmountCents() {
 export async function getEnrollmentAmountCents() {
   const settings = await getAdminSettings()
   return Math.round(settings.enrollmentFeeEuros * 100)
+}
+
+// Falls back to the global fee when the category has no override configured.
+export async function getEnrollmentAmountCentsForCategory(categoryId?: string | null) {
+  const globalCents = await getEnrollmentAmountCents()
+  if (!categoryId) return globalCents
+
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('categories')
+    .select('enrollment_fee_cents')
+    .eq('id', categoryId)
+    .maybeSingle()
+
+  return data?.enrollment_fee_cents ?? globalCents
 }
