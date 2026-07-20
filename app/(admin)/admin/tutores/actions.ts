@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createAdminAuditLog } from '@/lib/audit'
-import { requireAdminAction } from '@/lib/auth'
+import { requireAdminAction, requireSportsAdminAction } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeDocument, normalizeEmail, normalizePhone } from '@/lib/private-app-shared'
 import { getSiteUrl } from '@/lib/stripe'
@@ -108,7 +108,7 @@ async function createAuthProfile(values: z.infer<typeof basePersonSchema>, passw
 }
 
 export async function sendPasswordRecoveryAction(email: string): Promise<TutorSocioActionState> {
-  await requireAdminAction()
+  await requireSportsAdminAction()
   const parsed = z.string().trim().email('Correo no válido.').safeParse(email)
 
   if (!parsed.success) {
@@ -127,7 +127,7 @@ export async function createTutorAction(
   _prev: TutorSocioActionState,
   formData: FormData,
 ): Promise<TutorSocioActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
   const parsed = tutorSchema.safeParse({
     id: formData.get('id') || undefined,
     userId: formData.get('userId') || undefined,
@@ -266,7 +266,7 @@ export async function createMemberAction(
   _prev: TutorSocioActionState,
   formData: FormData,
 ): Promise<TutorSocioActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
   const parsed = memberSchema.safeParse({
     id: formData.get('id') || undefined,
     nombre: formData.get('nombre'),
@@ -332,7 +332,7 @@ export async function createMemberAction(
 }
 
 export async function toggleTutorMemberAction(userId: string, isSocio: boolean): Promise<TutorSocioActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
 
   try {
     await setUserMembership(userId, isSocio)
@@ -352,7 +352,7 @@ export async function toggleTutorMemberAction(userId: string, isSocio: boolean):
 }
 
 export async function approveTutorAction(guardianId: string): Promise<TutorSocioActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
 
   const supabase = createAdminClient()
   const { error } = await supabase
@@ -377,7 +377,7 @@ export async function approveTutorAction(guardianId: string): Promise<TutorSocio
 }
 
 export async function rejectTutorAction(guardianId: string): Promise<TutorSocioActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
 
   const supabase = createAdminClient()
   const { error } = await supabase
@@ -398,7 +398,7 @@ export async function rejectTutorAction(guardianId: string): Promise<TutorSocioA
 }
 
 export async function deleteTutorAction(guardianId: string, userId: string): Promise<TutorSocioActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
   const supabase = createAdminClient()
   const { error } = await supabase.auth.admin.deleteUser(userId)
   if (error) return { ok: false, message: error.message }
@@ -415,7 +415,7 @@ export async function deleteTutorAction(guardianId: string, userId: string): Pro
 }
 
 export async function deleteMemberAction(userId: string): Promise<TutorSocioActionState> {
-  const admin = await requireAdminAction()
+  const admin = await requireSportsAdminAction()
   const supabase = createAdminClient()
   const { error } = await supabase.auth.admin.deleteUser(userId)
   if (error) return { ok: false, message: error.message }

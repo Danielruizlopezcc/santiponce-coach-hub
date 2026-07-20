@@ -42,6 +42,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: 'Calendario', href: '/admin/calendario', icon: Calendar, section: 'sports' },
   { label: 'Estadísticas', href: '/admin/estadisticas', icon: BarChart3, section: 'sports' },
   { label: 'Temporadas', href: '/admin/temporadas', icon: Calendar, section: 'sports' },
+  { label: 'Categorías', href: '/admin/categorias', icon: ListChecks, section: 'sports' },
   { label: 'Tutores legales / Socios', href: '/admin/tutores', icon: UserCheck, section: 'administration' },
   { label: 'Matrículas', href: '/admin/matriculas', icon: ListChecks, section: 'administration' },
   { label: 'Contabilidad', href: '/admin/pagos', icon: CreditCard, section: 'administration' },
@@ -60,6 +61,8 @@ const SPORTS_COORDINATOR_NAV_PATHS = new Set([
   '/admin/calendario',
   '/admin/estadisticas',
   '/admin/temporadas',
+  '/admin/categorias',
+  '/admin/tutores',
 ])
 
 export function getAdminNavForRole(role: 'admin' | 'sports_coordinator') {

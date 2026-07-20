@@ -157,12 +157,6 @@ export function CategoriasClient({ categories, embedded = false, globalEnrollmen
                         {cat.estado === 'Activa' ? 'Disponible' : 'Borrador'}
                       </p>
                     </div>
-                    <div className="rounded-lg bg-emerald-50/70 p-3 ring-1 ring-emerald-100 sm:col-span-2">
-                      <p className="text-xs font-black uppercase text-muted-foreground">Precio de matrícula</p>
-                      <p className="mt-2 text-lg font-black text-foreground">
-                        {cat.importeMatricula != null ? formatEuro(cat.importeMatricula) : 'Precio global'}
-                      </p>
-                    </div>
                   </div>
 
                   <div className="mt-4 border-t border-border pt-3">

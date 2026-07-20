@@ -38,7 +38,7 @@ export function AdminNav({ onNavigate, role }: AdminNavProps) {
       <div className="admin-sidebar-scroll min-h-0 flex-1 overflow-y-auto pr-1">
         <div className="grid gap-4">
           {groupedNav.map((section) => {
-            const isCollapsible = section.items.length > 1
+            const isCollapsible = section.items.length > 0
             const isOpen = !isCollapsible || openSections[section.id]
 
             return (
